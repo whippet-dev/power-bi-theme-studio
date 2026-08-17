@@ -5,6 +5,7 @@ type RailEntry = { id: VisualKind; label: string; monogram: string };
 const RAIL_VISUALS: RailEntry[] = [
   { id: "card", label: "Card", monogram: "C" },
   { id: "bar", label: "Bar chart", monogram: "B" },
+  { id: "column", label: "Column chart", monogram: "Co" },
   { id: "line", label: "Line chart", monogram: "L" },
   { id: "table", label: "Table", monogram: "T" },
   { id: "slicer", label: "Slicer", monogram: "S" },

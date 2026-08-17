@@ -4,6 +4,8 @@ import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import { CARD_PROPERTIES, propertyThemePath as cardPropertyThemePath } from "../lib/cardProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import { COLUMN_CHART_PROPERTIES, propertyThemePath as columnChartPropertyThemePath } from "../lib/columnChartProperties";
+import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
@@ -23,6 +25,7 @@ type PropertyEditorProps = {
   resolved: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  columnChartStyle: ResolvedColumnChartStyle;
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
@@ -37,6 +40,7 @@ type PropertyEditorProps = {
 const visualNames: Record<VisualKind, string> = {
   card: "Card",
   bar: "Clustered bar chart",
+  column: "Clustered column chart",
   line: "Line chart",
   table: "Table",
   slicer: "Slicer",
@@ -57,6 +61,26 @@ const BAR_CHART_GROUP_LABELS: Record<keyof typeof BAR_CHART_PROPERTIES, string> 
   dataPoint: "Data colors",
   categoryAxis: "Y axis",
   valueAxis: "X axis",
+  legend: "Legend",
+  labels: "Data labels",
+  plotArea: "Plot area",
+  error: "Error bars",
+  trend: "Trend line",
+  referenceLine: "Constant line",
+  xAxisReferenceLine: "X-Axis constant line",
+  y1AxisReferenceLine: "Y-Axis constant line",
+  zoom: "Zoom slider",
+  smallMultiplesLayout: "Small multiples grid",
+  subheader: "Small multiple title",
+};
+
+// Column chart's schema is byte-identical to Bar chart's, but it's a
+// vertical layout — category renders on the X axis and value on the Y axis,
+// the opposite of Bar chart's horizontal layout, matching Power BI's own UI.
+const COLUMN_CHART_GROUP_LABELS: Record<keyof typeof COLUMN_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  categoryAxis: "X axis",
+  valueAxis: "Y axis",
   legend: "Legend",
   labels: "Data labels",
   plotArea: "Plot area",
@@ -406,6 +430,7 @@ const TYPOGRAPHY_ID = "typography";
 const CHROME_ID_PREFIX = "chrome:";
 const TABLE_ID_PREFIX = "table:";
 const BAR_CHART_ID_PREFIX = "bar:";
+const COLUMN_CHART_ID_PREFIX = "column:";
 const LINE_CHART_ID_PREFIX = "line:";
 const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
@@ -415,6 +440,7 @@ export function PropertyEditor({
   resolved,
   tableStyle,
   barChartStyle,
+  columnChartStyle,
   lineChartStyle,
   cardStyle,
   slicerStyle,
@@ -477,6 +503,13 @@ export function PropertyEditor({
           id: `${BAR_CHART_ID_PREFIX}${key}`,
           title: BAR_CHART_GROUP_LABELS[key],
           count: Object.keys(BAR_CHART_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "column"
+      ? (Object.keys(COLUMN_CHART_PROPERTIES) as Array<keyof typeof COLUMN_CHART_PROPERTIES>).map((key) => ({
+          id: `${COLUMN_CHART_ID_PREFIX}${key}`,
+          title: COLUMN_CHART_GROUP_LABELS[key],
+          count: Object.keys(COLUMN_CHART_PROPERTIES[key]).length,
         }))
       : []),
     ...(selected === "line"
@@ -624,6 +657,21 @@ export function PropertyEditor({
           groupValues={barChartStyle[key]}
           pathPrefix="visualStyles.clusteredBarChart.*"
           getThemePath={barChartPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(COLUMN_CHART_ID_PREFIX)) {
+      const key = id.slice(COLUMN_CHART_ID_PREFIX.length) as keyof typeof COLUMN_CHART_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={COLUMN_CHART_PROPERTIES[key]}
+          groupValues={columnChartStyle[key]}
+          pathPrefix="visualStyles.clusteredColumnChart.*"
+          getThemePath={columnChartPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />

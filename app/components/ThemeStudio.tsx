@@ -14,6 +14,7 @@ import {
 import { resolveBarChartStyle } from "../lib/barChartProperties";
 import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import { resolveColumnChartStyle } from "../lib/columnChartProperties";
 import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import type { VisualSchemaKey } from "../lib/properties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
@@ -27,12 +28,13 @@ import { VisualRail } from "./VisualRail";
 const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   card: "card",
   bar: "clusteredBarChart",
+  column: "clusteredColumnChart",
   line: "lineChart",
   table: "tableEx",
   slicer: "slicer",
 };
 
-const ALL_VISUALS: VisualKind[] = ["card", "bar", "line", "table", "slicer"];
+const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "line", "table", "slicer"];
 
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
@@ -40,6 +42,7 @@ export function ThemeStudio() {
   const [visibility, setVisibility] = useState<Record<VisualKind, boolean>>({
     card: true,
     bar: true,
+    column: true,
     line: true,
     table: true,
     slicer: true,
@@ -50,6 +53,7 @@ export function ThemeStudio() {
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
   const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
+  const columnChartStyle = useMemo(() => resolveColumnChartStyle(theme, resolved), [theme, resolved]);
   const lineChartStyle = useMemo(() => resolveLineChartStyle(theme, resolved), [theme, resolved]);
   const cardStyle = useMemo(() => resolveCardStyle(theme, resolved), [theme, resolved]);
   const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
@@ -57,6 +61,7 @@ export function ThemeStudio() {
     () => ({
       card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
       bar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bar, resolved),
+      column: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.column, resolved),
       line: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.line, resolved),
       table: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.table, resolved),
       slicer: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.slicer, resolved),
@@ -203,6 +208,7 @@ export function ThemeStudio() {
             theme={resolved}
             tableStyle={tableStyle}
             barChartStyle={barChartStyle}
+            columnChartStyle={columnChartStyle}
             lineChartStyle={lineChartStyle}
             cardStyle={cardStyle}
             slicerStyle={slicerStyle}
@@ -218,6 +224,7 @@ export function ThemeStudio() {
           resolved={resolved}
           tableStyle={tableStyle}
           barChartStyle={barChartStyle}
+          columnChartStyle={columnChartStyle}
           lineChartStyle={lineChartStyle}
           cardStyle={cardStyle}
           slicerStyle={slicerStyle}

@@ -2,17 +2,19 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
+import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "line" | "table" | "slicer";
+export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  columnChartStyle: ResolvedColumnChartStyle;
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
@@ -167,6 +169,7 @@ export function VisualGallery({
   theme,
   tableStyle,
   barChartStyle,
+  columnChartStyle,
   lineChartStyle,
   cardStyle,
   slicerStyle,
@@ -388,6 +391,174 @@ export function VisualGallery({
         </span>
       )}
       {legendAtBottom && legendNode}
+    </span>
+  );
+
+  const columnLegendNode = columnChartStyle.legend.show && (
+    <span className="chart-preview__legend">
+      <span className="chart-preview__legend-swatch" style={{ backgroundColor: columnChartStyle.dataPoint.fill }} />
+      <span
+        style={{
+          color: columnChartStyle.legend.labelColor,
+          fontFamily: columnChartStyle.legend.fontFamily,
+          fontSize: columnChartStyle.legend.fontSize,
+          fontWeight: columnChartStyle.legend.bold ? 700 : 400,
+          fontStyle: columnChartStyle.legend.italic ? "italic" : "normal",
+          textDecoration: columnChartStyle.legend.underline ? "underline" : "none",
+        }}
+      >
+        Applications
+      </span>
+    </span>
+  );
+  const columnLegendAtBottom = String(columnChartStyle.legend.position).startsWith("Bottom");
+
+  const columnContent = (
+    <span className="chart-preview" style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100 }}>
+      {!columnLegendAtBottom && columnLegendNode}
+      {columnChartStyle.valueAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title chart-preview__axis-title--value"
+          style={{
+            color: columnChartStyle.valueAxis.titleColor,
+            fontFamily: columnChartStyle.valueAxis.titleFontFamily,
+            fontSize: columnChartStyle.valueAxis.titleFontSize,
+            fontWeight: columnChartStyle.valueAxis.titleBold ? 700 : 400,
+            fontStyle: columnChartStyle.valueAxis.titleItalic ? "italic" : "normal",
+            textDecoration: columnChartStyle.valueAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(columnChartStyle.valueAxis.titleText) || "Applications (k)"}
+        </span>
+      )}
+      <span
+        className="column-preview__plot"
+        style={{
+          ...(columnChartStyle.valueAxis.gridlineShow
+            ? {
+                backgroundImage: `repeating-linear-gradient(to top, ${columnChartStyle.valueAxis.gridlineColor} 0, ${columnChartStyle.valueAxis.gridlineColor} ${columnChartStyle.valueAxis.gridlineThickness}px, transparent ${columnChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
+              }
+            : {}),
+        }}
+      >
+        {columnChartStyle.referenceLine.show && (
+          <span
+            className="column-preview__reference-line"
+            aria-hidden="true"
+            style={{
+              top: "22%",
+              borderTopWidth: columnChartStyle.referenceLine.width,
+              borderTopColor: columnChartStyle.referenceLine.lineColor,
+              borderTopStyle: mapLineStyle(columnChartStyle.referenceLine.style),
+              opacity: 1 - columnChartStyle.referenceLine.transparency / 100,
+            }}
+          />
+        )}
+        {columnChartStyle.trend.show && (
+          <span
+            className="chart-preview__trend-line"
+            aria-hidden="true"
+            style={{
+              borderTopWidth: columnChartStyle.trend.width,
+              borderTopColor: columnChartStyle.trend.lineColor,
+              borderTopStyle: mapLineStyle(columnChartStyle.trend.style),
+              opacity: 1 - columnChartStyle.trend.transparency / 100,
+            }}
+          />
+        )}
+        <span className="column-preview__columns">
+          {[
+            ["London", 82],
+            ["North West", 66],
+            ["Scotland", 51],
+            ["Wales", 38],
+          ].map(([label, value], index) => (
+            <span className="column-item" key={label}>
+              {columnChartStyle.labels.show && (
+                <span
+                  className="column-item__value"
+                  style={{
+                    color: columnChartStyle.labels.color,
+                    fontFamily: columnChartStyle.labels.fontFamily,
+                    fontSize: columnChartStyle.labels.fontSize,
+                    fontWeight: columnChartStyle.labels.bold ? 700 : 400,
+                    fontStyle: columnChartStyle.labels.italic ? "italic" : "normal",
+                    textDecoration: columnChartStyle.labels.underline ? "underline" : "none",
+                    backgroundColor: columnChartStyle.labels.enableBackground
+                      ? hexWithAlpha(columnChartStyle.labels.backgroundColor, columnChartStyle.labels.backgroundTransparency)
+                      : undefined,
+                    padding: columnChartStyle.labels.enableBackground ? "1px 4px" : undefined,
+                    borderRadius: columnChartStyle.labels.enableBackground ? 3 : undefined,
+                  }}
+                >
+                  {value}k
+                </span>
+              )}
+              <span className="column-item__track-wrap">
+                <span className="column-item__track">
+                  <span
+                    className="column-item__fill"
+                    style={{
+                      height: `${value}%`,
+                      backgroundColor: hexWithAlpha(columnChartStyle.dataPoint.fill, columnChartStyle.dataPoint.fillTransparency),
+                      border: columnChartStyle.dataPoint.borderShow
+                        ? `${columnChartStyle.dataPoint.borderSize}px solid ${columnChartStyle.dataPoint.borderColor}`
+                        : undefined,
+                    }}
+                  />
+                </span>
+                {index === 0 && columnChartStyle.error.enabled && columnChartStyle.error.barShow && (
+                  <span
+                    className="column-item__error"
+                    aria-hidden="true"
+                    title="Error bars are enabled — representative indicator, not a data-fit range"
+                    style={{ bottom: `${value}%` }}
+                  >
+                    <span
+                      style={{
+                        width: `${columnChartStyle.error.barWidth}px`,
+                        backgroundColor: columnChartStyle.error.barColor,
+                        border: `${columnChartStyle.error.barBorderSize}px solid ${columnChartStyle.error.barBorderColor}`,
+                      }}
+                    />
+                  </span>
+                )}
+              </span>
+              {columnChartStyle.categoryAxis.show && (
+                <span
+                  className="column-item__label"
+                  style={{
+                    color: columnChartStyle.categoryAxis.labelColor,
+                    fontFamily: columnChartStyle.categoryAxis.fontFamily,
+                    fontSize: columnChartStyle.categoryAxis.fontSize,
+                    fontWeight: columnChartStyle.categoryAxis.bold ? 700 : 400,
+                    fontStyle: columnChartStyle.categoryAxis.italic ? "italic" : "normal",
+                    textDecoration: columnChartStyle.categoryAxis.underline ? "underline" : "none",
+                  }}
+                >
+                  {label}
+                </span>
+              )}
+            </span>
+          ))}
+        </span>
+      </span>
+      {columnChartStyle.categoryAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title"
+          style={{
+            color: columnChartStyle.categoryAxis.titleColor,
+            fontFamily: columnChartStyle.categoryAxis.titleFontFamily,
+            fontSize: columnChartStyle.categoryAxis.titleFontSize,
+            fontWeight: columnChartStyle.categoryAxis.titleBold ? 700 : 400,
+            fontStyle: columnChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
+            textDecoration: columnChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(columnChartStyle.categoryAxis.titleText) || "Region"}
+        </span>
+      )}
+      {columnLegendAtBottom && columnLegendNode}
     </span>
   );
 
@@ -745,6 +916,7 @@ export function VisualGallery({
   }> = [
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
     { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barContent },
+    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnContent },
     { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
