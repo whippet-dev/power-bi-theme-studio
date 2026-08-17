@@ -30,6 +30,7 @@ import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties"
 import { PIE_CHART_PROPERTIES, propertyThemePath as pieChartPropertyThemePath } from "../lib/pieChartProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
+import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
 import { propertyThemePath as shapePropertyThemePath, SHAPE_PROPERTIES } from "../lib/shapeProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
@@ -499,9 +500,50 @@ function PropertyRow({
           <div className="info-toggle__panel">
             <p>{definition.description}</p>
             {definition.guidance && <p className="info-toggle__guidance">{definition.guidance}</p>}
+            <EffectDemo definition={definition} value={value} />
             <code>{`${pathPrefix} → ${definition.path.join(" → ")}`}</code>
           </div>
         </details>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A before/after demo for settings the main preview can't show — format
+ * strings, blank handling, resize behaviour, log scales. Each state the
+ * property can take is drawn with a sample of the affected element, and
+ * the active one is highlighted.
+ *
+ * Lives inside the ⓘ panel rather than the property row itself: these
+ * rows are already dense, and a demo on every applicable row would undo
+ * that. It costs nothing until someone asks what a setting does.
+ */
+function EffectDemo({
+  definition,
+  value,
+}: {
+  definition: PropertyDefinition<PropertyValueType>;
+  value: PropertyValue;
+}) {
+  // The group is the first path segment — ["labels", 0, "showBlankAs"].
+  const group = String(definition.path[0] ?? "");
+  const prop = String(definition.path[definition.path.length - 1] ?? "");
+  const effect = propertyEffect(group, prop);
+  if (!effect) return null;
+
+  const activeIndex = activeEffectState(effect, value);
+
+  return (
+    <div className="effect-demo">
+      <span className="effect-demo__caption">{effect.caption}</span>
+      <div className="effect-demo__states">
+        {effect.states.map((state, index) => (
+          <span className={`effect-demo__state${index === activeIndex ? " is-active" : ""}`} key={state.label}>
+            <span className="effect-demo__state-label">{state.label}</span>
+            <span className="effect-demo__sample">{state.sample || "—"}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
