@@ -110,6 +110,22 @@ test("visualLink.dataFunction ($ref itemLocation, a complex workspace/item refer
   assert.equal("height" in CHROME_PROPERTIES.general, false);
 });
 
+test("a feature that is on by default is never sized to zero, so it can't render invisibly", () => {
+  const base = resolveTheme(STARTER_THEME);
+  const chrome = resolveChromeStyle(STARTER_THEME, "clusteredBarChart", base);
+
+  // Regression guard for a bug that has now recurred three times (Line
+  // chart's stroke width, Bar chart's error-bar width, the divider): a
+  // thickness defaulting to 0 makes an otherwise-enabled feature render
+  // as nothing at all, which reads as "the setting is broken".
+  assert.ok(chrome.divider.width > 0, "divider width must be visible when the divider is switched on");
+  assert.ok(chrome.border.width > 0, "border width must be visible when the border is switched on");
+  assert.ok(chrome.title.fontSize > 0);
+  assert.ok(chrome.subTitle.fontSize > 0);
+  assert.ok(chrome.visualTooltip.fontSize > 0);
+  assert.ok(chrome.visualHeaderTooltip.fontSize > 0);
+});
+
 test("every resolved CHROME_PROPERTIES path is unique (no accidental JSON collisions)", () => {
   const seen = new Set<string>();
   for (const group of Object.values(CHROME_PROPERTIES)) {

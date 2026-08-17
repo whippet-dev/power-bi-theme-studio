@@ -1313,7 +1313,11 @@ export function resolveChromeStyle(
       divider: {
       show: resolveChromeValue(theme, activeVisual, p.divider.show, false),
       color: resolveChromeValue(theme, activeVisual, p.divider.color, "#E3E3E3"),
-      width: resolveChromeValue(theme, activeVisual, p.divider.width, 0),
+      // A divider that's switched on but 0px wide is invisible — same
+      // class of bug as the compound `*Width` fallbacks that defaulted to
+      // 0. Any "thickness of a thing that is otherwise on" needs a
+      // non-zero default.
+      width: resolveChromeValue(theme, activeVisual, p.divider.width, 1),
       style: resolveChromeValue(theme, activeVisual, p.divider.style, "solid"),
       ignorePadding: resolveChromeValue(theme, activeVisual, p.divider.ignorePadding, false),
     },

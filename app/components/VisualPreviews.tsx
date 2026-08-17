@@ -146,6 +146,87 @@ function shapeTile(style: ResolvedShapeFamilyCore, key: string, extra?: ReactNod
 }
 
 /**
+ * Power BI's display-units enum picks the scale a number is abbreviated to
+ * (0 = auto), and label precision fixes the decimal places. Both are
+ * meaningless unless the preview actually reformats its sample value, so
+ * the Card renders a real formatted number rather than a fixed string.
+ */
+function formatCardValue(
+  value: number,
+  displayUnits: string | number,
+  precision: number,
+  formatString: string,
+): string {
+  const units: Record<string, [number, string]> = {
+    "0": [1, ""], // Auto — the sample value sits in the millions
+    "1": [1, ""], // None
+    "1000": [1e3, "K"],
+    "1000000": [1e6, "M"],
+    "1000000000": [1e9, "bn"],
+    "1000000000000": [1e12, "T"],
+  };
+  const [divisor, suffix] = units[String(displayUnits)] ?? (value >= 1e6 ? [1e6, "M"] : [1, ""]);
+  const auto = String(displayUnits) === "0" && value >= 1e6 ? ([1e6, "M"] as const) : null;
+  const [d, s] = auto ?? [divisor, suffix];
+
+  const scaled = value / d;
+  // Precision 0 with an abbreviated unit still reads better with one
+  // decimal (Power BI's own auto behaviour), so only force 0 when the
+  // user explicitly picked it on an unabbreviated number.
+  const decimals = precision > 0 ? precision : s ? 1 : 0;
+  const body = scaled.toLocaleString("en-GB", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+  // formatString is a full .NET/Power BI format code; the preview only
+  // honours a leading currency symbol, which is the common case.
+  const currency = /^[£$€]/.exec(String(formatString))?.[0] ?? "£";
+  return `${currency}${body}${s}`;
+}
+
+/**
+ * `title.heading` / `subTitle.heading` deliberately change nothing visually
+ * — they set the heading level assistive technology announces. Rendering
+ * them as real ARIA heading semantics is the only faithful way to reflect
+ * them, so the preview matches what the property actually does.
+ */
+function headingAria(heading: string | number): { role?: string; "aria-level"?: number } {
+  const match = /^Heading([2-6])$/.exec(String(heading));
+  if (!match) return {};
+  return { role: "heading", "aria-level": Number(match[1]) };
+}
+
+/**
+ * Describes a visual's configured action, naming the destination where the
+ * action type has one — so switching between Bookmark/Page navigation/Web
+ * URL and setting its target both show up.
+ */
+function visualLinkLabel(link: ResolvedChromeStyle["visualLink"]): string {
+  const type = String(link.type);
+  const named: Record<string, string> = {
+    Back: "Back",
+    Bookmark: "Bookmark",
+    Drillthrough: "Drill through",
+    PageNavigation: "Page navigation",
+    Qna: "Q&A",
+    WebUrl: "Web URL",
+    ApplyAllSlicers: "Apply all slicers",
+    ClearAllSlicers: "Clear all slicers",
+    DataFunction: "Data function",
+  };
+  const destination =
+    type === "Bookmark"
+      ? String(link.bookmark)
+      : type === "Drillthrough"
+        ? String(link.drillthroughSection)
+        : type === "PageNavigation"
+          ? String(link.navigationSection)
+          : type === "WebUrl"
+            ? String(link.webUrl)
+            : "";
+  const base = named[type] ?? type;
+  return destination ? `${base} → ${destination}` : base;
+}
+
+/**
  * Every preview renders its content at the same literal pixel sizes
  * regardless of variant — resolved font sizes are often 8-12px, which
  * reads fine at thumbnail size but is hard to read at a glance. Rather
@@ -166,20 +247,178 @@ function PreviewShell({
   onSelect,
   children,
 }: PreviewShellProps) {
+  // Power BI offsets a drop shadow by an angle + distance unless a named
+  // preset overrides both; "Inner" draws it inside the visual's edge.
+  const shadowOffset = (): { x: number; y: number } => {
+    const presetOffsets: Record<string, [number, number]> = {
+      top: [0, -1],
+      topLeft: [-1, -1],
+      topRight: [1, -1],
+      center: [0, 0],
+      centerLeft: [-1, 0],
+      centerRight: [1, 0],
+      bottom: [0, 1],
+      bottomLeft: [-1, 1],
+      bottomRight: [1, 1],
+      // Power BI's chrome dropShadow group uses PascalCase preset values,
+      // unlike the shape family's lowercase ones — both spellings appear
+      // in the schema, so accept either rather than silently falling
+      // through to the angle branch for one of them.
+      Top: [0, -1],
+      TopLeft: [-1, -1],
+      TopRight: [1, -1],
+      Center: [0, 0],
+      CenterLeft: [-1, 0],
+      CenterRight: [1, 0],
+      Bottom: [0, 1],
+      BottomLeft: [-1, 1],
+      BottomRight: [1, 1],
+    };
+    const preset = presetOffsets[String(chrome.dropShadow.preset)];
+    const distance = chrome.dropShadow.shadowDistance;
+    if (preset) return { x: preset[0] * distance, y: preset[1] * distance };
+    const radians = (chrome.dropShadow.angle * Math.PI) / 180;
+    return { x: Math.cos(radians) * distance, y: Math.sin(radians) * distance };
+  };
+
+  const boxShadow = (() => {
+    if (!chrome.dropShadow.show) return undefined;
+    const { x, y } = shadowOffset();
+    const inset = String(chrome.dropShadow.position) === "Inner" ? "inset " : "";
+    const color = hexWithAlpha(chrome.dropShadow.color, chrome.dropShadow.transparency);
+    return `${inset}${x.toFixed(1)}px ${y.toFixed(1)}px ${chrome.dropShadow.shadowBlur}px ${chrome.dropShadow.shadowSpread}px ${color}`;
+  })();
+
   const frameStyle = {
     "--preview-bg": theme.background,
     "--preview-fg": theme.foreground,
     "--preview-muted": theme.muted,
     "--preview-font": theme.fontFamily,
+    paddingTop: chrome.padding.top || undefined,
+    paddingRight: chrome.padding.right || undefined,
+    paddingBottom: chrome.padding.bottom || undefined,
+    paddingLeft: chrome.padding.left || undefined,
+    boxShadow,
     ...(chrome.background.show
       ? { backgroundColor: hexWithAlpha(chrome.background.color, chrome.background.transparency) }
       : {}),
     ...(chrome.border.show
       ? { border: `${chrome.border.width}px solid ${chrome.border.color}`, borderRadius: chrome.border.radius }
       : {}),
+    ...(chrome.lockAspect.show ? { aspectRatio: "16 / 10" } : {}),
   } as CSSProperties;
 
   const titleText = chrome.title.text || defaultTitle;
+  // Only the spacing values apply when "Customize spacing" is on, matching
+  // Power BI — otherwise the visual keeps its own built-in spacing.
+  const spacing = chrome.spacing.customizeSpacing ? chrome.spacing : null;
+
+  // Every icon Power BI's visual header can show, in roughly its own
+  // left-to-right order, so toggling any one of them is visible here.
+  const headerIcons: Array<[boolean, string, string]> = [
+    [chrome.visualHeader.showVisualWarningButton, "⚠", "Warning"],
+    [chrome.visualHeader.showVisualErrorButton, "⊗", "Error"],
+    [chrome.visualHeader.showVisualInformationButton, "ℹ", "Information"],
+    [chrome.visualHeader.showFilterRestatementButton, "▽", "Filter"],
+    [chrome.visualHeader.showDrillRoleSelector, "▾", "Drill on"],
+    [chrome.visualHeader.showDrillUpButton, "↑", "Drill up"],
+    [chrome.visualHeader.showDrillDownExpandButton, "↓", "Expand to next level"],
+    [chrome.visualHeader.showDrillDownLevelButton, "⇊", "Show next level"],
+    [chrome.visualHeader.showDrillToggleButton, "⤓", "Drill down"],
+    [chrome.visualHeader.showPersonalizeVisualButton, "✎", "Personalize"],
+    [chrome.visualHeader.showSeeDataLayoutToggleButton, "▦", "See data"],
+    [chrome.visualHeader.showSmartNarrativeButton, "✦", "Smart narrative"],
+    [chrome.visualHeader.showCopilotSummaryButton, "✨", "Copilot summary"],
+    [chrome.visualHeader.showSetAlertButton, "◔", "Set alert"],
+    [chrome.visualHeader.showFollowVisualButton, "★", "Follow"],
+    [chrome.visualHeader.showPinButton, "⊙", "Pin"],
+    [chrome.visualHeader.showFocusModeButton, "⤢", "Focus mode"],
+    [chrome.visualHeader.showCopyVisualImageButton, "⧉", "Copy"],
+    [chrome.visualHeader.showCommentButton, "☰", "Comment"],
+    [chrome.visualHeader.showTooltipButton, "ⓘ", "Tooltip"],
+    [chrome.visualHeader.showOptionsMenu, "⋯", "More options"],
+  ];
+
+  // A sample tooltip, drawn only on the hero tile — 35 tooltip properties
+  // are otherwise unobservable, but repeating this on every thumbnail
+  // would bury the visuals themselves.
+  const tooltip = chrome.visualTooltip;
+  const tooltipIsReportPage = String(tooltip.type) === "Canvas";
+  const tooltipNode = variant === "hero" && tooltip.show && (
+    <span
+      className="preview-tooltip"
+      style={{
+        backgroundColor: hexWithAlpha(tooltip.themedBackground || tooltip.background, tooltip.transparency),
+        fontFamily: tooltip.fontFamily || undefined,
+        fontSize: tooltip.fontSize,
+        fontWeight: tooltip.bold ? 700 : 400,
+        fontStyle: tooltip.italic ? "italic" : "normal",
+        textDecoration: tooltip.underline ? "underline" : "none",
+      }}
+    >
+      {tooltipIsReportPage ? (
+        <span className="preview-tooltip__page" style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>
+          Report page tooltip{tooltip.section ? `: ${tooltip.section}` : ""}
+        </span>
+      ) : tooltip.showSentenceFormat && tooltip.sentenceTemplate ? (
+        <span style={{ color: tooltip.themedValueFontColor || tooltip.valueFontColor }}>{tooltip.sentenceTemplate}</span>
+      ) : (
+        <>
+          <span className="preview-tooltip__row">
+            <span style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>London</span>
+            <span
+              style={{
+                color: tooltip.themedValueFontColor || tooltip.valueFontColor,
+                fontWeight: tooltip.showValuesInBold ? 700 : undefined,
+              }}
+            >
+              2,480
+            </span>
+          </span>
+          {!tooltip.showTooltipFieldsOnly && tooltip.showChartSpecificTooltips && (
+            <span className="preview-tooltip__row">
+              <span style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>Share</span>
+              <span
+                style={{
+                  color: tooltip.themedValueFontColor || tooltip.valueFontColor,
+                  fontWeight: tooltip.showValuesInBold ? 700 : undefined,
+                }}
+              >
+                34%
+              </span>
+            </span>
+          )}
+          {tooltip.showActionsInTooltips && (
+            <span className="preview-tooltip__action" style={{ color: tooltip.actionFontColor }}>
+              ⤓ Drill through
+            </span>
+          )}
+        </>
+      )}
+    </span>
+  );
+
+  // The visual header's own tooltip — shown next to the header when its
+  // icon is enabled, so visualHeaderTooltip's 13 properties are visible.
+  const headerTooltip = chrome.visualHeaderTooltip;
+  const headerTooltipNode = variant === "hero" && chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && (
+    <span
+      className="preview-header-tooltip"
+      style={{
+        backgroundColor: hexWithAlpha(headerTooltip.themedBackground || headerTooltip.background, headerTooltip.transparency),
+        color: headerTooltip.themedTitleFontColor || headerTooltip.titleFontColor,
+        fontFamily: headerTooltip.fontFamily || undefined,
+        fontSize: headerTooltip.fontSize,
+        fontWeight: headerTooltip.bold ? 700 : 400,
+        fontStyle: headerTooltip.italic ? "italic" : "normal",
+        textDecoration: headerTooltip.underline ? "underline" : "none",
+      }}
+    >
+      {String(headerTooltip.type) === "Canvas"
+        ? `Report page tooltip${headerTooltip.section ? `: ${headerTooltip.section}` : ""}`
+        : String(headerTooltip.text) || "Header tooltip text"}
+    </span>
+  );
 
   const tile = (
     <button
@@ -187,16 +426,36 @@ function PreviewShell({
       className={`visual-tile visual-tile--${variant}${selected ? " is-selected" : ""}`}
       onClick={() => onSelect(id)}
       aria-pressed={selected}
-      aria-label={`Edit ${label} properties`}
+      aria-label={chrome.general.altText || `Edit ${label} properties`}
     >
       <span className="visual-tile__label">
         <span>{label}</span>
         <span className="visual-tile__action">{selected ? "Editing" : "Select"}</span>
       </span>
       <span className="visual-frame" style={frameStyle}>
+        {chrome.visualHeader.show && (
+          <span
+            className="visual-header"
+            style={{
+              backgroundColor: hexWithAlpha(chrome.visualHeader.background, chrome.visualHeader.transparency),
+              borderBottom: `1px solid ${chrome.visualHeader.border}`,
+              color: chrome.visualHeader.foreground,
+            }}
+          >
+            {headerIcons
+              .filter(([visible]) => visible)
+              .map(([, glyph, name]) => (
+                <span className="visual-header__icon" key={name} title={name} aria-hidden="true">
+                  {glyph}
+                </span>
+              ))}
+            {headerTooltipNode}
+          </span>
+        )}
         {chrome.title.show && (
           <span
             className="preview-title"
+            {...headingAria(chrome.title.heading)}
             style={{
               textAlign: chrome.title.alignment as CSSProperties["textAlign"],
               backgroundColor: chrome.title.background,
@@ -209,6 +468,7 @@ function PreviewShell({
               whiteSpace: chrome.title.titleWrap ? "normal" : "nowrap",
               overflow: "hidden",
               textOverflow: chrome.title.titleWrap ? "clip" : "ellipsis",
+              marginBottom: spacing?.spaceBelowTitle || undefined,
             }}
           >
             {titleText}
@@ -217,6 +477,7 @@ function PreviewShell({
         {chrome.subTitle.show && chrome.subTitle.text && (
           <span
             className="preview-subtitle"
+            {...headingAria(chrome.subTitle.heading)}
             style={{
               textAlign: chrome.subTitle.alignment as CSSProperties["textAlign"],
               color: chrome.subTitle.fontColor,
@@ -225,12 +486,57 @@ function PreviewShell({
               fontWeight: chrome.subTitle.bold ? 700 : 400,
               fontStyle: chrome.subTitle.italic ? "italic" : "normal",
               textDecoration: chrome.subTitle.underline ? "underline" : "none",
+              whiteSpace: chrome.subTitle.titleWrap ? "normal" : "nowrap",
+              overflow: "hidden",
+              textOverflow: chrome.subTitle.titleWrap ? "clip" : "ellipsis",
+              marginTop: spacing?.spaceAboveSubtitle || undefined,
+              marginBottom: spacing?.spaceBelowSubTitle || undefined,
             }}
           >
             {chrome.subTitle.text}
           </span>
         )}
-        {children}
+        {chrome.divider.show && (
+          <span
+            className="preview-divider"
+            style={{
+              marginTop: spacing?.spaceAboveDivider || undefined,
+              borderTopColor: chrome.divider.color,
+              borderTopWidth: chrome.divider.width,
+              borderTopStyle: mapLineStyle(chrome.divider.style),
+              // "Ignore padding" lets the divider run the full width of the
+              // visual instead of stopping inside its padding.
+              marginLeft: chrome.divider.ignorePadding ? -(chrome.padding.left || 0) : undefined,
+              marginRight: chrome.divider.ignorePadding ? -(chrome.padding.right || 0) : undefined,
+            }}
+          />
+        )}
+        <span
+          className="preview-body"
+          style={{
+            marginTop: spacing?.spaceBelowTitleArea || spacing?.spaceAbovePlotArea || undefined,
+          }}
+        >
+          {children}
+        </span>
+        {/* An action turns the whole visual into a button, so show what it
+            does and the tooltip that explains it. */}
+        {chrome.visualLink.show && (
+          <span className="preview-link" title={String(chrome.visualLink.tooltip) || undefined}>
+            <span className="preview-link__type">{visualLinkLabel(chrome.visualLink)}</span>
+            {(String(chrome.visualLink.tooltip) ||
+              (chrome.visualLink.showDefaultTooltip && !chrome.visualLink.suppressDefaultTooltip
+                ? String(chrome.visualLink.tooltipPlaceholderText) || String(chrome.visualLink.enabledTooltip)
+                : "")) && (
+              <span className="preview-link__tooltip">
+                {String(chrome.visualLink.tooltip) ||
+                  String(chrome.visualLink.tooltipPlaceholderText) ||
+                  String(chrome.visualLink.enabledTooltip)}
+              </span>
+            )}
+          </span>
+        )}
+        {tooltipNode}
       </span>
     </button>
   );
@@ -300,12 +606,22 @@ export function VisualGallery({
         <span
           className="card-preview__category"
           style={{
+            fontSize: cardStyle.categoryLabels.fontSize,
             color: cardStyle.categoryLabels.color,
             fontFamily: cardStyle.categoryLabels.fontFamily || undefined,
             fontWeight: cardStyle.categoryLabels.bold ? 700 : 400,
             fontStyle: cardStyle.categoryLabels.italic ? "italic" : "normal",
             textDecoration: cardStyle.categoryLabels.underline ? "underline" : "none",
-            whiteSpace: cardStyle.wordWrap.show ? "normal" : "nowrap",
+            whiteSpace: cardStyle.categoryLabels.preserveWhitespace
+              ? "pre-wrap"
+              : cardStyle.wordWrap.show
+                ? "normal"
+                : "nowrap",
+            // "Space between label and value" is a shared chrome property
+            // rather than a Card one, but the Card is where it applies.
+            marginBottom: chromeStyles.card.spacing.customizeSpacing
+              ? chromeStyles.card.spacing.verticalSpacing
+              : undefined,
           }}
         >
           Applications approved
@@ -320,9 +636,10 @@ export function VisualGallery({
           fontWeight: cardStyle.labels.bold ? 700 : 400,
           fontStyle: cardStyle.labels.italic ? "italic" : "normal",
           textDecoration: cardStyle.labels.underline ? "underline" : "none",
+          whiteSpace: cardStyle.labels.preserveWhitespace ? "pre-wrap" : undefined,
         }}
       >
-        £8.4m
+        {formatCardValue(8_400_000, cardStyle.labels.labelDisplayUnits, cardStyle.labels.labelPrecision, cardStyle.general.formatString)}
       </span>
       <span className="card-preview__trend" style={{ color: palette[1] ?? palette[0] }}>
         <span aria-hidden="true">↗</span> 7.2% vs last quarter
