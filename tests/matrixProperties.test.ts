@@ -31,7 +31,17 @@ test("resolveMatrixStyle falls back to shared theme tokens and sensible defaults
 
   assert.equal(matrix.columnHeaders.backColor, base.background);
   assert.equal(matrix.columnHeaders.wordWrap, false);
-  assert.equal(matrix.rowHeaders.stepped, false);
+
+  // These match how Power BI renders an unstyled matrix rather than being
+  // "everything off": a fresh matrix has a stepped (indented) hierarchy
+  // with expand/collapse buttons and subtotals switched on. A preview that
+  // hides them disagrees with the real visual it is meant to represent.
+  assert.equal(matrix.rowHeaders.stepped, true);
+  assert.equal(matrix.rowHeaders.showExpandCollapseButtons, true);
+  assert.equal(matrix.subTotals.rowSubtotals, true);
+  assert.equal(matrix.subTotals.columnSubtotals, true);
+  // Blank rows stay off — that one really is opt-in styling.
+  assert.equal(matrix.blankRows.showBlankRows, false);
 });
 
 test("resolveMatrixStyle prefers a visualStyles.pivotTable override over shared tokens and defaults", () => {

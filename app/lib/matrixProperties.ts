@@ -446,7 +446,8 @@ export function resolveMatrixStyle(theme: PowerBITheme, base: ResolvedTheme): Re
       italic: resolvePropertyValue(theme, p.rowHeaders.italic, false),
       legacyStyleDisabled: resolvePropertyValue(theme, p.rowHeaders.legacyStyleDisabled, false),
       repeatRowHeaders: resolvePropertyValue(theme, p.rowHeaders.repeatRowHeaders, false),
-      showExpandCollapseButtons: resolvePropertyValue(theme, p.rowHeaders.showExpandCollapseButtons, false),
+      // Power BI shows +/- expand buttons on a matrix hierarchy by default.
+      showExpandCollapseButtons: resolvePropertyValue(theme, p.rowHeaders.showExpandCollapseButtons, true),
       underline: resolvePropertyValue(theme, p.rowHeaders.underline, false),
       unfrozen: resolvePropertyValue(theme, p.rowHeaders.unfrozen, false),
       urlIcon: resolvePropertyValue(theme, p.rowHeaders.urlIcon, false),
@@ -457,7 +458,8 @@ export function resolveMatrixStyle(theme: PowerBITheme, base: ResolvedTheme): Re
       outlineColor: resolvePropertyValue(theme, p.rowHeaders.outlineColor, "#E3E3E3"),
       outlineStyle: resolvePropertyValue(theme, p.rowHeaders.outlineStyle, 0),
       outlineWeight: resolvePropertyValue(theme, p.rowHeaders.outlineWeight, 1),
-      stepped: resolvePropertyValue(theme, p.rowHeaders.stepped, false),
+      // Stepped layout (indented child rows) is the matrix default.
+      stepped: resolvePropertyValue(theme, p.rowHeaders.stepped, true),
       steppedLayoutIndentation: resolvePropertyValue(theme, p.rowHeaders.steppedLayoutIndentation, 10),
     },
     values: {
@@ -522,11 +524,13 @@ export function resolveMatrixStyle(theme: PowerBITheme, base: ResolvedTheme): Re
       levelSubtotalEnabled: resolvePropertyValue(theme, p.subTotals.levelSubtotalEnabled, false),
       levelSubtotalLabel: resolvePropertyValue(theme, p.subTotals.levelSubtotalLabel, ""),
       underline: resolvePropertyValue(theme, p.subTotals.underline, false),
-      columnSubtotals: resolvePropertyValue(theme, p.subTotals.columnSubtotals, false),
+      columnSubtotals: resolvePropertyValue(theme, p.subTotals.columnSubtotals, true),
       columnSubtotalsLabel: resolvePropertyValue(theme, p.subTotals.columnSubtotalsLabel, ""),
       perColumnLevel: resolvePropertyValue(theme, p.subTotals.perColumnLevel, false),
       perRowLevel: resolvePropertyValue(theme, p.subTotals.perRowLevel, false),
-      rowSubtotals: resolvePropertyValue(theme, p.subTotals.rowSubtotals, false),
+      // Subtotals are on by default in Power BI; a preview without them
+      // disagrees with an unstyled matrix.
+      rowSubtotals: resolvePropertyValue(theme, p.subTotals.rowSubtotals, true),
       rowSubtotalsLabel: resolvePropertyValue(theme, p.subTotals.rowSubtotalsLabel, ""),
       rowSubtotalsPosition: resolvePropertyValue(theme, p.subTotals.rowSubtotalsPosition, "Top"),
     },

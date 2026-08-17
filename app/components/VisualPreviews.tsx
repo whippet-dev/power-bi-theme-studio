@@ -1483,6 +1483,91 @@ export function VisualGallery({
   const matrixGridBorder = (show: boolean, color: string, weight: number) =>
     show ? `${weight}px solid ${color}` : undefined;
 
+  const matrixSubTotalCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.subTotals.backColor,
+    color: matrixStyle.subTotals.fontColor,
+    fontFamily: matrixStyle.subTotals.fontFamily,
+    fontSize: matrixStyle.subTotals.fontSize,
+    fontWeight: matrixStyle.subTotals.bold ? 700 : 400,
+    fontStyle: matrixStyle.subTotals.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.subTotals.underline ? "underline" : "none",
+  };
+
+  // Column-level formatting targets one column in Power BI; the preview
+  // applies it to the Q2 column so its effect is visible against Q1.
+  const matrixColumnFormattingStyle: CSSProperties = {
+    backgroundColor: matrixStyle.columnFormatting.backColor,
+    color: matrixStyle.columnFormatting.fontColor,
+    textAlign: mapTextAlign(matrixStyle.columnFormatting.alignment),
+  };
+
+  const matrixExpandToggle = (expanded: boolean) =>
+    matrixStyle.rowHeaders.showExpandCollapseButtons && (
+      <span
+        className="matrix-preview__expand"
+        aria-hidden="true"
+        style={{
+          color: matrixStyle.rowHeaders.expandCollapseButtonsColor,
+          fontSize: matrixStyle.rowHeaders.expandCollapseButtonsSize,
+        }}
+      >
+        {expanded ? "−" : "+"}
+      </span>
+    );
+
+  /** A miniature sparkline cell, drawn as bars or a line per chartType. */
+  const matrixSparkline = (values: number[]) => {
+    const spark = matrixStyle.sparklines;
+    const max = Math.max(...values);
+    if (String(spark.chartType) === "Line") {
+      const points = values
+        .map((v, i) => `${(i / (values.length - 1)) * 100},${100 - (v / max) * 100}`)
+        .join(" ");
+      return (
+        <svg className="matrix-preview__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline
+            points={points}
+            fill="none"
+            stroke={spark.dataColor}
+            strokeWidth={spark.strokeWidth}
+            vectorEffect="non-scaling-stroke"
+          />
+          {spark.markers > 0 &&
+            values.map((v, i) => (
+              <circle
+                key={i}
+                cx={(i / (values.length - 1)) * 100}
+                cy={100 - (v / max) * 100}
+                r={spark.markerSize / 2}
+                fill={spark.markerColor}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+        </svg>
+      );
+    }
+    return (
+      <span className="matrix-preview__spark matrix-preview__spark--bars" aria-hidden="true">
+        {values.map((v, i) => (
+          <span key={i} style={{ height: `${(v / max) * 100}%`, backgroundColor: spark.dataColor }} />
+        ))}
+      </span>
+    );
+  };
+
+  // The sparklines group has no show/enable flag of its own — a sparkline
+  // exists when the report author adds one — so the preview always shows
+  // the column, which is what makes its styling adjustable.
+  const matrixColumnCount = 5;
+
+  // A parent row with children, so row-header indentation, expand toggles,
+  // and subtotals all have a real hierarchy to act on.
+  const matrixRows: Array<{ label: string; q1: number; q2: number; child: boolean; index: number }> = [
+    { label: "London", q1: 82, q2: 91, child: false, index: 0 },
+    { label: "Central", q1: 44, q2: 49, child: true, index: 1 },
+    { label: "Manchester", q1: 66, q2: 74, child: false, index: 2 },
+  ];
+
   const matrixContent = (
     <span
       className="matrix-preview"
@@ -1492,14 +1577,21 @@ export function VisualGallery({
       }}
     >
       <span className="matrix-preview__cell matrix-preview__cell--corner" style={matrixHeaderCellStyle} />
-      {["Q1", "Q2"].map((label) => (
+      {["Q1", "Q2"].map((label, columnIndex) => (
         <span
           key={label}
           className="matrix-preview__cell"
           style={{
             ...matrixHeaderCellStyle,
+            // Column-level formatting optionally reaches the header too.
+            ...(columnIndex === 1 && matrixStyle.columnFormatting.styleHeader ? matrixColumnFormattingStyle : {}),
             textAlign: mapTextAlign(matrixStyle.columnHeaders.titleAlignment),
             borderBottom: matrixGridBorder(matrixStyle.grid.gridHorizontal, matrixStyle.grid.gridHorizontalColor, matrixStyle.grid.gridHorizontalWeight),
+            ...outlineFromBitmask(
+              matrixStyle.columnHeaders.outlineStyle,
+              matrixStyle.columnHeaders.outlineColor,
+              matrixStyle.columnHeaders.outlineWeight,
+            ),
           }}
         >
           {label}
@@ -1514,41 +1606,117 @@ export function VisualGallery({
       >
         Total
       </span>
+      <span
+        className="matrix-preview__cell"
+        style={{
+          ...matrixHeaderCellStyle,
+          borderBottom: matrixGridBorder(matrixStyle.grid.gridHorizontal, matrixStyle.grid.gridHorizontalColor, matrixStyle.grid.gridHorizontalWeight),
+        }}
+      >
+        Trend
+      </span>
 
-      {[
-        ["London", 82, 91],
-        ["Manchester", 66, 74],
-      ].map(([label, q1, q2]) => (
+      {matrixRows.map((row) => (
         // Fragment, not a wrapping span — every cell must be a direct child
         // of .matrix-preview for CSS grid column alignment to work.
-        <Fragment key={label as string}>
+        <Fragment key={row.label}>
           <span
             className="matrix-preview__cell"
             style={{
               ...matrixRowHeaderCellStyle,
-              paddingLeft: matrixStyle.rowHeaders.stepped ? matrixStyle.rowHeaders.steppedLayoutIndentation : undefined,
+              // Child rows indent under their parent; stepped layout is
+              // what makes the hierarchy legible.
+              paddingLeft: row.child && matrixStyle.rowHeaders.stepped ? matrixStyle.rowHeaders.steppedLayoutIndentation : undefined,
+              textAlign: mapTextAlign(matrixStyle.rowHeaders.alignment),
+              whiteSpace: matrixStyle.rowHeaders.wordWrap ? "normal" : "nowrap",
               borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+              ...outlineFromBitmask(
+                matrixStyle.rowHeaders.outlineStyle,
+                matrixStyle.rowHeaders.outlineColor,
+                matrixStyle.rowHeaders.outlineWeight,
+              ),
             }}
           >
-            {label}
+            {!row.child && matrixExpandToggle(true)}
+            {row.label}
           </span>
-          {[q1, q2].map((value, i) => (
+          {[row.q1, row.q2].map((value, i) => (
             <span
               key={i}
               className="matrix-preview__cell matrix-preview__cell--value"
               style={{
                 ...matrixValueCellStyle,
+                // Banded rows alternate the background of every other row.
+                ...(matrixStyle.values.bandedRowHeaders && row.index % 2 === 1
+                  ? { backgroundColor: matrixStyle.values.backColorPrimary }
+                  : {}),
+                ...(i === 1 && matrixStyle.columnFormatting.styleValues ? matrixColumnFormattingStyle : {}),
                 borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+                ...outlineFromBitmask(matrixStyle.values.outlineStyle, matrixStyle.values.outlineColor, matrixStyle.values.outlineWeight),
               }}
             >
-              {value}
+              {i === 1
+                ? formatValue(value, matrixStyle.columnFormatting.labelDisplayUnits, matrixStyle.columnFormatting.labelPrecision)
+                : value}
             </span>
           ))}
           <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixRowTotalCellStyle}>
-            {(q1 as number) + (q2 as number)}
+            {row.q1 + row.q2}
+          </span>
+          <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixValueCellStyle}>
+            {matrixSparkline([row.q1, row.q2, Math.round((row.q1 + row.q2) / 2), row.q2 + 6])}
           </span>
         </Fragment>
       ))}
+
+      {/* Row subtotals close out each hierarchy level. */}
+      {matrixStyle.subTotals.rowSubtotals && (
+        <Fragment>
+          <span
+            className="matrix-preview__cell"
+            style={{
+              ...matrixSubTotalCellStyle,
+              borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+            }}
+          >
+            {String(matrixStyle.subTotals.rowSubtotalsLabel) || String(matrixStyle.subTotals.levelSubtotalLabel) || "Subtotal"}
+          </span>
+          {[148, 165].map((value, i) => (
+            <span key={i} className="matrix-preview__cell matrix-preview__cell--value" style={matrixSubTotalCellStyle}>
+              {i === 1 && matrixStyle.columnFormatting.styleSubtotals
+                ? formatValue(value, matrixStyle.columnFormatting.labelDisplayUnits, matrixStyle.columnFormatting.labelPrecision)
+                : value}
+            </span>
+          ))}
+          <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixSubTotalCellStyle}>
+            313
+          </span>
+          <span className="matrix-preview__cell" style={matrixSubTotalCellStyle} />
+        </Fragment>
+      )}
+
+      {/* A styled blank row separates sections of the matrix. */}
+      {matrixStyle.blankRows.showBlankRows && (
+        <Fragment>
+          {Array.from({ length: matrixColumnCount }, (_, i) => (
+            <span
+              key={i}
+              className="matrix-preview__cell matrix-preview__cell--blank"
+              style={{
+                backgroundColor: hexWithAlpha(matrixStyle.blankRows.blankRowColor, matrixStyle.blankRows.blankRowTransparency),
+                ...(matrixStyle.blankRows.showBorder
+                  ? {
+                      borderBottom: `${matrixStyle.blankRows.borderWidth}px solid ${hexWithAlpha(
+                        matrixStyle.blankRows.borderColor,
+                        matrixStyle.blankRows.borderTransparency,
+                      )}`,
+                    }
+                  : {}),
+              }}
+            />
+          ))}
+        </Fragment>
+      )}
 
       <span
         className="matrix-preview__cell"
@@ -1564,13 +1732,18 @@ export function VisualGallery({
       </span>
       <span
         className="matrix-preview__cell matrix-preview__cell--value"
-        style={{ ...matrixColumnTotalCellStyle, borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight) }}
+        style={{
+          ...matrixColumnTotalCellStyle,
+          ...(matrixStyle.columnFormatting.styleTotal ? matrixColumnFormattingStyle : {}),
+          borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+        }}
       >
         165
       </span>
       <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixGrandTotalCellStyle}>
         313
       </span>
+      <span className="matrix-preview__cell" style={matrixGrandTotalCellStyle} />
     </span>
   );
 

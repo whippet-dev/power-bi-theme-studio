@@ -1109,10 +1109,37 @@ button { color: inherit; }
 .matrix-preview {
   height: 202px;
   display: grid;
-  grid-template-columns: minmax(76px, 1fr) 40px 40px 46px;
+  grid-template-columns: minmax(70px, 1fr) 38px 38px 42px 34px;
   grid-auto-rows: min-content;
   align-content: start;
   font-size: 9px;
+}
+
+.matrix-preview__expand {
+  margin-right: 3px;
+  line-height: 1;
+}
+
+.matrix-preview__cell--blank {
+  min-height: 9px;
+}
+
+/* Sparkline column: a line (SVG) or bars, per the sparkline chart type. */
+.matrix-preview__spark {
+  width: 100%;
+  height: 14px;
+  display: block;
+}
+
+.matrix-preview__spark--bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.matrix-preview__spark--bars > span {
+  flex: 1;
+  border-radius: 1px 1px 0 0;
 }
 
 .matrix-preview__cell {
