@@ -115,6 +115,36 @@ function mapTextAlign(value: string | number): CSSProperties["textAlign"] | unde
  * body; each caller adds its own extras (an icon, an accent bar, ...).
  */
 /**
+ * Power BI's slicer type (list, dropdown, between, date range, relative
+ * date) is a per-instance display setting the theme JSON can't drive, but
+ * each type has its own styling group in the schema. The preview offers
+ * them as a local view toggle so those groups have something to render
+ * against — without pretending the tool can write a setting Power BI
+ * won't honour from a theme file.
+ */
+type SlicerLayout = "list" | "dropdown" | "between" | "dateRange" | "relative";
+
+const SLICER_LAYOUTS: Array<[SlicerLayout, string]> = [
+  ["list", "List"],
+  ["dropdown", "Dropdown"],
+  ["between", "Between"],
+  ["dateRange", "Date range"],
+  ["relative", "Relative"],
+];
+
+/** Power BI's outlineStyle is a bitmask of which edges draw a border. */
+function outlineFromBitmask(mask: number, color: string, weight: number): CSSProperties {
+  if (!mask || !weight) return {};
+  const line = `${weight}px solid ${color}`;
+  return {
+    borderTop: mask & 1 ? line : undefined,
+    borderBottom: mask & 2 ? line : undefined,
+    borderLeft: mask & 4 ? line : undefined,
+    borderRight: mask & 8 ? line : undefined,
+  };
+}
+
+/**
  * Bar/column thickness from the chart's gap-size setting. Power BI's gap
  * is the share of each category slot left empty, so a larger gap means a
  * thinner bar. 0 keeps the built-in default rather than a full-width bar.
@@ -518,11 +548,23 @@ function PreviewShell({
     </span>
   );
 
+  // Not a <button>: several previews put their own controls inside the
+  // tile (the slicer's mode toggle and expandable dropdown), and nesting
+  // interactive elements inside a button is invalid HTML — React warns
+  // about it and screen readers handle it badly. A div with button
+  // semantics keeps the whole tile clickable while letting those controls
+  // work properly.
   const tile = (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`visual-tile visual-tile--${variant}${selected ? " is-selected" : ""}`}
       onClick={() => onSelect(id)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect(id);
+      }}
       aria-pressed={selected}
       aria-label={chrome.general.altText || `Edit ${label} properties`}
     >
@@ -636,7 +678,7 @@ function PreviewShell({
         )}
         {tooltipNode}
       </span>
-    </button>
+    </div>
   );
 
   if (variant !== "hero") return tile;
@@ -677,7 +719,11 @@ export function VisualGallery({
   // drive — so this is a preview-only view toggle, not theme state, letting
   // users check how their header/item styling looks in each layout without
   // it affecting the exported JSON.
-  const [slicerLayout, setSlicerLayout] = useState<"list" | "dropdown">("list");
+  const [slicerLayout, setSlicerLayout] = useState<SlicerLayout>("list");
+  // The dropdown's item styling is only visible while it's open, so the
+  // preview lets you expand it rather than showing a permanently
+  // collapsed control whose colours you can't judge.
+  const [slicerDropdownOpen, setSlicerDropdownOpen] = useState(false);
 
   // Shared sample data, so every cartesian chart plots the same figures
   // and axis ticks line up with the bars they describe.
@@ -1612,7 +1658,78 @@ export function VisualGallery({
     fontWeight: slicerStyle.items.bold ? 700 : 400,
     fontStyle: slicerStyle.items.italic ? "italic" : "normal",
     textDecoration: slicerStyle.items.underline ? "underline" : "none",
+    padding: slicerStyle.items.padding || undefined,
+    ...outlineFromBitmask(slicerStyle.items.outlineStyle, slicerStyle.general.outlineColor, slicerStyle.general.outlineWeight),
   };
+
+  // Date/numeric inputs share one style group each in the schema.
+  const slicerDateInputStyle: CSSProperties = {
+    backgroundColor: slicerStyle.date.background,
+    color: slicerStyle.date.fontColor,
+    fontFamily: slicerStyle.date.fontFamily || undefined,
+    fontSize: slicerStyle.date.textSize,
+    fontWeight: slicerStyle.date.bold ? 700 : 400,
+    fontStyle: slicerStyle.date.italic ? "italic" : "normal",
+    textDecoration: slicerStyle.date.underline ? "underline" : "none",
+  };
+
+  const slicerNumericInputStyle: CSSProperties = {
+    backgroundColor: slicerStyle.numericInputStyle.background,
+    color: slicerStyle.numericInputStyle.fontColor,
+    fontFamily: slicerStyle.numericInputStyle.fontFamily || undefined,
+    fontSize: slicerStyle.numericInputStyle.textSize,
+    fontWeight: slicerStyle.numericInputStyle.bold ? 700 : 400,
+    fontStyle: slicerStyle.numericInputStyle.italic ? "italic" : "normal",
+    textDecoration: slicerStyle.numericInputStyle.underline ? "underline" : "none",
+  };
+
+  const calendar = slicerStyle.calendarButton;
+  const calendarButtonNode = !slicerStyle.date.hideDatePickerButton && (
+    <span
+      className="slicer-preview__calendar-button"
+      aria-hidden="true"
+      style={{
+        color: hexWithAlpha(calendar.iconColor, calendar.iconTransparency),
+        fontSize: calendar.iconSize,
+        backgroundColor: calendar.backgroundShow
+          ? hexWithAlpha(calendar.backgroundColor, calendar.backgroundTransparency)
+          : "transparent",
+        border: calendar.strokeShow
+          ? `${calendar.strokeWidth}px ${mapLineStyle(calendar.strokePattern)} ${hexWithAlpha(calendar.strokeColor, calendar.strokeTransparency)}`
+          : undefined,
+        borderRadius: calendar.individualCorners
+          ? `${calendar.cornerTopLeft}px ${calendar.cornerTopRight}px ${calendar.cornerBottomRight}px ${calendar.cornerBottomLeft}px`
+          : calendar.cornerRadius,
+      }}
+    >
+      📅
+    </span>
+  );
+
+  const slicerOptions = ["All statuses", "Approved", "In review", "Declined"];
+
+  // Selection settings change what the option controls even look like:
+  // single-select shows radios and drops the "select all" row.
+  const singleSelect = slicerStyle.selection.singleSelect || slicerStyle.selection.strictSingleSelect;
+  const visibleSlicerOptions = slicerStyle.selection.selectAllCheckboxEnabled ? slicerOptions : slicerOptions.slice(1);
+
+  const slicerOptionRows = visibleSlicerOptions.map((label, index) => (
+    <span className="slicer-preview__option" key={label} style={slicerItemStyle}>
+      <span
+        className={`slicer-preview__check${index < (singleSelect ? 1 : 2) ? " is-checked" : ""}${singleSelect ? " slicer-preview__check--radio" : ""}`}
+        style={
+          index < (singleSelect ? 1 : 2)
+            ? { backgroundColor: slicerStyle.selectionIcon.color, borderColor: slicerStyle.selectionIcon.color }
+            : undefined
+        }
+        aria-hidden="true"
+      >
+        {index < (singleSelect ? 1 : 2) ? (singleSelect ? "" : "✓") : ""}
+      </span>
+      {label}
+      {index === 0 && slicerStyle.selection.selectAllCheckboxEnabled && <span className="slicer-preview__count">4</span>}
+    </span>
+  ));
 
   const slicerContent = (
     <span className="slicer-preview">
@@ -1621,20 +1738,16 @@ export function VisualGallery({
           only changes what's rendered here, so header/item styling can be
           checked in either layout without affecting the exported theme. */}
       <span className="slicer-preview__layout-toggle" role="group" aria-label="Preview layout">
-        <button
-          type="button"
-          className={slicerLayout === "list" ? "is-active" : ""}
-          onClick={() => setSlicerLayout("list")}
-        >
-          List
-        </button>
-        <button
-          type="button"
-          className={slicerLayout === "dropdown" ? "is-active" : ""}
-          onClick={() => setSlicerLayout("dropdown")}
-        >
-          Dropdown
-        </button>
+        {SLICER_LAYOUTS.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={slicerLayout === value ? "is-active" : ""}
+            onClick={() => setSlicerLayout(value)}
+          >
+            {label}
+          </button>
+        ))}
       </span>
 
       {slicerStyle.header.show && (
@@ -1654,33 +1767,176 @@ export function VisualGallery({
         </span>
       )}
 
-      {slicerLayout === "dropdown" ? (
-        <span className="slicer-preview__dropdown" style={slicerItemStyle}>
-          <span>Approved, In review +2</span>
-          <span aria-hidden="true">⌄</span>
-        </span>
-      ) : (
+      {slicerLayout === "dropdown" && (
         <>
-          <span
-            className="slicer-preview__search"
-            style={{ backgroundColor: slicerStyle.searchBox.background, borderColor: slicerStyle.searchBox.borderColor }}
+          <button
+            type="button"
+            className="slicer-preview__dropdown"
+            style={slicerItemStyle}
+            aria-expanded={slicerDropdownOpen}
+            onClick={(event) => {
+              // The tile itself is a button that selects the visual, so
+              // stop this from also changing selection.
+              event.stopPropagation();
+              setSlicerDropdownOpen((open) => !open);
+            }}
           >
-            Search
-          </span>
-          {["All statuses", "Approved", "In review", "Declined"].map((label, index) => (
-            <span className="slicer-preview__option" key={label} style={slicerItemStyle}>
-              <span
-                className={`slicer-preview__check${index < 2 ? " is-checked" : ""}`}
-                style={index < 2 ? { backgroundColor: palette[0], borderColor: palette[0] } : undefined}
-                aria-hidden="true"
-              >
-                {index < 2 ? "✓" : ""}
-              </span>
-              {label}
-              {index === 0 && <span className="slicer-preview__count">4</span>}
-            </span>
-          ))}
+            <span>Approved, In review +2</span>
+            <span aria-hidden="true">{slicerDropdownOpen ? "⌃" : "⌄"}</span>
+          </button>
+          {slicerDropdownOpen && <span className="slicer-preview__dropdown-list">{slicerOptionRows}</span>}
         </>
+      )}
+
+      {slicerLayout === "list" && (
+        <>
+          {slicerStyle.general.selfFilterEnabled && (
+            <span
+              className="slicer-preview__search"
+              style={{
+                backgroundColor: slicerStyle.searchBox.background,
+                borderColor: slicerStyle.searchBox.borderColor,
+                ...outlineFromBitmask(
+                  slicerStyle.searchBox.outlineStyle,
+                  slicerStyle.searchBox.borderColor,
+                  slicerStyle.general.outlineWeight || 1,
+                ),
+              }}
+            >
+              Search
+            </span>
+          )}
+          <span className={`slicer-preview__options${slicerStyle.general.orientation === 1 ? " slicer-preview__options--horizontal" : ""}`}>
+            {slicerOptionRows}
+          </span>
+        </>
+      )}
+
+      {slicerLayout === "between" && (
+        <span className="slicer-preview__range">
+          <span className="slicer-preview__range-inputs">
+            <span className="slicer-preview__input" style={slicerNumericInputStyle}>
+              0
+            </span>
+            <span className="slicer-preview__range-sep">and</span>
+            <span className="slicer-preview__input" style={slicerNumericInputStyle}>
+              120
+            </span>
+          </span>
+          {slicerStyle.slider.show && (
+            <span className="slicer-preview__slider" aria-hidden="true">
+              <span className="slicer-preview__slider-track" style={{ backgroundColor: slicerStyle.slider.secondaryLineColor }} />
+              <span className="slicer-preview__slider-fill" style={{ backgroundColor: slicerStyle.slider.color }} />
+              {[0, 1].map((handle) => (
+                <span
+                  className="slicer-preview__slider-handle"
+                  key={handle}
+                  style={{
+                    left: handle === 0 ? "8%" : "72%",
+                    backgroundColor: slicerStyle.slider.handleFillColor,
+                    borderColor: slicerStyle.slider.handleBorderColor,
+                  }}
+                />
+              ))}
+            </span>
+          )}
+        </span>
+      )}
+
+      {slicerLayout === "dateRange" && (
+        <span className="slicer-preview__range">
+          <span className="slicer-preview__range-inputs">
+            <span className="slicer-preview__input" style={slicerDateInputStyle}>
+              01/04/2026
+              {calendarButtonNode}
+            </span>
+            <span className="slicer-preview__range-sep">and</span>
+            <span className="slicer-preview__input" style={slicerDateInputStyle}>
+              {slicerStyle.dateRange.includeToday ? "Today" : "30/06/2026"}
+              {calendarButtonNode}
+            </span>
+          </span>
+          <span
+            className="slicer-preview__range-text"
+            style={{
+              color: hexWithAlpha(slicerStyle.dateRangeText.color, slicerStyle.dateRangeText.transparency),
+              fontFamily: slicerStyle.dateRangeText.fontFamily || undefined,
+              fontSize: slicerStyle.dateRangeText.fontSize,
+              fontWeight: slicerStyle.dateRangeText.bold ? 700 : 400,
+              fontStyle: slicerStyle.dateRangeText.italic ? "italic" : "normal",
+              textDecoration: slicerStyle.dateRangeText.underline ? "underline" : "none",
+            }}
+          >
+            {String(slicerStyle.dateRange.anchorDate) || "1 Apr 2026 – 30 Jun 2026"}
+          </span>
+          {slicerStyle.slider.show && (
+            <span className="slicer-preview__slider" aria-hidden="true">
+              <span className="slicer-preview__slider-track" style={{ backgroundColor: slicerStyle.slider.secondaryLineColor }} />
+              <span className="slicer-preview__slider-fill" style={{ backgroundColor: slicerStyle.slider.color }} />
+              {[0, 1].map((handle) => (
+                <span
+                  className="slicer-preview__slider-handle"
+                  key={handle}
+                  style={{
+                    left: handle === 0 ? "12%" : "64%",
+                    backgroundColor: slicerStyle.slider.handleFillColor,
+                    borderColor: slicerStyle.slider.handleBorderColor,
+                  }}
+                />
+              ))}
+            </span>
+          )}
+        </span>
+      )}
+
+      {slicerLayout === "relative" && (
+        <span className="slicer-preview__range">
+          <span className="slicer-preview__range-inputs">
+            <span className="slicer-preview__input" style={slicerDateInputStyle}>
+              Last
+            </span>
+            <span className="slicer-preview__input" style={slicerNumericInputStyle}>
+              30
+            </span>
+            <span className="slicer-preview__input" style={slicerDateInputStyle}>
+              days
+            </span>
+          </span>
+          {slicerStyle.relativeText.show && (
+            <span
+              className="slicer-preview__range-text"
+              style={{
+                color: hexWithAlpha(slicerStyle.relativeText.color, slicerStyle.relativeText.transparency),
+                fontFamily: slicerStyle.relativeText.fontFamily || undefined,
+                fontSize: slicerStyle.relativeText.fontSize,
+                fontWeight: slicerStyle.relativeText.bold ? 700 : 400,
+                fontStyle: slicerStyle.relativeText.italic ? "italic" : "normal",
+                textDecoration: slicerStyle.relativeText.underline ? "underline" : "none",
+              }}
+            >
+              1 Jun 2026 – 30 Jun 2026
+            </span>
+          )}
+        </span>
+      )}
+
+      {/* Shown when the slicer defers filtering until Apply is pressed. */}
+      {slicerStyle.pendingChangesIcon.show && (
+        <span
+          className={`slicer-preview__pending slicer-preview__pending--${String(slicerStyle.pendingChangesIcon.position).toLowerCase()}`}
+          title={
+            slicerStyle.pendingChangesIcon.showTooltip
+              ? String(slicerStyle.pendingChangesIcon.tooltipText) || String(slicerStyle.pendingChangesIcon.tooltipLabel) || undefined
+              : undefined
+          }
+          style={{
+            color: hexWithAlpha(slicerStyle.pendingChangesIcon.color, slicerStyle.pendingChangesIcon.transparency),
+            fontSize: slicerStyle.pendingChangesIcon.size,
+          }}
+          aria-hidden="true"
+        >
+          ⟳
+        </span>
       )}
     </span>
   );

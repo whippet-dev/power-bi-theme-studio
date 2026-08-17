@@ -1236,6 +1236,7 @@ button { color: inherit; }
 }
 
 .slicer-preview__dropdown {
+  width: 100%;
   height: 30px;
   margin-top: 9px;
   display: flex;
@@ -1245,6 +1246,121 @@ button { color: inherit; }
   border: 1px solid #d8d3db;
   border-radius: 3px;
   font-size: 9px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.slicer-preview__dropdown-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2px;
+  border: 1px solid #d8d3db;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.slicer-preview__options {
+  display: flex;
+  flex-direction: column;
+}
+
+.slicer-preview__options--horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.slicer-preview__check--radio {
+  border-radius: 999px;
+}
+
+/* Between / date-range / relative-date slicer bodies. */
+.slicer-preview__range {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.slicer-preview__range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.slicer-preview__input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid #d8d3db;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.slicer-preview__range-sep {
+  flex-shrink: 0;
+  color: var(--preview-muted);
+  font-size: 9px;
+}
+
+.slicer-preview__calendar-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 3px;
+  line-height: 1;
+}
+
+.slicer-preview__range-text {
+  display: block;
+}
+
+.slicer-preview__slider {
+  position: relative;
+  height: 14px;
+  display: block;
+}
+
+.slicer-preview__slider-track,
+.slicer-preview__slider-fill {
+  position: absolute;
+  top: 6px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.slicer-preview__slider-track {
+  left: 0;
+  right: 0;
+}
+
+.slicer-preview__slider-fill {
+  left: 8%;
+  right: 22%;
+}
+
+.slicer-preview__slider-handle {
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid;
+  border-radius: 999px;
+}
+
+.slicer-preview__pending {
+  align-self: flex-end;
+  margin-top: 8px;
+  line-height: 1;
+}
+
+.slicer-preview__pending--left {
+  align-self: flex-start;
 }
 
 .slicer-preview__search {
