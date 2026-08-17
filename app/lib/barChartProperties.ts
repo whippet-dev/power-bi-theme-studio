@@ -45,6 +45,7 @@ export const BAR_CHART_PROPERTIES = {
     borderShow: boolProp("clusteredBarChart", "bar.dataPoint.borderShow", "Border", "Whether the border is shown.", ["dataPoint", 0, "borderShow"], undefined, "Border"),
     borderSize: numberProp("clusteredBarChart", "bar.dataPoint.borderSize", "Width", "The thickness, in pixels, of the border.", ["dataPoint", 0, "borderSize"], 0, 10, undefined, "Border"),
     borderTransparency: numberProp("clusteredBarChart", "bar.dataPoint.borderTransparency", "Transparency", "How see-through the border appears — 0 is solid, 100 is invisible.", ["dataPoint", 0, "borderTransparency"], 0, 100, undefined, "Border"),
+    borderOutlineOnly: boolProp("clusteredBarChart", "bar.dataPoint.borderOutlineOnly", "Hide inner borders", "Whether the border outline only is turned on.", ["dataPoint", 0, "borderOutlineOnly"], undefined, "Border"),
   },
 
   categoryAxis: {
@@ -368,6 +369,14 @@ export const BAR_CHART_PROPERTIES = {
     titleWrap: boolProp("clusteredBarChart", "bar.subheader.titleWrap", "Word wrap", "Whether the title wrap is turned on.", ["subheader", 0, "titleWrap"]),
     underline: boolProp("clusteredBarChart", "bar.subheader.underline", "Underline", "Whether the small multiple titles's text is underlined.", ["subheader", 0, "underline"]),
   },
+
+  layout: {
+    clusteredGapOverlapReverse: boolProp("clusteredBarChart", "bar.layout.clusteredGapOverlapReverse", "Flip overlap", "Whether the flip overlap is turned on.", ["layout", 0, "clusteredGapOverlapReverse"]),
+    clusteredGapOverlaps: boolProp("clusteredBarChart", "bar.layout.clusteredGapOverlaps", "Overlap", "Whether the overlap is turned on.", ["layout", 0, "clusteredGapOverlaps"]),
+    clusteredGapSize: numberProp("clusteredBarChart", "bar.layout.clusteredGapSize", "Space between series", "Sets the space between series.", ["layout", 0, "clusteredGapSize"], 0, 50),
+    seriesOrderReversed: boolProp("clusteredBarChart", "bar.layout.seriesOrderReversed", "Reverse order", "Reverse the series order of your bars or columns.", ["layout", 0, "seriesOrderReversed"]),
+    seriesOrderSorted: boolProp("clusteredBarChart", "bar.layout.seriesOrderSorted", "Sort by value", "Within each category, dynamically sort series by their data value.", ["layout", 0, "seriesOrderSorted"]),
+  },
 } as const;
 
 export type ResolvedBarChartStyle = {
@@ -380,6 +389,7 @@ export type ResolvedBarChartStyle = {
     defaultColor: string;
     fill: string;
     fillTransparency: number;
+    borderOutlineOnly: boolean;
   };
   categoryAxis: {
     axisStyle: string | number;
@@ -690,6 +700,13 @@ export type ResolvedBarChartStyle = {
     titleWrap: boolean;
     underline: boolean;
   };
+  layout: {
+    clusteredGapOverlapReverse: boolean;
+    clusteredGapOverlaps: boolean;
+    clusteredGapSize: number;
+    seriesOrderReversed: boolean;
+    seriesOrderSorted: boolean;
+  };
 };
 
 /**
@@ -709,6 +726,7 @@ export function resolveBarChartStyle(theme: PowerBITheme, base: ResolvedTheme): 
       defaultColor: resolvePropertyValue(theme, p.dataPoint.defaultColor, base.palette[0] ?? base.foreground),
       fill: resolvePropertyValue(theme, p.dataPoint.fill, base.palette[0] ?? base.foreground),
       fillTransparency: resolvePropertyValue(theme, p.dataPoint.fillTransparency, 0),
+      borderOutlineOnly: resolvePropertyValue(theme, p.dataPoint.borderOutlineOnly, false),
     },
     categoryAxis: {
       axisStyle: resolvePropertyValue(theme, p.categoryAxis.axisStyle, "showTitleOnly"),
@@ -1018,6 +1036,13 @@ export function resolveBarChartStyle(theme: PowerBITheme, base: ResolvedTheme): 
       show: resolvePropertyValue(theme, p.subheader.show, false),
       titleWrap: resolvePropertyValue(theme, p.subheader.titleWrap, false),
       underline: resolvePropertyValue(theme, p.subheader.underline, false),
+    },
+    layout: {
+      clusteredGapOverlapReverse: resolvePropertyValue(theme, p.layout.clusteredGapOverlapReverse, false),
+      clusteredGapOverlaps: resolvePropertyValue(theme, p.layout.clusteredGapOverlaps, false),
+      clusteredGapSize: resolvePropertyValue(theme, p.layout.clusteredGapSize, 10),
+      seriesOrderReversed: resolvePropertyValue(theme, p.layout.seriesOrderReversed, false),
+      seriesOrderSorted: resolvePropertyValue(theme, p.layout.seriesOrderSorted, false),
     },
   };
 }

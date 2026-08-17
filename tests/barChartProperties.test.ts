@@ -82,5 +82,5 @@ test("every resolved BAR_CHART_PROPERTIES path is unique across groups (no accid
       seen.add(key);
     }
   }
-  assert.equal(seen.size > 280, true, `expected close to 291 resolved properties, got ${seen.size}`);
+  assert.equal(seen.size > 280, true, `expected close to 297 resolved properties, got ${seen.size}`);
 });

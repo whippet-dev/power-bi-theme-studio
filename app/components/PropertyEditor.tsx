@@ -104,6 +104,7 @@ const BAR_CHART_GROUP_LABELS: Record<keyof typeof BAR_CHART_PROPERTIES, string> 
   zoom: "Zoom slider",
   smallMultiplesLayout: "Small multiples grid",
   subheader: "Small multiple title",
+  layout: "Layout",
 };
 
 // Column chart's schema is byte-identical to Bar chart's, but it's a
@@ -124,6 +125,7 @@ const COLUMN_CHART_GROUP_LABELS: Record<keyof typeof COLUMN_CHART_PROPERTIES, st
   zoom: "Zoom slider",
   smallMultiplesLayout: "Small multiples grid",
   subheader: "Small multiple title",
+  layout: "Layout",
 };
 
 const CHROME_GROUP_LABELS: Record<keyof typeof CHROME_PROPERTIES, string> = {

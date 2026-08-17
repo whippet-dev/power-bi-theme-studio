@@ -76,5 +76,5 @@ test("every resolved COLUMN_CHART_PROPERTIES path is unique across groups (no ac
       seen.add(key);
     }
   }
-  assert.equal(seen.size, 291, `expected 291 resolved properties, got ${seen.size}`);
+  assert.equal(seen.size, 297, `expected 297 resolved properties, got ${seen.size}`);
 });
