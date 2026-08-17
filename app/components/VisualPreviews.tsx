@@ -4,6 +4,17 @@ import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { hexWithAlpha } from "../lib/colorUtils";
+import {
+  AxisTickLabels,
+  axisTitleStyle,
+  ChartLegend,
+  dataLabelStyle,
+  formatValue,
+  Gridlines,
+  legendIsAfterPlot,
+  legendIsVertical,
+  textStyle,
+} from "./ChartParts";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
@@ -103,6 +114,16 @@ function mapTextAlign(value: string | number): CSSProperties["textAlign"] | unde
  * fill/outline/shadow/text core, so one function renders the common tile
  * body; each caller adds its own extras (an icon, an accent bar, ...).
  */
+/**
+ * Bar/column thickness from the chart's gap-size setting. Power BI's gap
+ * is the share of each category slot left empty, so a larger gap means a
+ * thinner bar. 0 keeps the built-in default rather than a full-width bar.
+ */
+function barThickness(gapSize: number): string {
+  const gap = Math.max(0, Math.min(90, gapSize || 20));
+  return `${100 - gap}%`;
+}
+
 /** The glyph Power BI shows for each built-in action button icon. */
 function actionButtonGlyph(shapeType: string): string {
   const glyphs: Record<string, string> = {
@@ -658,24 +679,22 @@ export function VisualGallery({
   // it affecting the exported JSON.
   const [slicerLayout, setSlicerLayout] = useState<"list" | "dropdown">("list");
 
-  const legendNode = barChartStyle.legend.show && (
-    <span className="chart-preview__legend">
-      <span className="chart-preview__legend-swatch" style={{ backgroundColor: barChartStyle.dataPoint.fill }} />
-      <span
-        style={{
-          color: barChartStyle.legend.labelColor,
-          fontFamily: barChartStyle.legend.fontFamily,
-          fontSize: barChartStyle.legend.fontSize,
-          fontWeight: barChartStyle.legend.bold ? 700 : 400,
-          fontStyle: barChartStyle.legend.italic ? "italic" : "normal",
-          textDecoration: barChartStyle.legend.underline ? "underline" : "none",
-        }}
-      >
-        Applications
-      </span>
-    </span>
-  );
-  const legendAtBottom = String(barChartStyle.legend.position).startsWith("Bottom");
+  // Shared sample data, so every cartesian chart plots the same figures
+  // and axis ticks line up with the bars they describe.
+  const barCategories: Array<[string, number]> = [
+    ["London", 82],
+    ["North West", 66],
+    ["Scotland", 51],
+    ["Wales", 38],
+  ];
+
+  // Series shown in every cartesian chart's legend. Clustered charts show
+  // one series; the stacked variants show the two they actually draw.
+  const singleSeries = [{ label: "Applications", color: barChartStyle.dataPoint.fill }];
+
+  const legendNode = <ChartLegend legend={barChartStyle.legend} items={singleSeries} />;
+  const legendAtBottom = legendIsAfterPlot(barChartStyle.legend.position);
+  const legendVertical = legendIsVertical(barChartStyle.legend.position);
 
   const cardContent = (
     <span className="card-preview">
@@ -730,34 +749,18 @@ export function VisualGallery({
   );
 
   const barContent = (
-    <span className="chart-preview" style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}>
+    <span
+      className={`chart-preview${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}
+    >
       {!legendAtBottom && legendNode}
       {barChartStyle.categoryAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title"
-          style={{
-            color: barChartStyle.categoryAxis.titleColor,
-            fontFamily: barChartStyle.categoryAxis.titleFontFamily,
-            fontSize: barChartStyle.categoryAxis.titleFontSize,
-            fontWeight: barChartStyle.categoryAxis.titleBold ? 700 : 400,
-            fontStyle: barChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
-            textDecoration: barChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
+        <span className="chart-preview__axis-title" style={axisTitleStyle(barChartStyle.categoryAxis)}>
           {String(barChartStyle.categoryAxis.titleText) || "Region"}
         </span>
       )}
-      <span
-        className="chart-preview__plot"
-        style={{
-          position: "relative",
-          ...(barChartStyle.valueAxis.gridlineShow
-            ? {
-                backgroundImage: `repeating-linear-gradient(to right, ${barChartStyle.valueAxis.gridlineColor} 0, ${barChartStyle.valueAxis.gridlineColor} ${barChartStyle.valueAxis.gridlineThickness}px, transparent ${barChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
-              }
-            : {}),
-        }}
-      >
+      <span className="chart-preview__plot" style={{ position: "relative" }}>
+        <Gridlines axis={barChartStyle.valueAxis} orientation="vertical" />
         {barChartStyle.referenceLine.show && (
           <span
             className="chart-preview__reference-line"
@@ -783,25 +786,10 @@ export function VisualGallery({
             }}
           />
         )}
-        {[
-          ["London", 82],
-          ["North West", 66],
-          ["Scotland", 51],
-          ["Wales", 38],
-        ].map(([label, value], index) => (
+        {barCategories.map(([label, value], index) => (
           <span className="bar-row" key={label}>
             {barChartStyle.categoryAxis.show && (
-              <span
-                className="bar-row__label"
-                style={{
-                  color: barChartStyle.categoryAxis.labelColor,
-                  fontFamily: barChartStyle.categoryAxis.fontFamily,
-                  fontSize: barChartStyle.categoryAxis.fontSize,
-                  fontWeight: barChartStyle.categoryAxis.bold ? 700 : 400,
-                  fontStyle: barChartStyle.categoryAxis.italic ? "italic" : "normal",
-                  textDecoration: barChartStyle.categoryAxis.underline ? "underline" : "none",
-                }}
-              >
+              <span className="bar-row__label" style={textStyle(barChartStyle.categoryAxis)}>
                 {label}
               </span>
             )}
@@ -811,6 +799,9 @@ export function VisualGallery({
                   className="bar-row__fill"
                   style={{
                     width: `${value}%`,
+                    // Gap size thins the bar within its slot; 0 keeps the
+                    // Power BI default rather than collapsing the bar.
+                    height: barThickness(barChartStyle.layout.clusteredGapSize),
                     backgroundColor: hexWithAlpha(barChartStyle.dataPoint.fill, barChartStyle.dataPoint.fillTransparency),
                     border: barChartStyle.dataPoint.borderShow
                       ? `${barChartStyle.dataPoint.borderSize}px solid ${barChartStyle.dataPoint.borderColor}`
@@ -836,41 +827,17 @@ export function VisualGallery({
               )}
             </span>
             {barChartStyle.labels.show && (
-              <span
-                className="bar-row__value"
-                style={{
-                  color: barChartStyle.labels.color,
-                  fontFamily: barChartStyle.labels.fontFamily,
-                  fontSize: barChartStyle.labels.fontSize,
-                  fontWeight: barChartStyle.labels.bold ? 700 : 400,
-                  fontStyle: barChartStyle.labels.italic ? "italic" : "normal",
-                  textDecoration: barChartStyle.labels.underline ? "underline" : "none",
-                  backgroundColor: barChartStyle.labels.enableBackground
-                    ? hexWithAlpha(barChartStyle.labels.backgroundColor, barChartStyle.labels.backgroundTransparency)
-                    : undefined,
-                  padding: barChartStyle.labels.enableBackground ? "1px 4px" : undefined,
-                  borderRadius: barChartStyle.labels.enableBackground ? 3 : undefined,
-                }}
-              >
-                {value}k
+              <span className="bar-row__value" style={dataLabelStyle(barChartStyle.labels)}>
+                {formatValue(value * 1000, barChartStyle.labels.labelDisplayUnits, barChartStyle.labels.labelPrecision)}
               </span>
             )}
           </span>
         ))}
       </span>
+      <AxisTickLabels axis={barChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" />
       {barChartStyle.valueAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title chart-preview__axis-title--value"
-          style={{
-            color: barChartStyle.valueAxis.titleColor,
-            fontFamily: barChartStyle.valueAxis.titleFontFamily,
-            fontSize: barChartStyle.valueAxis.titleFontSize,
-            fontWeight: barChartStyle.valueAxis.titleBold ? 700 : 400,
-            fontStyle: barChartStyle.valueAxis.titleItalic ? "italic" : "normal",
-            textDecoration: barChartStyle.valueAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
-          {String(barChartStyle.valueAxis.titleText) || "Applications (k)"}
+        <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(barChartStyle.valueAxis)}>
+          {String(barChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
       {legendAtBottom && legendNode}

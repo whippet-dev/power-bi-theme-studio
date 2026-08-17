@@ -777,7 +777,9 @@ export function resolveBarChartStyle(theme: PowerBITheme, base: ResolvedTheme): 
       gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
       gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
       gridlineDashCap: resolvePropertyValue(theme, p.valueAxis.gridlineDashCap, "none"),
-      gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, false),
+      // Power BI draws value-axis gridlines on a new visual by default,
+      // so a preview that hides them does not match an unstyled chart.
+      gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, true),
       gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, "solid"),
       gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),

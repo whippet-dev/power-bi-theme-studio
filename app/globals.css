@@ -682,6 +682,77 @@ button { color: inherit; }
   border-top-style: solid;
 }
 
+/* Chart furniture shared by bar/column/stacked/line previews. */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.chart-legend--vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 10px 0 0;
+}
+
+.chart-legend__title {
+  font-weight: 650;
+}
+
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chart-legend__swatch {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* Legend to the left/right puts the plot beside it instead of below.
+   Doubled class so this beats the base `.chart-preview` column rule,
+   which is defined later in this file. */
+.chart-preview.chart-preview--legend-side {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.chart-preview.chart-preview--legend-side.chart-preview--legend-after {
+  flex-direction: row-reverse;
+}
+
+.chart-preview--legend-side .chart-preview__plot {
+  flex: 1;
+  min-width: 0;
+}
+
+.chart-gridline {
+  position: absolute;
+  border-left-style: solid;
+  border-top-style: solid;
+  pointer-events: none;
+}
+
+.chart-ticks {
+  display: flex;
+  margin-top: 3px;
+}
+
+.chart-ticks--horizontal {
+  justify-content: space-between;
+}
+
+.chart-ticks--vertical {
+  flex-direction: column-reverse;
+  justify-content: space-between;
+}
+
 .preview-header-tooltip {
   margin-left: 6px;
   padding: 3px 7px;
