@@ -47,6 +47,13 @@ export type PropertyDefinition<T extends PropertyValueType = PropertyValueType> 
   description: string;
   /** Practical consequence of changing the value, shown as supporting detail. */
   guidance?: string;
+  /**
+   * Optional sub-heading this property is clustered under within its group
+   * (e.g. "Gridline", "Title" within the Y axis group). Undefined means it
+   * renders in the group's unlabelled general cluster, alongside the
+   * group's master enable/show toggle.
+   */
+  section?: string;
   /** Path within visualStyles[visual]["*"], e.g. ["columnHeaders", 0, "backColor"]. */
   path: Array<string | number>;
   min?: T extends "number" ? number : never;
@@ -167,8 +174,9 @@ export function colorProp(
   description: string,
   path: Array<string | number>,
   guidance?: string,
+  section?: string,
 ): PropertyDefinition<"color"> {
-  return { id, visual, valueType: "color", label, description, guidance, path };
+  return { id, visual, valueType: "color", label, description, guidance, section, path };
 }
 
 export function numberProp(
@@ -180,8 +188,9 @@ export function numberProp(
   min: number,
   max: number,
   guidance?: string,
+  section?: string,
 ): PropertyDefinition<"number"> {
-  return { id, visual, valueType: "number", label, description, guidance, path, min, max };
+  return { id, visual, valueType: "number", label, description, guidance, section, path, min, max };
 }
 
 export function boolProp(
@@ -191,8 +200,9 @@ export function boolProp(
   description: string,
   path: Array<string | number>,
   guidance?: string,
+  section?: string,
 ): PropertyDefinition<"boolean"> {
-  return { id, visual, valueType: "boolean", label, description, guidance, path };
+  return { id, visual, valueType: "boolean", label, description, guidance, section, path };
 }
 
 export function textProp(
@@ -202,8 +212,9 @@ export function textProp(
   description: string,
   path: Array<string | number>,
   guidance?: string,
+  section?: string,
 ): PropertyDefinition<"text"> {
-  return { id, visual, valueType: "text", label, description, guidance, path };
+  return { id, visual, valueType: "text", label, description, guidance, section, path };
 }
 
 export function enumProp(
@@ -214,6 +225,7 @@ export function enumProp(
   path: Array<string | number>,
   options: readonly EnumOption[],
   guidance?: string,
+  section?: string,
 ): PropertyDefinition<"enum"> {
-  return { id, visual, valueType: "enum", label, description, guidance, path, options };
+  return { id, visual, valueType: "enum", label, description, guidance, section, path, options };
 }
