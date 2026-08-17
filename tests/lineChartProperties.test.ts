@@ -41,6 +41,17 @@ test("resolveLineChartStyle falls back to shared theme tokens and sensible defau
   assert.equal(line.referenceLine.show, false);
 });
 
+test("the line itself is drawn by default — a line chart whose stroke is off renders an empty plot", () => {
+  const base = resolveTheme(STARTER_THEME);
+  const line = resolveLineChartStyle(STARTER_THEME, base);
+
+  // Regression guard: strokeShow defaulted to false, so the preview drew
+  // gridlines and axes but no line at all. Same class as the divider and
+  // shape-parameter defaults, but on the one element that IS the visual.
+  assert.equal(line.lineStyles.strokeShow, true);
+  assert.ok(line.lineStyles.strokeWidth > 0, "a visible stroke needs a non-zero width");
+});
+
 test("resolveLineChartStyle prefers a visualStyles.lineChart override over shared tokens and defaults", () => {
   const base = resolveTheme(THEME_WITH_LINE_OVERRIDE);
   const line = resolveLineChartStyle(THEME_WITH_LINE_OVERRIDE, base);

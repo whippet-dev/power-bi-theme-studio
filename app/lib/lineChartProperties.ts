@@ -1040,11 +1040,16 @@ export function resolveLineChartStyle(theme: PowerBITheme, base: ResolvedTheme):
       showMarker: resolvePropertyValue(theme, p.lineStyles.showMarker, false),
       showMarkerByDefault: resolvePropertyValue(theme, p.lineStyles.showMarkerByDefault, false),
       strokeAutoScale: resolvePropertyValue(theme, p.lineStyles.strokeAutoScale, false),
-      strokeColor: resolvePropertyValue(theme, p.lineStyles.strokeColor, "#E3E3E3"),
+      // The stroke colour is an override; unset, a series uses its data
+      // colour, so a neutral grey default made every line look unthemed.
+      strokeColor: resolvePropertyValue(theme, p.lineStyles.strokeColor, base.palette[0]),
       strokeDashArray: resolvePropertyValue(theme, p.lineStyles.strokeDashArray, ""),
       strokeDashCap: resolvePropertyValue(theme, p.lineStyles.strokeDashCap, "none"),
       strokeLineJoin: resolvePropertyValue(theme, p.lineStyles.strokeLineJoin, "miter"),
-      strokeShow: resolvePropertyValue(theme, p.lineStyles.strokeShow, false),
+      // The stroke IS the line chart — defaulting it off renders an
+      // empty plot, which is the most severe form of the zero/false
+      // default trap seen elsewhere in this project.
+      strokeShow: resolvePropertyValue(theme, p.lineStyles.strokeShow, true),
       strokeTransparency: resolvePropertyValue(theme, p.lineStyles.strokeTransparency, 0),
       strokeWidth: resolvePropertyValue(theme, p.lineStyles.strokeWidth, 2),
     },

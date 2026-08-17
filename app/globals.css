@@ -739,6 +739,36 @@ button { color: inherit; }
   pointer-events: none;
 }
 
+/* Constant lines: the line itself, the region it shades, and its label. */
+.chart-preview__constant {
+  position: absolute;
+  pointer-events: none;
+}
+
+.chart-preview__constant--vertical {
+  top: 0;
+  bottom: 0;
+}
+
+.chart-preview__constant--horizontal {
+  left: 0;
+  right: 0;
+}
+
+.chart-preview__constant-shade {
+  position: absolute;
+  pointer-events: none;
+}
+
+.chart-preview__constant-label {
+  position: absolute;
+  padding: 0 3px;
+  font-size: 8px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .chart-ticks {
   display: flex;
   margin-top: 3px;

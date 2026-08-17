@@ -22,6 +22,7 @@ import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
+import { areaPath, linePath, markerShape } from "../lib/lineGeometry";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
@@ -123,6 +124,33 @@ function mapTextAlign(value: string | number): CSSProperties["textAlign"] | unde
  * won't honour from a theme file.
  */
 type SlicerLayout = "list" | "dropdown" | "between" | "dateRange" | "relative";
+
+/**
+ * The shape shared by every constant-line group (referenceLine,
+ * xAxisReferenceLine, y1AxisReferenceLine). They differ only in whether
+ * `value` is typed as a string or a number, so the preview accepts both.
+ */
+type ConstantLineStyle = {
+  show: boolean;
+  lineColor: string;
+  style: string | number;
+  width: number;
+  transparency: number;
+  value: string | number;
+  displayName: string | number;
+  shadeShow: boolean;
+  shadeColor: string;
+  shadeColorMatchStroke: boolean;
+  shadeRegion: string | number;
+  shadeTransparency: number;
+  dataLabelShow: boolean;
+  dataLabelColor: string;
+  dataLabelText: string | number;
+  dataLabelDisplayUnits: string | number;
+  dataLabelDecimalPoints: number;
+  dataLabelHorizontalPosition: string | number;
+  dataLabelVerticalPosition: string | number;
+};
 
 const SLICER_LAYOUTS: Array<[SlicerLayout, string]> = [
   ["list", "List"],
@@ -1219,11 +1247,182 @@ export function VisualGallery({
     x: (index / (linePointValues.length - 1)) * 100,
     y: 100 - value,
   }));
-  const linePathD = linePointCoords.map((point) => `${point.x},${point.y}`).join(" ");
-  const lineDashStyle = mapLineStyle(lineChartStyle.lineStyles.lineStyle);
-  const lineAreaColor = lineChartStyle.lineStyles.areaMatchStrokeColor
-    ? lineChartStyle.dataPoint.fill
-    : lineChartStyle.lineStyles.areaColor;
+  const lineStyles = lineChartStyle.lineStyles;
+  // `lineChartType` is the interpolation mode (linear/smooth/step);
+  // `interpolationSmooth`/`interpolationStep` name *which* algorithm to
+  // use within a mode ("monotoneX", "before"), so they are not on/off
+  // switches and must not be read as such.
+  const lineInterpolation = String(lineStyles.lineChartType).toLowerCase();
+  const linePathD = linePath(linePointCoords, {
+    smooth: lineInterpolation === "smooth",
+    step: lineInterpolation === "step",
+    // For a stepped line, the step's alignment comes from the step
+    // algorithm ("before"/"after"/"center") rather than segmentAlignment,
+    // which positions segment labels.
+    stepAlignment: lineStyles.interpolationStep,
+  });
+  const lineDashStyle = mapLineStyle(lineStyles.lineStyle);
+  const lineAreaColor = lineStyles.areaMatchStrokeColor ? lineChartStyle.dataPoint.fill : lineStyles.areaColor;
+  // lineChartType decides whether the series is drawn as a plain line or
+  // filled down to the baseline as an area/stacked area.
+  // lineChartType only selects interpolation, so the area fill is driven
+  // by its own areaShow toggle.
+  const lineIsArea = lineStyles.areaShow;
+  const lineStrokeColor = lineStyles.strokeColor || lineChartStyle.dataPoint.fill;
+  const lineMarkerColor = lineStyles.markerColor || lineChartStyle.dataPoint.fill;
+  const lineShowMarkers = lineStyles.showMarker || lineStyles.showMarkerByDefault;
+  const lineMarker = markerShape(String(lineStyles.markerShape), lineStyles.markerSize || 5);
+
+  /**
+   * Constant lines: the schema gives a line chart three of them
+   * (referenceLine, xAxisReferenceLine, y1AxisReferenceLine) with the
+   * same shape — a line, an optional shaded region on one side of it, and
+   * an optional data label. Rendering them from one helper keeps all
+   * three consistent instead of only the first being drawn.
+   */
+  const constantLine = (
+    // Structural, not one group's type: the three constant-line groups
+    // are identical except that `value` is a string in some and a number
+    // in others, so a cast between them isn't valid.
+    line: ConstantLineStyle,
+    orientation: "vertical" | "horizontal",
+    offsetPercent: number,
+    key: string,
+  ) => {
+    if (!line.show) return null;
+    const stroke = mapLineStyle(line.style);
+    const shade = line.shadeShow && (
+      <span
+        className="chart-preview__constant-shade"
+        key={`${key}-shade`}
+        aria-hidden="true"
+        style={{
+          backgroundColor: hexWithAlpha(line.shadeColorMatchStroke ? line.lineColor : line.shadeColor, line.shadeTransparency),
+          // shadeRegion picks which side of the line is filled.
+          ...(orientation === "vertical"
+            ? String(line.shadeRegion).toLowerCase() === "before"
+              ? { left: 0, width: `${offsetPercent}%`, top: 0, bottom: 0 }
+              : { left: `${offsetPercent}%`, right: 0, top: 0, bottom: 0 }
+            : String(line.shadeRegion).toLowerCase() === "before"
+              ? { bottom: 0, height: `${offsetPercent}%`, left: 0, right: 0 }
+              : { bottom: `${offsetPercent}%`, top: 0, left: 0, right: 0 }),
+        }}
+      />
+    );
+
+    return (
+      <Fragment key={key}>
+        {shade}
+        <span
+          className={`chart-preview__constant chart-preview__constant--${orientation}`}
+          aria-hidden="true"
+          style={{
+            ...(orientation === "vertical"
+              ? {
+                  left: `${offsetPercent}%`,
+                  borderLeftWidth: line.width,
+                  borderLeftColor: line.lineColor,
+                  borderLeftStyle: stroke,
+                }
+              : {
+                  bottom: `${offsetPercent}%`,
+                  borderTopWidth: line.width,
+                  borderTopColor: line.lineColor,
+                  borderTopStyle: stroke,
+                }),
+            opacity: 1 - line.transparency / 100,
+          }}
+        />
+        {line.dataLabelShow && (
+          <span
+            className="chart-preview__constant-label"
+            style={{
+              color: line.dataLabelColor,
+              ...(orientation === "vertical"
+                ? { left: `${offsetPercent}%`, top: String(line.dataLabelVerticalPosition).toLowerCase() === "under" ? "auto" : 2, bottom: String(line.dataLabelVerticalPosition).toLowerCase() === "under" ? 2 : "auto" }
+                : { bottom: `${offsetPercent}%`, left: String(line.dataLabelHorizontalPosition).toLowerCase() === "left" ? 2 : "auto", right: String(line.dataLabelHorizontalPosition).toLowerCase() === "left" ? "auto" : 2 }),
+            }}
+          >
+            {String(line.dataLabelText) ||
+              String(line.displayName) ||
+              formatValue(Number(line.value) || 50, line.dataLabelDisplayUnits, line.dataLabelDecimalPoints)}
+          </span>
+        )}
+      </Fragment>
+    );
+  };
+
+  const lineConstantLines = (
+    <>
+      {constantLine(lineChartStyle.referenceLine, "vertical", 70, "ref")}
+      {constantLine(lineChartStyle.xAxisReferenceLine, "vertical", 45, "x")}
+      {constantLine(lineChartStyle.y1AxisReferenceLine, "horizontal", 55, "y1")}
+    </>
+  );
+
+  // Forecast continues the series past the last point, with an optional
+  // confidence band around it.
+  const forecast = lineChartStyle.forecast;
+  const forecastNode = forecast.show && (
+    <>
+      {forecast.bandAreaShow && (
+        <polygon
+          points="72,28 100,8 100,52 72,40"
+          fill={hexWithAlpha(forecast.bandAreaMatchColor ? forecast.lineColor : forecast.bandAreaColor, forecast.bandAreaTransparency)}
+          stroke={forecast.bandLineShow ? hexWithAlpha(forecast.bandLineMatchColor ? forecast.lineColor : forecast.bandLineColor, forecast.bandLineTransparency) : "none"}
+          strokeWidth={forecast.bandLineWidth}
+          strokeDasharray={String(forecast.bandLineDashArray) || svgDashArray(mapLineStyle(forecast.bandLinePattern))}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      <path
+        d="M 72 34 L 100 30"
+        fill="none"
+        stroke={hexWithAlpha(forecast.lineColor, forecast.strokeTransparency)}
+        strokeWidth={forecast.width}
+        strokeDasharray={String(forecast.dashArray) || svgDashArray(mapLineStyle(forecast.style))}
+        strokeLinecap={String(forecast.dashCap).toLowerCase() === "flat" ? "butt" : "round"}
+        vectorEffect="non-scaling-stroke"
+      />
+    </>
+  );
+
+  // Anomaly detection highlights outlying points and can shade a
+  // confidence band behind the whole series.
+  const anomaly = lineChartStyle.anomalyDetection;
+  const anomalyMarker = markerShape(String(anomaly.markerShape), anomaly.markerShapeSize || 7);
+  const anomalyNode = anomaly.show && (
+    <>
+      {anomaly.confidenceBandShow && (
+        <polygon
+          points={`0,${linePointCoords[0].y - 9} ${linePointCoords.map((p) => `${p.x},${p.y - 9}`).join(" ")} 100,${
+            linePointCoords[linePointCoords.length - 1].y + 9
+          } ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 9}`).join(" ")}`}
+          fill={hexWithAlpha(anomaly.confidenceBandColor, anomaly.transparency)}
+          stroke="none"
+        />
+      )}
+      {anomaly.markerShow && (
+        <circle
+          cx={linePointCoords[2].x}
+          cy={linePointCoords[2].y}
+          r={anomalyMarker.kind === "circle" ? anomalyMarker.r : (anomaly.markerShapeSize || 7) / 2}
+          fill={hexWithAlpha(anomaly.markerColor, anomaly.markerTransparency)}
+          stroke={
+            anomaly.markerBorderShow
+              ? hexWithAlpha(
+                  anomaly.markerBorderColorMatchFill ? anomaly.markerColor : anomaly.markerBorderColor,
+                  anomaly.markerBorderTransparency,
+                )
+              : "none"
+          }
+          strokeWidth={anomaly.markerBorderWidth}
+          transform={`rotate(${anomaly.markerRotation} ${linePointCoords[2].x} ${linePointCoords[2].y})`}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </>
+  );
 
   const lineContent = (
     <span
@@ -1240,50 +1439,75 @@ export function VisualGallery({
         <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
         <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
-        {lineChartStyle.referenceLine.show && (
-          <span
-            className="chart-preview__reference-line"
-            aria-hidden="true"
-            style={{
-              left: "70%",
-              borderLeftWidth: lineChartStyle.referenceLine.width,
-              borderLeftColor: lineChartStyle.referenceLine.lineColor,
-              borderLeftStyle: mapLineStyle(lineChartStyle.referenceLine.style),
-              opacity: 1 - lineChartStyle.referenceLine.transparency / 100,
-            }}
-          />
-        )}
+        {lineConstantLines}
         <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {lineChartStyle.lineStyles.areaShow && (
-            <polygon
-              points={`0,100 ${linePathD} 100,100`}
-              fill={hexWithAlpha(lineAreaColor, 78)}
+          {anomalyNode}
+          {lineIsArea && (
+            <path
+              d={areaPath(linePointCoords, linePathD)}
+              fill={hexWithAlpha(lineAreaColor, lineStyles.segmentGradient ? 60 : 78)}
               stroke="none"
             />
           )}
-          <polyline
-            points={linePathD}
-            fill="none"
-            stroke={lineChartStyle.dataPoint.fill}
-            strokeWidth={lineChartStyle.lineStyles.strokeWidth}
-            strokeDasharray={svgDashArray(lineDashStyle)}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-          {lineChartStyle.lineStyles.showMarker &&
-            linePointCoords.map((point, index) => (
-              <circle
-                key={index}
-                cx={point.x}
-                cy={point.y}
-                r={2.6}
-                fill={lineChartStyle.dataPoint.fill}
-                stroke={lineChartStyle.markers.borderShow ? lineChartStyle.markers.borderColor : "none"}
-                strokeWidth={lineChartStyle.markers.borderWidth}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
+          {lineStyles.strokeShow && (
+            <path
+              d={linePathD}
+              fill="none"
+              stroke={hexWithAlpha(lineStrokeColor, lineStyles.strokeTransparency)}
+              strokeWidth={lineStyles.strokeWidth}
+              // An explicit dash array wins over the named line style,
+              // matching how Power BI treats the advanced setting.
+              strokeDasharray={String(lineStyles.strokeDashArray) || svgDashArray(lineDashStyle)}
+              strokeLinejoin={
+                ["round", "bevel", "miter"].includes(String(lineStyles.strokeLineJoin).toLowerCase())
+                  ? (String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter")
+                  : "round"
+              }
+              strokeLinecap={String(lineStyles.strokeDashCap).toLowerCase() === "flat" ? "butt" : "round"}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {lineShowMarkers &&
+            linePointCoords.map((point, index) => {
+              const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
+              const markerStroke = lineChartStyle.markers.borderShow
+                ? hexWithAlpha(
+                    lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
+                    lineChartStyle.markers.borderTransparency,
+                  )
+                : "none";
+              const rotation = lineChartStyle.markers.rotation;
+              const common = {
+                fill: markerFill,
+                stroke: markerStroke,
+                strokeWidth: lineChartStyle.markers.borderWidth,
+                vectorEffect: "non-scaling-stroke" as const,
+              };
+              if (lineMarker.kind === "circle") {
+                return <circle key={index} cx={point.x} cy={point.y} r={lineMarker.r} {...common} />;
+              }
+              if (lineMarker.kind === "rect") {
+                return (
+                  <rect
+                    key={index}
+                    x={point.x - lineMarker.size / 2}
+                    y={point.y - lineMarker.size / 2}
+                    width={lineMarker.size}
+                    height={lineMarker.size}
+                    transform={`rotate(${lineMarker.rotate + rotation} ${point.x} ${point.y})`}
+                    {...common}
+                  />
+                );
+              }
+              return (
+                <polygon
+                  key={index}
+                  points={lineMarker.points}
+                  transform={`translate(${point.x} ${point.y}) rotate(${rotation})`}
+                  {...common}
+                />
+              );
+            })}
           {lineChartStyle.error.enabled && lineChartStyle.error.barShow && (
             <line
               x1={linePointCoords[3].x}
@@ -1295,6 +1519,7 @@ export function VisualGallery({
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {forecastNode}
         </svg>
         {lineChartStyle.trend.show && (
           <span
