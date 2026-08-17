@@ -14,7 +14,7 @@ the whole `visualStyles` schema.
 
 ## Current user journey
 
-1. Open the application with the included private-theme-style starter theme loaded.
+1. Open the application with the included sample starter theme loaded.
 2. Import a Power BI `.json` theme from the browser, or continue with the
    starter theme.
 3. Select Card, Bar chart, Table, or Slicer in the visual gallery.
@@ -56,7 +56,7 @@ clone, so imported properties outside the current UI remain intact for export.
 | `app/components/PropertyEditor.tsx` | Current GUI controls and writes to raw theme paths. |
 | `app/lib/theme.ts` | Theme types, parsing, fallback resolution, immutable updates, and export filename creation. |
 | `app/globals.css` | All application and preview styling; no component library or CSS framework is used. |
-| `public/fixtures/private-starter-theme.json` | Small shareable development fixture. |
+| `public/fixtures/starter-theme.json` | Small shareable development fixture. |
 | `tests/static-output.test.mjs` | Checks that a production build emits a static Vite entry point. |
 
 ## Theme handling

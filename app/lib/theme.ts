@@ -30,7 +30,7 @@ export type ResolvedTheme = {
 };
 
 export const STARTER_THEME: PowerBITheme = {
-  name: "Private starter",
+  name: "Sample theme",
   dataColors: ["#005EA5", "#28A197", "#FFDD00", "#D4351C", "#912B88"],
   background: "#FFFFFF",
   foreground: "#0B0C0C",

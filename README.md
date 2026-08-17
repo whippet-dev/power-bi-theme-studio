@@ -61,7 +61,7 @@ npm test
 - Preserve unedited JSON properties and export the updated theme
 - Show a useful error when an uploaded file is not valid JSON
 
-The included `public/fixtures/private-starter-theme.json` is a small development
+The included `public/fixtures/starter-theme.json` is a small development
 fixture. It is not intended to replace the user's full theme.
 
 ## Your theme files
@@ -83,7 +83,7 @@ app/
   globals.css             # application and preview styling
   main.tsx                # browser entry point
 public/fixtures/
-  private-starter-theme.json  # development theme
+  starter-theme.json      # development theme
 tests/
   static-output.test.mjs  # static build smoke test
 ```

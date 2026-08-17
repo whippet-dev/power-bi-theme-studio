@@ -4,7 +4,7 @@ import { propertyThemePath, resolveTableStyle, TABLE_PROPERTIES } from "../app/l
 import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 const STARTER_THEME: PowerBITheme = {
-  name: "Private starter",
+  name: "Sample theme",
   dataColors: ["#005EA5", "#28A197", "#FFDD00", "#D4351C", "#912B88"],
   background: "#FFFFFF",
   foreground: "#0B0C0C",
@@ -15,9 +15,8 @@ const STARTER_THEME: PowerBITheme = {
   visualStyles: {},
 };
 
-// Mirrors the shape (and the real bug) found in a private real-world theme: a
-// tableEx override with a dark blue header/white text that the resolver must
-// prefer over the unrelated top-level tableAccent token.
+// Mirrors a real-world tableEx override (dark blue header, white text) that
+// the resolver must prefer over the unrelated top-level tableAccent token.
 const THEME_WITH_TABLE_OVERRIDE: PowerBITheme = {
   ...STARTER_THEME,
   tableAccent: "#252423",
@@ -69,7 +68,7 @@ test("propertyThemePath writes round-trip through updateThemeValue and resolveTa
 
   assert.equal(table.headerBackground, "#123456");
   // Writing one property must not disturb the rest of the theme.
-  assert.equal(updated.name, "Private starter");
+  assert.equal(updated.name, "Sample theme");
 });
 
 test("propertyThemePath writes a boolean property directly, without a colour wrapper", () => {
