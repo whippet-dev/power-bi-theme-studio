@@ -137,10 +137,17 @@ export function VisualGallery({ theme, tableStyle, selected, onSelect }: VisualG
           <span
             className="table-preview__row table-preview__head"
             style={{
-              backgroundColor: tableStyle.headerBackground,
-              color: tableStyle.headerText,
-              fontSize: tableStyle.headerFontSize,
-              padding: `${tableStyle.rowPadding}px 8px`,
+              backgroundColor: tableStyle.columnHeaders.backColor,
+              color: tableStyle.columnHeaders.fontColor,
+              fontFamily: tableStyle.columnHeaders.fontFamily,
+              fontSize: tableStyle.columnHeaders.fontSize,
+              fontWeight: tableStyle.columnHeaders.bold ? 700 : 400,
+              fontStyle: tableStyle.columnHeaders.italic ? "italic" : "normal",
+              textDecoration: tableStyle.columnHeaders.underline ? "underline" : "none",
+              padding: `${tableStyle.grid.rowPadding}px 8px`,
+              borderRight: tableStyle.grid.gridVertical
+                ? `${tableStyle.grid.gridVerticalWeight}px solid ${tableStyle.grid.gridVerticalColor}`
+                : undefined,
             }}
           >
             <span>Region</span><span>Approved</span><span>Value</span>
@@ -149,23 +156,47 @@ export function VisualGallery({ theme, tableStyle, selected, onSelect }: VisualG
             ["London", "82%", "£2.8m"],
             ["North West", "76%", "£2.1m"],
             ["Scotland", "71%", "£1.9m"],
-          ].map((row, index) => (
+          ].map((row, index) => {
+            const banded = index % 2 === 1;
+            return (
+              <span
+                className="table-preview__row"
+                key={row[0]}
+                style={{
+                  backgroundColor: banded ? tableStyle.values.backColorSecondary : tableStyle.values.backColorPrimary,
+                  color: banded ? tableStyle.values.fontColorSecondary : tableStyle.values.fontColorPrimary,
+                  fontFamily: tableStyle.values.fontFamily,
+                  fontSize: tableStyle.values.fontSize,
+                  fontWeight: tableStyle.values.bold ? 700 : 400,
+                  fontStyle: tableStyle.values.italic ? "italic" : "normal",
+                  textDecoration: tableStyle.values.underline ? "underline" : "none",
+                  padding: `${tableStyle.grid.rowPadding}px 8px`,
+                  borderBottom: tableStyle.grid.gridHorizontal
+                    ? `${tableStyle.grid.gridHorizontalWeight}px solid ${tableStyle.grid.gridHorizontalColor}`
+                    : "none",
+                }}
+              >
+                {row.map((cell) => <span key={cell}>{cell}</span>)}
+              </span>
+            );
+          })}
+          {tableStyle.total.totals && (
             <span
               className="table-preview__row"
-              key={row[0]}
               style={{
-                backgroundColor: index % 2 === 0 ? tableStyle.rowBaseBackground : tableStyle.rowAltBackground,
-                color: tableStyle.valuesText,
-                fontSize: tableStyle.valuesFontSize,
-                padding: `${tableStyle.rowPadding}px 8px`,
-                borderBottom: tableStyle.gridlinesVisible
-                  ? `1px solid ${tableStyle.gridlineColor}`
-                  : "none",
+                backgroundColor: tableStyle.total.backColor,
+                color: tableStyle.total.fontColor,
+                fontFamily: tableStyle.total.fontFamily,
+                fontSize: tableStyle.total.fontSize,
+                fontWeight: tableStyle.total.bold ? 700 : 400,
+                fontStyle: tableStyle.total.italic ? "italic" : "normal",
+                textDecoration: tableStyle.total.underline ? "underline" : "none",
+                padding: `${tableStyle.grid.rowPadding}px 8px`,
               }}
             >
-              {row.map((cell) => <span key={cell}>{cell}</span>)}
+              <span>{tableStyle.total.label}</span><span>76%</span><span>£6.8m</span>
             </span>
-          ))}
+          )}
         </span>
       </PreviewShell>
 

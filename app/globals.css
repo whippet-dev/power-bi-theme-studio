@@ -395,7 +395,6 @@ button { color: inherit; }
 
 .table-preview__head {
   margin-top: 13px;
-  font-weight: 700;
 }
 
 .slicer-preview__search {
@@ -586,26 +585,18 @@ button { color: inherit; }
   text-align: center;
 }
 
-.number-property {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: #403b47;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.number-property__control {
+.number-control {
   display: grid;
-  grid-template-columns: 1fr 48px;
+  grid-template-columns: 1fr 34px;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  width: 140px;
 }
 
-.number-property input { accent-color: var(--brand); }
+.number-control input { accent-color: var(--brand); }
 
-.number-property output {
-  padding: 6px;
+.number-control output {
+  padding: 5px;
   border: 1px solid #d8d3dc;
   border-radius: 5px;
   color: #5f5967;
@@ -613,48 +604,123 @@ button { color: inherit; }
   text-align: center;
 }
 
+.text-control,
+.select-control {
+  height: 30px;
+  width: 140px;
+  border: 1px solid #d8d3dc;
+  border-radius: 5px;
+  padding: 0 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+/* Compact by default: a property is just a label + control row. All
+   explanation (plain-English description, practical guidance, and the
+   underlying schema path) lives behind the small ⓘ toggle so a group of
+   many properties stays scannable. */
 .registry-property {
-  padding: 12px 0;
   border-bottom: 1px solid #efedf0;
 }
 
 .registry-property:last-child { border-bottom: 0; }
 
-.registry-property__description {
-  margin: 0 0 8px;
+.info-toggle {
+  margin: -6px 0 6px;
+}
+
+.info-toggle summary {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #f2eef6;
+  color: #8a8490;
+  font-size: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.info-toggle summary::-webkit-details-marker { display: none; }
+
+.info-toggle[open] summary {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.info-toggle__panel {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #f7f4fb;
+}
+
+.info-toggle__panel p {
+  margin: 0;
   color: #6d627b;
   font-size: 11px;
   line-height: 1.4;
 }
 
-.registry-property__guidance {
-  margin: 8px 0 0;
-  color: #8a8490;
-  font-size: 10px;
+.info-toggle__guidance {
+  margin-top: 6px !important;
   font-style: italic;
-  line-height: 1.4;
 }
 
-.registry-property__technical {
-  margin-top: 6px;
-}
-
-.registry-property__technical summary {
-  color: #a49db0;
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.registry-property__technical code {
+.info-toggle__panel code {
   display: block;
-  margin-top: 4px;
+  margin-top: 8px;
   padding: 6px 8px;
   border-radius: 5px;
-  background: #f7f4fb;
+  background: #fff;
   color: #5f5967;
   font-family: Consolas, monospace;
   font-size: 9px;
   word-break: break-word;
+}
+
+/* Collapsible groups (Column headers, Values, Total, Grid, ...) so 70+
+   Table properties don't have to render at once. */
+.property-group {
+  border-top: 1px solid #efedf0;
+}
+
+.property-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px;
+  color: #403b47;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.property-group summary::-webkit-details-marker { display: none; }
+
+.property-group__count {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #f2eef6;
+  color: #8a8490;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.property-group[open] > summary .property-group__count {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.property-group__body {
+  padding-bottom: 6px;
 }
 
 .properties-panel__note {

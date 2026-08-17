@@ -5,19 +5,31 @@ import type { JsonValue, PowerBITheme } from "./theme";
  * `visualStyles[visualKey]["*"][propertyGroup][0][propertyName]`. The `"*"`
  * selector means "all instances of this visual type" (as opposed to a
  * specific visual's GUID) and is the only selector this app writes.
+ *
+ * Property coverage is pinned to Microsoft's published schema
+ * reportThemeSchema-2.156.json (microsoft/powerbi-desktop-samples), not
+ * guessed from example themes.
  */
 export type VisualSchemaKey = "tableEx";
 
-export type PropertyValueType = "color" | "number" | "boolean";
+export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
+
+export type EnumOption = { value: string | number; label: string };
 
 type ValueForType<T extends PropertyValueType> = T extends "color"
   ? string
   : T extends "number"
     ? number
-    : boolean;
+    : T extends "boolean"
+      ? boolean
+      : T extends "text"
+        ? string
+        : T extends "enum"
+          ? string | number
+          : never;
 
 export type PropertyDefinition<T extends PropertyValueType = PropertyValueType> = {
-  /** Stable internal id, e.g. "table.headerBackground". */
+  /** Stable internal id, e.g. "table.columnHeaders.backColor". */
   id: string;
   visual: VisualSchemaKey;
   valueType: T;
@@ -31,6 +43,7 @@ export type PropertyDefinition<T extends PropertyValueType = PropertyValueType> 
   path: Array<string | number>;
   min?: T extends "number" ? number : never;
   max?: T extends "number" ? number : never;
+  options?: T extends "enum" ? readonly EnumOption[] : never;
 };
 
 function isRecord(value: unknown): value is Record<string, JsonValue> {
@@ -65,23 +78,31 @@ export function readVisualStyleValue<T extends PropertyValueType>(
 
   const forAllInstances = readAtPath(visualStyles[definition.visual], ["*", ...definition.path]);
 
-  if (definition.valueType === "color") {
-    if (isRecord(forAllInstances)) {
-      const solid = forAllInstances.solid;
-      if (isRecord(solid) && typeof solid.color === "string" && HEX_COLOR.test(solid.color)) {
-        return solid.color as ValueForType<T>;
+  switch (definition.valueType) {
+    case "color": {
+      if (isRecord(forAllInstances)) {
+        const solid = forAllInstances.solid;
+        if (isRecord(solid) && typeof solid.color === "string" && HEX_COLOR.test(solid.color)) {
+          return solid.color as ValueForType<T>;
+        }
       }
+      return undefined;
     }
-    return undefined;
+    case "number":
+      return typeof forAllInstances === "number" && Number.isFinite(forAllInstances)
+        ? (forAllInstances as ValueForType<T>)
+        : undefined;
+    case "boolean":
+      return typeof forAllInstances === "boolean" ? (forAllInstances as ValueForType<T>) : undefined;
+    case "text":
+      return typeof forAllInstances === "string" ? (forAllInstances as ValueForType<T>) : undefined;
+    case "enum":
+      return typeof forAllInstances === "string" || typeof forAllInstances === "number"
+        ? (forAllInstances as ValueForType<T>)
+        : undefined;
+    default:
+      return undefined;
   }
-
-  if (definition.valueType === "number") {
-    return typeof forAllInstances === "number" && Number.isFinite(forAllInstances)
-      ? (forAllInstances as ValueForType<T>)
-      : undefined;
-  }
-
-  return typeof forAllInstances === "boolean" ? (forAllInstances as ValueForType<T>) : undefined;
 }
 
 /** Resolves a property to its theme override, falling back to `fallback` when unset. */
