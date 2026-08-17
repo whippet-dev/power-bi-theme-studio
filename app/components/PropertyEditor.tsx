@@ -182,6 +182,17 @@ const CHROME_GROUP_LABELS: Record<keyof typeof CHROME_PROPERTIES, string> = {
   subTitle: "Subtitle",
   background: "Background",
   border: "Border",
+  divider: "Divider",
+  dropShadow: "Shadow",
+  general: "General",
+  lockAspect: "Lock aspect",
+  padding: "Padding",
+  spacing: "Spacing",
+  stylePreset: "Style preset",
+  visualHeader: "Visual header",
+  visualHeaderTooltip: "Visual header tooltip",
+  visualLink: "Action",
+  visualTooltip: "Tooltip",
 };
 
 const CARD_GROUP_LABELS: Record<keyof typeof CARD_PROPERTIES, string> = {
