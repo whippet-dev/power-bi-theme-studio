@@ -188,8 +188,104 @@ button { color: inherit; }
 
 .studio-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 328px;
+  grid-template-columns: 96px minmax(0, 1fr) 328px;
   min-height: calc(100vh - 116px);
+}
+
+.visual-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: calc(100vh - 116px);
+  position: sticky;
+  top: 116px;
+  padding: 18px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+  overflow-y: auto;
+}
+
+.visual-rail__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.visual-rail__item.is-selected { background: var(--brand-soft); }
+.visual-rail__item.is-hidden { opacity: 0.45; }
+
+.visual-rail__focus {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.visual-rail__focus:disabled { cursor: not-allowed; }
+
+.visual-rail__monogram {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f2eef6;
+  color: #6d627b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.is-selected .visual-rail__monogram {
+  background: var(--brand);
+  color: white;
+}
+
+.visual-rail__name {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 650;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-selected .visual-rail__name { color: var(--brand); }
+
+.visual-rail__toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d6d1d9;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.visual-rail__toggle[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
 }
 
 .canvas-panel {
@@ -248,12 +344,38 @@ button { color: inherit; }
   font-weight: 650;
 }
 
-.visual-grid {
+.visual-canvas {
   max-width: 1100px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Hero: rendered at a fixed pre-scale size, then visually enlarged with a
+   transform so resolved font sizes (often 8-12px) stay legible. The wrap
+   reserves the post-scale footprint so surrounding layout doesn't overlap;
+   transform itself doesn't affect layout sizing, hence the two-box setup. */
+.visual-hero-scale-wrap {
+  display: block;
+  width: 630px;
+  max-width: 100%;
+  height: 510px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.visual-hero-scale {
+  display: block;
+  width: 420px;
+  transform: scale(1.5);
+  transform-origin: top left;
+}
+
+.visual-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .visual-tile {
@@ -268,6 +390,9 @@ button { color: inherit; }
   cursor: pointer;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
+
+.visual-tile--hero { width: 420px; }
+.visual-tile--thumb { width: 200px; }
 
 .visual-tile:hover {
   border-color: #c3b6d7;
@@ -312,6 +437,11 @@ button { color: inherit; }
   background: var(--preview-bg);
   color: var(--preview-fg);
   font-family: var(--preview-font), "Segoe UI", sans-serif;
+}
+
+.visual-tile--thumb .visual-frame {
+  min-height: 150px;
+  padding: 14px;
 }
 
 .preview-title {
@@ -915,6 +1045,16 @@ button { color: inherit; }
     border-top: 1px solid var(--line);
     border-left: 0;
   }
+  .visual-rail {
+    flex-direction: row;
+    height: auto;
+    position: static;
+    padding: 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .visual-rail__item { flex-direction: column; }
 }
 
 @media (max-width: 680px) {
@@ -930,7 +1070,12 @@ button { color: inherit; }
   .canvas-panel { padding: 26px 16px 38px; }
   .canvas-panel__intro { align-items: flex-start; }
   .preview-badge { display: none; }
-  .visual-grid { grid-template-columns: 1fr; }
+  .visual-hero-scale-wrap {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 630 / 510;
+  }
+  .visual-tile--thumb { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

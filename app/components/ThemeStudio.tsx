@@ -17,6 +17,7 @@ import type { VisualSchemaKey } from "../lib/properties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
+import { VisualRail } from "./VisualRail";
 
 // Maps this app's UI visual identifiers to the schema's real visual-type
 // keys, so chrome (title/subtitle/background/border) resolves per visual.
@@ -27,9 +28,17 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   slicer: "slicer",
 };
 
+const ALL_VISUALS: VisualKind[] = ["card", "bar", "table", "slicer"];
+
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
   const [selectedVisual, setSelectedVisual] = useState<VisualKind>("bar");
+  const [visibility, setVisibility] = useState<Record<VisualKind, boolean>>({
+    card: true,
+    bar: true,
+    table: true,
+    slicer: true,
+  });
   const [fileLabel, setFileLabel] = useState("Starter theme");
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -73,6 +82,25 @@ export function ThemeStudio() {
   const handleReset = (path: Array<string | number>) => {
     setTheme((current) => deleteThemeValue(current, path));
     setMessage(null);
+  };
+
+  const visibleVisuals = ALL_VISUALS.filter((kind) => visibility[kind]);
+
+  const handleToggleVisible = (kind: VisualKind) => {
+    setVisibility((current) => {
+      const makingVisible = !current[kind];
+      const visibleCount = ALL_VISUALS.filter((k) => current[k]).length;
+      if (!makingVisible && visibleCount <= 1) return current; // at least one visual must stay on the canvas
+
+      const next = { ...current, [kind]: makingVisible };
+      if (makingVisible) {
+        setSelectedVisual(kind);
+      } else if (selectedVisual === kind) {
+        const fallback = ALL_VISUALS.find((k) => k !== kind && next[k]);
+        if (fallback) setSelectedVisual(fallback);
+      }
+      return next;
+    });
   };
 
   const handleExport = () => {
@@ -143,14 +171,23 @@ export function ThemeStudio() {
       )}
 
       <div className="studio-layout">
+        <VisualRail
+          visibility={visibility}
+          selected={selectedVisual}
+          onSelect={setSelectedVisual}
+          onToggleVisible={handleToggleVisible}
+        />
+
         <section className="canvas-panel" aria-labelledby="gallery-title">
           <div className="canvas-panel__intro">
             <div>
               <span className="eyebrow">Live canvas</span>
               <h1 id="gallery-title">Visual gallery</h1>
-              <p>Choose a visual, then tune the shared theme settings. Every preview updates immediately.</p>
+              <p>Pick visuals on the left, then tune their settings on the right. The selected visual previews large.</p>
             </div>
-            <span className="preview-badge"><span /> 4 previews</span>
+            <span className="preview-badge">
+              <span /> {visibleVisuals.length} on canvas
+            </span>
           </div>
 
           <VisualGallery
@@ -158,6 +195,7 @@ export function ThemeStudio() {
             tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             chromeStyles={chromeStyles}
+            visibleVisuals={visibleVisuals}
             selected={selectedVisual}
             onSelect={setSelectedVisual}
           />
