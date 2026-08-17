@@ -746,7 +746,7 @@ export function resolveTableStyle(theme: PowerBITheme, base: ResolvedTheme): Res
       gridVerticalWeight: resolvePropertyValue(theme, p.grid.gridVerticalWeight, 1),
       rowPadding: resolvePropertyValue(theme, p.grid.rowPadding, 3),
       textSize: resolvePropertyValue(theme, p.grid.textSize, 12),
-      outlineColor: resolvePropertyValue(theme, p.grid.outlineColor, "#E3E3E3"),
+      outlineColor: resolvePropertyValue(theme, p.grid.outlineColor, "#D8D3DC"),
       outlineWeight: resolvePropertyValue(theme, p.grid.outlineWeight, 1),
       outlineStyle: resolvePropertyValue(theme, p.grid.outlineStyle, 0),
       imageHeight: resolvePropertyValue(theme, p.grid.imageHeight, 20),

@@ -386,9 +386,8 @@ button { color: inherit; }
   border-radius: 12px;
   background: white;
   text-align: left;
-  box-shadow: 0 2px 5px rgba(34, 25, 43, 0.035);
   cursor: pointer;
-  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: border-color 150ms ease, transform 150ms ease;
 }
 
 .visual-tile--hero { width: 420px; }
@@ -396,18 +395,11 @@ button { color: inherit; }
 
 .visual-tile:hover {
   border-color: #c3b6d7;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(34, 25, 43, 0.08);
 }
 
 .visual-tile:focus-visible {
   outline: 3px solid rgba(86, 59, 143, 0.24);
   outline-offset: 2px;
-}
-
-.visual-tile.is-selected {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px var(--brand), 0 10px 26px rgba(63, 41, 105, 0.12);
 }
 
 .visual-tile__label {
