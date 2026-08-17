@@ -16,6 +16,7 @@ import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import { resolveActionButtonStyle } from "../lib/actionButtonProperties";
 import { resolveBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
+import { hexWithAlpha } from "../lib/colorUtils";
 import { resolveGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { resolveColumnChartStyle } from "../lib/columnChartProperties";
 import { resolveImageStyle } from "../lib/imageProperties";
@@ -30,6 +31,8 @@ import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
 import { resolveStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { resolveTextboxStyle } from "../lib/textboxProperties";
+import { resolveThemeColors } from "../lib/themeGlobalsProperties";
+import { FilterPanePreview, PaletteLegend } from "./GlobalPreviews";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
 import { VisualRail } from "./VisualRail";
@@ -141,6 +144,7 @@ export function ThemeStudio() {
   // resolved chrome.
   const sharedChromeStyle = useMemo(() => resolveChromeStyle(theme, "*", resolved), [theme, resolved]);
   const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(theme, resolved), [theme, resolved]);
+  const themeColors = useMemo(() => resolveThemeColors(theme, resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -273,9 +277,29 @@ export function ThemeStudio() {
             </span>
           </div>
 
-          <VisualGallery
-            theme={resolved}
-            tableStyle={tableStyle}
+          {/* The report surface: wallpaper (the area around the page),
+              then the page itself, then the filter pane docked to its
+              right — so page/report-level settings have somewhere to
+              actually show up rather than only existing in the JSON. */}
+          <div
+            className="report-surface"
+            style={{
+              backgroundColor: hexWithAlpha(globalOptionsStyle.pageWallpaper.color, globalOptionsStyle.pageWallpaper.transparency),
+            }}
+          >
+            <div
+              className="report-page"
+              style={{
+                backgroundColor: hexWithAlpha(
+                  globalOptionsStyle.pageBackground.color,
+                  globalOptionsStyle.pageBackground.transparency,
+                ),
+                justifyContent: globalOptionsStyle.pageAlignment.verticalAlignment === "Middle" ? "center" : "flex-start",
+              }}
+            >
+              <VisualGallery
+                theme={resolved}
+                tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}
             stackedBarChartStyle={stackedBarChartStyle}
@@ -291,11 +315,16 @@ export function ThemeStudio() {
             pageNavigatorStyle={pageNavigatorStyle}
             textboxStyle={textboxStyle}
             imageStyle={imageStyle}
-            chromeStyles={chromeStyles}
-            visibleVisuals={visibleVisuals}
-            selected={selectedVisual}
-            onSelect={setSelectedVisual}
-          />
+                chromeStyles={chromeStyles}
+                visibleVisuals={visibleVisuals}
+                selected={selectedVisual}
+                onSelect={setSelectedVisual}
+              />
+            </div>
+            <FilterPanePreview globalOptions={globalOptionsStyle} />
+          </div>
+
+          <PaletteLegend theme={resolved} colors={themeColors} />
         </section>
 
         <PropertyEditor

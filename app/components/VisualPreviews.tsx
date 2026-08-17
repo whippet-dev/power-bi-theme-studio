@@ -3,6 +3,7 @@ import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
+import { hexWithAlpha } from "../lib/colorUtils";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
@@ -94,14 +95,6 @@ function mapTextAlign(value: string | number): CSSProperties["textAlign"] | unde
   return undefined; // "Auto" — leave the per-column default alignment alone.
 }
 
-function hexWithAlpha(hex: string, transparencyPercent: number): string {
-  const clean = hex.replace("#", "");
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  const alpha = Math.max(0, Math.min(1, 1 - transparencyPercent / 100));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 /**
  * Shared tile renderer for the "shape family" visuals (Shape, Action

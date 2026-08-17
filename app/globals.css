@@ -345,11 +345,236 @@ button { color: inherit; }
 }
 
 .visual-canvas {
-  max-width: 1100px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+/* The report surface stack: wallpaper (outer) -> page (inner) -> filter
+   pane docked right. Gives page/report-level theme settings somewhere to
+   actually render, instead of only existing in the exported JSON. */
+.report-surface {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: stretch;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.report-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border-radius: 10px;
+}
+
+.filter-pane {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-left: 18px;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.filter-pane--hidden,
+.filter-pane--collapsed {
+  width: 42px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 14px 6px;
+}
+
+.filter-pane--hidden {
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+
+.filter-pane__hidden-note,
+.filter-pane__collapsed-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
+
+.filter-pane__title {
+  font-weight: 700;
+}
+
+.filter-pane__header {
+  margin-top: 4px;
+  font-weight: 650;
+  opacity: 0.85;
+}
+
+.filter-pane__search {
+  padding: 6px 8px;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.filter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border-radius: 4px;
+}
+
+.filter-card__name {
+  font-weight: 650;
+}
+
+.filter-card__value {
+  padding: 5px 7px;
+  border-radius: 3px;
+  opacity: 0.9;
+}
+
+.filter-card__options {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-card__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-card__check {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.filter-pane__apply {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 5px 12px;
+  border-radius: 3px;
+  color: #fff;
+  font-weight: 650;
+}
+
+/* Theme-level colour tokens have no single visual that shows them, so
+   this strip draws each as a miniature of what it actually controls. */
+.palette-legend {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.palette-legend h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.palette-legend p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.palette-legend__series {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 40px;
+}
+
+.palette-legend__series-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.palette-legend__series-bar {
+  width: 15px;
+  border-radius: 2px 2px 0 0;
+}
+
+.palette-legend__series-item small,
+.palette-legend__scale-labels small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.palette-legend__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.palette-legend__chip,
+.palette-legend__null {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.palette-legend__chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.palette-legend__scale {
+  height: 13px;
+  border-radius: 3px;
+}
+
+.palette-legend__scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.palette-legend__null {
+  margin-top: 10px;
+}
+
+.palette-legend__text-demos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.palette-legend__stroke-demo {
+  padding: 3px 8px;
+  border: 1.5px solid;
+  border-radius: 4px;
 }
 
 /* Hero: rendered at a fixed pre-scale size, then visually enlarged with a
