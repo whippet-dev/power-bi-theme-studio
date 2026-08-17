@@ -85,7 +85,7 @@ app/
 public/fixtures/
   private-starter-theme.json  # development theme
 tests/
-  rendered-html.test.mjs  # production-render smoke test
+  static-output.test.mjs  # static build smoke test
 ```
 
 ## Deliberately deferred
