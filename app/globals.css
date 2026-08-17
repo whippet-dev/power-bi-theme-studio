@@ -790,9 +790,109 @@ button { color: inherit; }
   z-index: 1;
 }
 
+/* Zoom sliders sit against the axis they belong to. */
+.chart-zoom {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.chart-zoom--horizontal {
+  left: 0;
+  right: 0;
+  bottom: -10px;
+}
+
+.chart-zoom--vertical {
+  top: 0;
+  bottom: 0;
+  right: -10px;
+  flex-direction: column;
+}
+
+.chart-zoom__thumb {
+  flex: 1;
+  margin: 2px 18%;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.chart-zoom__label {
+  position: absolute;
+  font-size: 7px;
+  opacity: 0.65;
+}
+
+.chart-zoom--horizontal .chart-zoom__label--start { left: 0; top: 100%; }
+.chart-zoom--horizontal .chart-zoom__label--end { right: 0; top: 100%; }
+.chart-zoom--vertical .chart-zoom__label--start { bottom: 0; left: 100%; }
+.chart-zoom--vertical .chart-zoom__label--end { top: 0; left: 100%; }
+
+.line-preview__error-label {
+  position: absolute;
+  transform: translate(6px, -14px);
+  white-space: nowrap;
+}
+
 .chart-ticks {
   display: flex;
   margin-top: 3px;
+}
+
+/* Secondary value axis, drawn to the right of the plot. */
+.chart-ticks--secondary {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 0;
+  transform: translateX(100%);
+  padding-left: 4px;
+  pointer-events: none;
+}
+
+.chart-preview__axis-title--secondary {
+  text-align: right;
+}
+
+.line-preview__series-label {
+  position: absolute;
+  right: 0;
+  transform: translate(100%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.line-preview__leader {
+  display: inline-block;
+  width: 10px;
+  border-top-style: solid;
+}
+
+/* A grid of repeated mini-charts, one per category. */
+.small-multiples {
+  display: grid;
+  height: 202px;
+  overflow: hidden;
+}
+
+.small-multiples__cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.small-multiples__title {
+  display: block;
+  flex-shrink: 0;
 }
 
 .chart-ticks--horizontal {

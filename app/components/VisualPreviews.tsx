@@ -1486,6 +1486,61 @@ export function VisualGallery({
     </span>
   );
 
+  // Zoom sliders sit against whichever axes they're enabled for. Their
+  // size is a thickness in pixels, and labels show the visible range.
+  const zoom = lineChartStyle.zoom;
+  const zoomSlider = (orientation: "horizontal" | "vertical", size: number, min: number, max: number, key: string) => (
+    <span className={`chart-zoom chart-zoom--${orientation}`} key={key} style={{ [orientation === "horizontal" ? "height" : "width"]: size || 8 }}>
+      <span className="chart-zoom__thumb" />
+      {zoom.showLabels && (
+        <>
+          <span className="chart-zoom__label chart-zoom__label--start">{min || 0}</span>
+          <span className="chart-zoom__label chart-zoom__label--end">{max || 100}</span>
+        </>
+      )}
+    </span>
+  );
+  const zoomNodes = zoom.show && (
+    <>
+      {zoom.showOnValueAxis && zoomSlider("vertical", zoom.valueSize, zoom.valueMin, zoom.valueMax, "v")}
+      {zoom.showOnValueSecAxis && zoomSlider("vertical", zoom.valueSecSize, zoom.valueSecMin, zoom.valueSecMax, "v2")}
+      {zoom.showOnCategoryAxis && zoomSlider("horizontal", zoom.categorySize, zoom.categoryMin, zoom.categoryMax, "h")}
+    </>
+  );
+
+  // Error bars can carry their own label and a shaded band around the
+  // series — 20-odd properties with nothing to render against before.
+  const err = lineChartStyle.error;
+  const errorShade = err.enabled && err.shadeShow && (
+    <polygon
+      points={`${linePointCoords.map((p) => `${p.x},${p.y - 7}`).join(" ")} ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 7}`).join(" ")}`}
+      fill={hexWithAlpha(err.shadeMatchSeriesColor ? lineChartStyle.dataPoint.fill : err.shadeColor, err.shadeTransparency)}
+      stroke="none"
+    />
+  );
+  const errorLabel = err.enabled && err.labelShow && (
+    <span
+      className="line-preview__error-label"
+      style={{
+        left: `${linePointCoords[3].x}%`,
+        top: `${linePointCoords[3].y}%`,
+        color: err.labelMatchSeriesColor ? lineChartStyle.dataPoint.fill : err.labelColor,
+        fontFamily: err.labelFontFamily || undefined,
+        fontSize: err.labelFontSize,
+        fontWeight: err.labelBold ? 700 : 400,
+        fontStyle: err.labelItalic ? "italic" : "normal",
+        textDecoration: err.labelUnderline ? "underline" : "none",
+        backgroundColor: err.labelBackground
+          ? hexWithAlpha(err.labelBackgroundColor, err.labelBackgroundTransparency)
+          : undefined,
+        padding: err.labelBackground ? "1px 3px" : undefined,
+        borderRadius: err.labelBackground ? 3 : undefined,
+      }}
+    >
+      ±6%
+    </span>
+  );
+
   const lineConstantLines = (
     <>
       {constantLine(lineChartStyle.referenceLine, "vertical", 70, "ref")}
@@ -1580,9 +1635,12 @@ export function VisualGallery({
         <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
         {y2Node}
         {seriesLabelNode}
+        {zoomNodes}
+        {errorLabel}
         {lineConstantLines}
         <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {anomalyNode}
+          {errorShade}
           {lineIsArea && (
             <path
               d={areaPath(linePointCoords, linePathD)}
