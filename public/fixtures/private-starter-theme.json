@@ -1,0 +1,31 @@
+{
+  "name": "Private starter",
+  "dataColors": [
+    "#005EA5",
+    "#28A197",
+    "#FFDD00",
+    "#D4351C",
+    "#912B88"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#0B0C0C",
+  "tableAccent": "#005EA5",
+  "textClasses": {
+    "title": {
+      "fontFace": "Segoe UI",
+      "fontSize": 12,
+      "color": "#0B0C0C"
+    },
+    "callout": {
+      "fontFace": "Segoe UI Semibold",
+      "fontSize": 28,
+      "color": "#0B0C0C"
+    },
+    "label": {
+      "fontFace": "Segoe UI",
+      "fontSize": 10,
+      "color": "#505A5F"
+    }
+  },
+  "visualStyles": {}
+}
