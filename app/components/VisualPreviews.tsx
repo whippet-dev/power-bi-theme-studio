@@ -881,8 +881,13 @@ export function VisualGallery({
                     height: barThickness(barChartStyle.layout.clusteredGapSize),
                     backgroundColor: hexWithAlpha(barChartStyle.dataPoint.fill, barChartStyle.dataPoint.fillTransparency),
                     border: barChartStyle.dataPoint.borderShow
-                      ? `${barChartStyle.dataPoint.borderSize}px solid ${barChartStyle.dataPoint.borderColor}`
+                      ? `${barChartStyle.dataPoint.borderSize}px solid ${hexWithAlpha(
+                          barChartStyle.dataPoint.borderColorMatchFill ? barChartStyle.dataPoint.fill : barChartStyle.dataPoint.borderColor,
+                          barChartStyle.dataPoint.borderTransparency,
+                        )}`
                       : undefined,
+                    // "Outline only" draws the border and drops the fill.
+                    ...(barChartStyle.dataPoint.borderOutlineOnly ? { backgroundColor: "transparent" } : {}),
                   }}
                 />
               </span>

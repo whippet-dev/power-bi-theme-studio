@@ -45,6 +45,7 @@ export type AxisStyle = {
   gridlineThickness: number;
   gridlineStyle: string | number;
   gridlineTransparency?: number;
+  gridlineDashArray?: string;
   // The schema types axis start/end as strings, not numbers.
   start?: string | number;
   end?: string | number;
@@ -178,6 +179,9 @@ export function ChartLegend({
 export function Gridlines({ axis, orientation, count = 4 }: { axis: AxisStyle; orientation: "vertical" | "horizontal"; count?: number }) {
   if (!axis.gridlineShow) return null;
   const style = mapLineStyle(axis.gridlineStyle);
+  // An explicit dash array wins over the named style, as elsewhere.
+  const dashed = String(axis.gridlineDashArray ?? "") !== "";
+  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
 
   return (
     <>
@@ -195,16 +199,16 @@ export function Gridlines({ axis, orientation, count = 4 }: { axis: AxisStyle; o
                     top: 0,
                     bottom: 0,
                     borderLeftWidth: axis.gridlineThickness,
-                    borderLeftStyle: style,
-                    borderLeftColor: axis.gridlineColor,
+                    borderLeftStyle: dashed ? "dashed" : style,
+                    borderLeftColor: color,
                   }
                 : {
                     bottom: offset,
                     left: 0,
                     right: 0,
                     borderTopWidth: axis.gridlineThickness,
-                    borderTopStyle: style,
-                    borderTopColor: axis.gridlineColor,
+                    borderTopStyle: dashed ? "dashed" : style,
+                    borderTopColor: color,
                   }
             }
           />
@@ -264,6 +268,7 @@ export type DataLabelStyle = {
   // Not every chart's labels group carries these — the line chart has no
   // orientation or word-wrap setting, for instance.
   labelOrientation?: string | number;
+  horizontalAlignment?: string | number;
   wordWrap?: boolean;
   enableBackground: boolean;
   backgroundColor: string;
@@ -349,6 +354,10 @@ export function DataLabel({
         padding: labels.enableBackground ? "1px 4px" : undefined,
         borderRadius: labels.enableBackground ? 3 : undefined,
         maxWidth: labels.labelContainerMaxWidth || undefined,
+        opacity: 1 - (labels.transparency ?? 0) / 100,
+        textAlign: /left|right|center/i.test(String(labels.horizontalAlignment ?? ""))
+          ? (String(labels.horizontalAlignment).toLowerCase() as CSSProperties["textAlign"])
+          : undefined,
         whiteSpace: labels.wordWrap ? "normal" : "nowrap",
         writingMode: vertical ? "vertical-rl" : undefined,
       }}
