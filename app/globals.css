@@ -510,8 +510,7 @@ button { color: inherit; }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 6px;
-  margin-right: -6px;
+  overflow-x: hidden;
 }
 
 .properties-panel h2 {
@@ -554,17 +553,18 @@ button { color: inherit; }
 }
 
 .property-row {
+  min-width: 0;
   min-height: 45px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   border-bottom: 1px solid #efedf0;
 }
 
 .property-row:last-child { border-bottom: 0; }
 
 .property-row__copy {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -572,9 +572,19 @@ button { color: inherit; }
 }
 
 .property-row__label {
+  display: block;
+  overflow: hidden;
   color: #403b47;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.property-row__control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .property-row__value {
@@ -587,6 +597,7 @@ button { color: inherit; }
 .palette-editor__item { position: relative; }
 
 .color-control {
+  flex-shrink: 0;
   width: 32px;
   height: 27px;
   overflow: hidden;
@@ -637,6 +648,7 @@ button { color: inherit; }
 }
 
 .number-control {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: 1fr 34px;
   align-items: center;
@@ -657,8 +669,10 @@ button { color: inherit; }
 
 .text-control,
 .select-control {
+  flex-shrink: 0;
   height: 30px;
   width: 140px;
+  max-width: 100%;
   border: 1px solid #d8d3dc;
   border-radius: 5px;
   padding: 0 8px;
@@ -667,18 +681,23 @@ button { color: inherit; }
   font-size: 11px;
 }
 
-/* Compact by default: a property is just a label + control row. All
-   explanation (plain-English description, practical guidance, and the
-   underlying schema path) lives behind the small ⓘ toggle so a group of
-   many properties stays scannable. */
+/* Compact by default: a property is just a label + control + ⓘ on one
+   line. All explanation (plain-English description, practical guidance,
+   and the underlying schema path) lives behind the small ⓘ toggle so a
+   group of many properties stays scannable. The toggle sits inline in the
+   same row as its label/control — not on a line of its own — so it's
+   never ambiguous which property it belongs to. */
 .registry-property {
   border-bottom: 1px solid #efedf0;
 }
 
 .registry-property:last-child { border-bottom: 0; }
 
+.registry-property .property-row { border-bottom: 0; }
+
 .info-toggle {
-  margin: -6px 0 6px;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .info-toggle summary {
@@ -687,7 +706,6 @@ button { color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
   border-radius: 999px;
   background: #f2eef6;
   color: #8a8490;
@@ -703,11 +721,54 @@ button { color: inherit; }
   color: var(--brand);
 }
 
+.info-toggle .info-toggle__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  width: 230px;
+  max-width: 60vw;
+}
+
+/* Marks a property with an explicit value in the theme (vs. a resolved
+   fallback shown for reference), and lets it be cleared back to inherited. */
+.property-row__override-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  vertical-align: middle;
+}
+
+.reset-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: #f2eef6;
+  color: #8a8490;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reset-toggle:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
 .info-toggle__panel {
-  margin-top: 6px;
   padding: 10px 12px;
   border-radius: 7px;
+  border: 1px solid #e5dfec;
   background: #f7f4fb;
+  box-shadow: 0 6px 18px rgba(20, 10, 30, 0.14);
 }
 
 .info-toggle__panel p {

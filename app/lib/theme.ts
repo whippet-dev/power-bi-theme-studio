@@ -146,6 +146,61 @@ export function updateThemeValue(
   return clone as PowerBITheme;
 }
 
+/** Whether the theme has an explicit value at `path` — used to tell an active override apart from a resolved fallback. */
+export function hasThemeValueAtPath(theme: PowerBITheme, path: Array<string | number>): boolean {
+  let cursor: unknown = theme;
+
+  for (const part of path) {
+    if (Array.isArray(cursor)) {
+      cursor = typeof part === "number" ? cursor[part] : undefined;
+    } else if (isRecord(cursor)) {
+      cursor = cursor[part];
+    } else {
+      return false;
+    }
+  }
+
+  return cursor !== undefined;
+}
+
+/**
+ * Removes the value at `path`, so resolution falls back to a shared default
+ * or plain fallback again — the counterpart to updateThemeValue. Any
+ * now-empty object left behind along the path is pruned too, so clearing
+ * the last override in e.g. `visualStyles.tableEx` removes the whole empty
+ * shell rather than leaving `{ "tableEx": { "*": { "title": [{}] } } }`
+ * behind.
+ */
+export function deleteThemeValue(theme: PowerBITheme, path: Array<string | number>): PowerBITheme {
+  const clone = JSON.parse(JSON.stringify(theme)) as Record<string | number, unknown>;
+  const chain: Array<{ container: Record<string | number, unknown>; key: string | number }> = [];
+  let cursor: Record<string | number, unknown> = clone;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const part = path[i];
+    const next = cursor[part];
+    if (typeof next !== "object" || next === null) return clone as PowerBITheme;
+    chain.push({ container: cursor, key: part });
+    cursor = next as Record<string | number, unknown>;
+  }
+
+  delete cursor[path[path.length - 1]];
+
+  // Prune empty containers we just walked through, innermost first.
+  let pruned: Record<string | number, unknown> | null = cursor;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const isEmpty = Array.isArray(pruned)
+      ? pruned.every((entry) => entry === undefined || (isRecord(entry) && Object.keys(entry).length === 0))
+      : Object.keys(pruned).length === 0;
+    if (!isEmpty) break;
+    const { container, key } = chain[i];
+    delete container[key];
+    pruned = container;
+  }
+
+  return clone as PowerBITheme;
+}
+
 export function cloneStarterTheme(): PowerBITheme {
   return JSON.parse(JSON.stringify(STARTER_THEME)) as PowerBITheme;
 }

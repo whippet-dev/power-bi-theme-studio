@@ -5,7 +5,7 @@ import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "..
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
-import type { PowerBITheme, ResolvedTheme } from "../lib/theme";
+import { hasThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
 import type { VisualKind } from "./VisualPreviews";
 
 type ThemePath = Array<string | number>;
@@ -22,6 +22,7 @@ type PropertyEditorProps = {
   activeVisualSchemaKey: VisualSchemaKey;
   selected: VisualKind;
   onChange: (path: ThemePath, value: PropertyValue) => void;
+  onReset: (path: ThemePath) => void;
 };
 
 const visualNames: Record<VisualKind, string> = {
@@ -156,23 +157,36 @@ function SelectControl({
  * defined once but write to different visuals depending on which tab is
  * active — the technical path shown must reflect where this row actually
  * writes, not the registry entry's placeholder visual.
+ *
+ * `hasOverride` distinguishes an explicit value the theme actually sets
+ * from one this row is merely showing as a resolved fallback — only the
+ * former gets a dot marker and a reset control, so clearing it lets
+ * resolution fall through to the shared/theme default again instead of
+ * requiring the value to be hand-matched back.
  */
 function PropertyRow({
   definition,
   pathPrefix,
   value,
+  hasOverride,
   onChange,
+  onReset,
 }: {
   definition: PropertyDefinition;
   pathPrefix: string;
   value: PropertyValue;
+  hasOverride: boolean;
   onChange: (value: PropertyValue) => void;
+  onReset: () => void;
 }) {
   return (
     <div className="registry-property">
       <div className="property-row">
         <span className="property-row__copy">
-          <span className="property-row__label">{definition.label}</span>
+          <span className="property-row__label">
+            {hasOverride && <span className="property-row__override-dot" title="This value is set explicitly" />}
+            {definition.label}
+          </span>
         </span>
         <span className="property-row__control">
           {definition.valueType === "color" && (
@@ -201,15 +215,26 @@ function PropertyRow({
             />
           )}
         </span>
+        {hasOverride && (
+          <button
+            type="button"
+            className="reset-toggle"
+            onClick={onReset}
+            aria-label={`Reset ${definition.label} to the theme default`}
+            title="Reset to theme default"
+          >
+            ↺
+          </button>
+        )}
+        <details className="info-toggle">
+          <summary aria-label={`About ${definition.label}`}>ⓘ</summary>
+          <div className="info-toggle__panel">
+            <p>{definition.description}</p>
+            {definition.guidance && <p className="info-toggle__guidance">{definition.guidance}</p>}
+            <code>{`${pathPrefix} → ${definition.path.join(" → ")}`}</code>
+          </div>
+        </details>
       </div>
-      <details className="info-toggle">
-        <summary aria-label={`About ${definition.label}`}>ⓘ</summary>
-        <div className="info-toggle__panel">
-          <p>{definition.description}</p>
-          {definition.guidance && <p className="info-toggle__guidance">{definition.guidance}</p>}
-          <code>{`${pathPrefix} → ${definition.path.join(" → ")}`}</code>
-        </div>
-      </details>
     </div>
   );
 }
@@ -221,19 +246,23 @@ function PropertyRow({
  * out of view.
  */
 function PropertyGroupSection({
+  theme,
   title,
   group,
   groupValues,
   pathPrefix,
   getThemePath,
   onChange,
+  onReset,
 }: {
+  theme: PowerBITheme;
   title: string;
   group: Record<string, PropertyDefinition<PropertyValueType>>;
   groupValues: Record<string, PropertyValue>;
   pathPrefix: string;
   getThemePath: (definition: PropertyDefinition) => ThemePath;
   onChange: (path: ThemePath, value: PropertyValue) => void;
+  onReset: (path: ThemePath) => void;
 }) {
   return (
     <details className="property-group">
@@ -242,15 +271,20 @@ function PropertyGroupSection({
         <span className="property-group__count">{Object.keys(group).length}</span>
       </summary>
       <div className="property-group__body">
-        {Object.entries(group).map(([key, definition]) => (
-          <PropertyRow
-            key={definition.id}
-            definition={definition}
-            pathPrefix={pathPrefix}
-            value={groupValues[key]}
-            onChange={(next) => onChange(getThemePath(definition), next)}
-          />
-        ))}
+        {Object.entries(group).map(([key, definition]) => {
+          const path = getThemePath(definition);
+          return (
+            <PropertyRow
+              key={definition.id}
+              definition={definition}
+              pathPrefix={pathPrefix}
+              value={groupValues[key]}
+              hasOverride={hasThemeValueAtPath(theme, path)}
+              onChange={(next) => onChange(path, next)}
+              onReset={() => onReset(path)}
+            />
+          );
+        })}
       </div>
     </details>
   );
@@ -266,6 +300,7 @@ export function PropertyEditor({
   activeVisualSchemaKey,
   selected,
   onChange,
+  onReset,
 }: PropertyEditorProps) {
   const [tab, setTab] = useState<Tab>("visual");
 
@@ -370,12 +405,14 @@ export function PropertyEditor({
             {(Object.keys(CHROME_PROPERTIES) as Array<keyof typeof CHROME_PROPERTIES>).map((groupKey) => (
               <PropertyGroupSection
                 key={groupKey}
+                theme={theme}
                 title={CHROME_GROUP_LABELS[groupKey]}
                 group={CHROME_PROPERTIES[groupKey]}
                 groupValues={sharedChromeStyle[groupKey]}
                 pathPrefix="visualStyles.*.*"
                 getThemePath={(definition) => chromeThemePath("*", definition)}
                 onChange={onChange}
+                onReset={onReset}
               />
             ))}
           </>
@@ -386,56 +423,50 @@ export function PropertyEditor({
             {(Object.keys(CHROME_PROPERTIES) as Array<keyof typeof CHROME_PROPERTIES>).map((groupKey) => (
               <PropertyGroupSection
                 key={groupKey}
+                theme={theme}
                 title={CHROME_GROUP_LABELS[groupKey]}
                 group={CHROME_PROPERTIES[groupKey]}
                 groupValues={chromeStyle[groupKey]}
                 pathPrefix={`visualStyles.${activeVisualSchemaKey}.*`}
                 getThemePath={(definition) => chromeThemePath(activeVisualSchemaKey, definition)}
                 onChange={onChange}
+                onReset={onReset}
               />
             ))}
 
-            <details className="property-group">
-              <summary>Typography</summary>
-              <div className="property-group__body">
-                {selected === "card" ? (
+            {selected === "card" && (
+              <details className="property-group">
+                <summary>Typography</summary>
+                <div className="property-group__body">
                   <div className="property-row">
                     <span className="property-row__copy">
                       <span className="property-row__label">Callout size</span>
                     </span>
-                    <NumberControl
-                      value={resolved.calloutSize}
-                      min={18}
-                      max={48}
-                      onChange={(value) => onChange(["textClasses", "callout", "fontSize"], value)}
-                    />
-                  </div>
-                ) : (
-                  <div className="property-row">
-                    <span className="property-row__copy">
-                      <span className="property-row__label">Title size</span>
+                    <span className="property-row__control">
+                      <NumberControl
+                        value={resolved.calloutSize}
+                        min={18}
+                        max={48}
+                        onChange={(value) => onChange(["textClasses", "callout", "fontSize"], value)}
+                      />
                     </span>
-                    <NumberControl
-                      value={resolved.titleSize}
-                      min={9}
-                      max={24}
-                      onChange={(value) => onChange(["textClasses", "title", "fontSize"], value)}
-                    />
                   </div>
-                )}
-              </div>
-            </details>
+                </div>
+              </details>
+            )}
 
             {selected === "table" &&
               (Object.keys(TABLE_PROPERTIES) as Array<keyof typeof TABLE_PROPERTIES>).map((groupKey) => (
                 <PropertyGroupSection
                   key={groupKey}
+                  theme={theme}
                   title={TABLE_GROUP_LABELS[groupKey]}
                   group={TABLE_PROPERTIES[groupKey]}
                   groupValues={tableStyle[groupKey]}
                   pathPrefix="visualStyles.tableEx.*"
                   getThemePath={tablePropertyThemePath}
                   onChange={onChange}
+                  onReset={onReset}
                 />
               ))}
 
@@ -443,12 +474,14 @@ export function PropertyEditor({
               (Object.keys(BAR_CHART_PROPERTIES) as Array<keyof typeof BAR_CHART_PROPERTIES>).map((groupKey) => (
                 <PropertyGroupSection
                   key={groupKey}
+                  theme={theme}
                   title={BAR_CHART_GROUP_LABELS[groupKey]}
                   group={BAR_CHART_PROPERTIES[groupKey]}
                   groupValues={barChartStyle[groupKey]}
                   pathPrefix="visualStyles.clusteredBarChart.*"
                   getThemePath={barChartPropertyThemePath}
                   onChange={onChange}
+                  onReset={onReset}
                 />
               ))}
           </>

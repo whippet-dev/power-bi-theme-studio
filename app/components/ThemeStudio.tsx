@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   cloneStarterTheme,
+  deleteThemeValue,
   parseThemeJson,
   resolveTheme,
   themeFileName,
@@ -66,6 +67,11 @@ export function ThemeStudio() {
 
   const handleChange = (path: Array<string | number>, value: string | number | boolean) => {
     setTheme((current) => updateThemeValue(current, path, value as JsonValue));
+    setMessage(null);
+  };
+
+  const handleReset = (path: Array<string | number>) => {
+    setTheme((current) => deleteThemeValue(current, path));
     setMessage(null);
   };
 
@@ -167,6 +173,7 @@ export function ThemeStudio() {
           activeVisualSchemaKey={VISUAL_SCHEMA_KEY[selectedVisual]}
           selected={selectedVisual}
           onChange={handleChange}
+          onReset={handleReset}
         />
       </div>
     </main>
