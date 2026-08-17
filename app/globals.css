@@ -769,6 +769,27 @@ button { color: inherit; }
   pointer-events: none;
 }
 
+/* A three-part data label (title / value / detail). */
+.chart-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.25;
+}
+
+.chart-label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.bar-row__value--inside {
+  /* An inside label sits over the end of the bar rather than after it. */
+  margin-left: -46px;
+  position: relative;
+  z-index: 1;
+}
+
 .chart-ticks {
   display: flex;
   margin-top: 3px;

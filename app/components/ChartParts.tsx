@@ -240,6 +240,154 @@ export function AxisTickLabels({
   );
 }
 
+/**
+ * Power BI's data label is really three independently-styled parts —
+ * Title (the category), Value, and Detail (a secondary measure) — each
+ * with its own font, colour, transparency, display units and precision,
+ * and each switchable. Previews that render a single value string leave
+ * roughly 40 properties per chart with nothing to affect.
+ */
+export type DataLabelStyle = {
+  show: boolean;
+  color: string;
+  fontFamily: string;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  transparency: number;
+  labelDisplayUnits: string | number;
+  labelPrecision: number;
+  labelPosition: string | number;
+  labelContentLayout: string | number;
+  labelContainerMaxWidth: number;
+  // Not every chart's labels group carries these — the line chart has no
+  // orientation or word-wrap setting, for instance.
+  labelOrientation?: string | number;
+  wordWrap?: boolean;
+  enableBackground: boolean;
+  backgroundColor: string;
+  backgroundTransparency: number;
+  enableTitleDataLabel: boolean;
+  enableValueDataLabel: boolean;
+  enableDetailDataLabel: boolean;
+  titleColor: string;
+  titleFontFamily: string;
+  titleFontSize: number;
+  titleBold: boolean;
+  titleItalic: boolean;
+  titleUnderline: boolean;
+  titleTransparency: number;
+  titleLabelDisplayUnits: string | number;
+  titleLabelPrecision: number;
+  detailColor: string;
+  detailFontFamily: string;
+  detailFontSize: number;
+  detailBold: boolean;
+  detailItalic: boolean;
+  detailUnderline: boolean;
+  detailTransparency: number;
+  detailLabelDisplayUnits: string | number;
+  detailLabelPrecision: number;
+};
+
+/** Text style for one part of a three-part data label. */
+function labelPartStyle(part: {
+  color: string;
+  fontFamily: string;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  transparency: number;
+}): CSSProperties {
+  return {
+    color: hexWithAlpha(part.color, part.transparency),
+    fontFamily: part.fontFamily || undefined,
+    fontSize: part.fontSize,
+    fontWeight: part.bold ? 700 : 400,
+    fontStyle: part.italic ? "italic" : "normal",
+    textDecoration: part.underline ? "underline" : "none",
+  };
+}
+
+/**
+ * Renders a data label's enabled parts. `labelContentLayout` decides
+ * whether they stack or sit on one line, and `labelOrientation` rotates
+ * the whole label — both otherwise invisible settings.
+ */
+export function DataLabel({
+  labels,
+  category,
+  value,
+  detail,
+}: {
+  labels: DataLabelStyle;
+  category: string;
+  value: number;
+  detail?: number;
+}): ReactNode {
+  if (!labels.show) return null;
+
+  // If every part is switched off Power BI still shows the value —
+  // otherwise turning labels on would display nothing at all.
+  const showTitle = labels.enableTitleDataLabel;
+  const showDetail = labels.enableDetailDataLabel && detail !== undefined;
+  const showValue = labels.enableValueDataLabel || (!showTitle && !showDetail);
+
+  const stacked = !/inline|horizontal/i.test(String(labels.labelContentLayout));
+  const vertical = /vertical|rotate/i.test(String(labels.labelOrientation));
+
+  return (
+    <span
+      className={`chart-label${stacked ? " chart-label--stacked" : ""}`}
+      style={{
+        ...labelPartStyle(labels),
+        backgroundColor: labels.enableBackground
+          ? hexWithAlpha(labels.backgroundColor, labels.backgroundTransparency)
+          : undefined,
+        padding: labels.enableBackground ? "1px 4px" : undefined,
+        borderRadius: labels.enableBackground ? 3 : undefined,
+        maxWidth: labels.labelContainerMaxWidth || undefined,
+        whiteSpace: labels.wordWrap ? "normal" : "nowrap",
+        writingMode: vertical ? "vertical-rl" : undefined,
+      }}
+    >
+      {showTitle && (
+        <span style={labelPartStyle({ ...labels, color: labels.titleColor, fontFamily: labels.titleFontFamily, fontSize: labels.titleFontSize, bold: labels.titleBold, italic: labels.titleItalic, underline: labels.titleUnderline, transparency: labels.titleTransparency })}>
+          {category}
+        </span>
+      )}
+      {showValue && <span>{formatValue(value, labels.labelDisplayUnits, labels.labelPrecision)}</span>}
+      {showDetail && (
+        <span style={labelPartStyle({ ...labels, color: labels.detailColor, fontFamily: labels.detailFontFamily, fontSize: labels.detailFontSize, bold: labels.detailBold, italic: labels.detailItalic, underline: labels.detailUnderline, transparency: labels.detailTransparency })}>
+          {formatValue(detail as number, labels.detailLabelDisplayUnits, labels.detailLabelPrecision)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Whether a label sits inside the bar/column or outside its end. Power BI
+ * names these InsideEnd / InsideCenter / InsideBase / OutsideEnd.
+ */
+export function labelIsInside(position: string | number): boolean {
+  return /inside/i.test(String(position));
+}
+
+/**
+ * Label density is a 0-100 dial for how many labels Power BI is allowed
+ * to draw. 0 means "none", 100 means "all"; in between it thins them out.
+ */
+export function labelVisibleAt(index: number, total: number, density: number): boolean {
+  if (density >= 100) return true;
+  if (density <= 0) return false;
+  const allowed = Math.max(1, Math.round((density / 100) * total));
+  const step = total / allowed;
+  return Math.floor(index % step) === 0;
+}
+
 /** A data label, with its optional background chip. */
 export function dataLabelStyle(labels: {
   color: string;

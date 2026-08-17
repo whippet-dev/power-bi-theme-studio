@@ -73,6 +73,16 @@ test("propertyThemePath writes a bar chart enum property using its raw string va
   assert.equal(bar.legend.position, "TopRight");
 });
 
+test("switching data labels on actually shows labels — density must not default to zero", () => {
+  const base = resolveTheme(STARTER_THEME);
+  const bar = resolveBarChartStyle(STARTER_THEME, base);
+
+  // labelDensity is a 0-100 dial for how many labels may be drawn. It
+  // defaulted to 0, so enabling data labels rendered nothing — the same
+  // "on but invisible" trap as the divider width and the line's stroke.
+  assert.equal(bar.labels.labelDensity, 100);
+});
+
 test("every resolved BAR_CHART_PROPERTIES path is unique across groups (no accidental JSON collisions)", () => {
   const seen = new Set<string>();
   for (const group of Object.values(BAR_CHART_PROPERTIES)) {

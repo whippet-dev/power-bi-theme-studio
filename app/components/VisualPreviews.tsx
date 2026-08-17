@@ -8,9 +8,12 @@ import {
   AxisTickLabels,
   axisTitleStyle,
   ChartLegend,
+  DataLabel,
   dataLabelStyle,
   formatValue,
   Gridlines,
+  labelIsInside,
+  labelVisibleAt,
   legendIsAfterPlot,
   legendIsVertical,
   textStyle,
@@ -900,9 +903,9 @@ export function VisualGallery({
                 </span>
               )}
             </span>
-            {barChartStyle.labels.show && (
-              <span className="bar-row__value" style={dataLabelStyle(barChartStyle.labels)}>
-                {formatValue(value * 1000, barChartStyle.labels.labelDisplayUnits, barChartStyle.labels.labelPrecision)}
+            {labelVisibleAt(index, barCategories.length, barChartStyle.labels.labelDensity) && (
+              <span className={`bar-row__value${labelIsInside(barChartStyle.labels.labelPosition) ? " bar-row__value--inside" : ""}`}>
+                <DataLabel labels={barChartStyle.labels} category={label} value={value * 1000} detail={value * 12} />
               </span>
             )}
           </span>
@@ -1060,9 +1063,9 @@ export function VisualGallery({
         <span className="column-preview__columns">
           {barCategories.map(([label, value], index) => (
             <span className="column-item" key={label}>
-              {columnChartStyle.labels.show && (
-                <span className="column-item__value" style={dataLabelStyle(columnChartStyle.labels)}>
-                  {formatValue(value * 1000, columnChartStyle.labels.labelDisplayUnits, columnChartStyle.labels.labelPrecision)}
+              {labelVisibleAt(index, barCategories.length, columnChartStyle.labels.labelDensity) && (
+                <span className="column-item__value">
+                  <DataLabel labels={columnChartStyle.labels} category={label} value={value * 1000} detail={value * 12} />
                 </span>
               )}
               <span className="column-item__track-wrap">
@@ -1533,25 +1536,18 @@ export function VisualGallery({
             }}
           />
         )}
-        {lineChartStyle.labels.show && (
-          <span
-            className="line-preview__label"
-            style={{
-              left: `${linePointCoords[3].x}%`,
-              top: `${linePointCoords[3].y}%`,
-              color: lineChartStyle.labels.color,
-              fontFamily: lineChartStyle.labels.fontFamily,
-              fontSize: lineChartStyle.labels.fontSize,
-              fontWeight: lineChartStyle.labels.bold ? 700 : 400,
-              fontStyle: lineChartStyle.labels.italic ? "italic" : "normal",
-              textDecoration: lineChartStyle.labels.underline ? "underline" : "none",
-              backgroundColor: lineChartStyle.labels.enableBackground
-                ? hexWithAlpha(lineChartStyle.labels.backgroundColor, lineChartStyle.labels.backgroundTransparency)
-                : undefined,
-            }}
-          >
-            68k
-          </span>
+        {/* One label per point, thinned by label density like Power BI. */}
+        {linePointCoords.map((point, index) =>
+          labelVisibleAt(index, linePointCoords.length, lineChartStyle.labels.labelDensity) ? (
+            <span key={index} className="line-preview__label" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
+              <DataLabel
+                labels={lineChartStyle.labels}
+                category={["Jan", "Feb", "Mar", "Apr", "May"][index] ?? ""}
+                value={linePointValues[index] * 1000}
+                detail={linePointValues[index] * 8}
+              />
+            </span>
+          ) : null,
         )}
       </span>
       {lineChartStyle.categoryAxis.show && (

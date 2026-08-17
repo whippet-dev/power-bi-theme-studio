@@ -1184,14 +1184,18 @@ export function resolveLineChartStyle(theme: PowerBITheme, base: ResolvedTheme):
       color: resolvePropertyValue(theme, p.labels.color, base.palette[0] ?? base.foreground),
       enableDetailDataLabel: resolvePropertyValue(theme, p.labels.enableDetailDataLabel, false),
       enableTitleDataLabel: resolvePropertyValue(theme, p.labels.enableTitleDataLabel, false),
-      enableValueDataLabel: resolvePropertyValue(theme, p.labels.enableValueDataLabel, false),
+      // The value is a data label's default content; title and detail are
+      // additions to it, not replacements for it.
+      enableValueDataLabel: resolvePropertyValue(theme, p.labels.enableValueDataLabel, true),
       fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
       fontSize: resolvePropertyValue(theme, p.labels.fontSize, 6),
       horizontalAlignment: resolvePropertyValue(theme, p.labels.horizontalAlignment, "left"),
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelContainerMaxWidth: resolvePropertyValue(theme, p.labels.labelContainerMaxWidth, 0),
       labelContentLayout: resolvePropertyValue(theme, p.labels.labelContentLayout, "MultiLine"),
-      labelDensity: resolvePropertyValue(theme, p.labels.labelDensity, 0),
+      // Density is a 0-100 dial for how many labels may be drawn; 0 means
+      // none, so switching data labels on would still show nothing.
+      labelDensity: resolvePropertyValue(theme, p.labels.labelDensity, 100),
       labelDisplayUnits: resolvePropertyValue(theme, p.labels.labelDisplayUnits, 0),
       labelPosition: resolvePropertyValue(theme, p.labels.labelPosition, "Auto"),
       labelPrecision: resolvePropertyValue(theme, p.labels.labelPrecision, 0),
