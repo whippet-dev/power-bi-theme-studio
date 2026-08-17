@@ -17,6 +17,7 @@ import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromePrope
 import { resolveColumnChartStyle } from "../lib/columnChartProperties";
 import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import { resolveMatrixStyle } from "../lib/matrixProperties";
+import { resolvePieChartStyle } from "../lib/pieChartProperties";
 import type { VisualSchemaKey } from "../lib/properties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
@@ -33,10 +34,11 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   line: "lineChart",
   table: "tableEx",
   matrix: "pivotTable",
+  pie: "pieChart",
   slicer: "slicer",
 };
 
-const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "line", "table", "matrix", "slicer"];
+const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "line", "table", "matrix", "pie", "slicer"];
 
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
@@ -48,6 +50,7 @@ export function ThemeStudio() {
     line: true,
     table: true,
     matrix: true,
+    pie: true,
     slicer: true,
   });
   const [fileLabel, setFileLabel] = useState("Starter theme");
@@ -61,6 +64,7 @@ export function ThemeStudio() {
   const cardStyle = useMemo(() => resolveCardStyle(theme, resolved), [theme, resolved]);
   const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
   const matrixStyle = useMemo(() => resolveMatrixStyle(theme, resolved), [theme, resolved]);
+  const pieChartStyle = useMemo(() => resolvePieChartStyle(theme, resolved), [theme, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({
       card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
@@ -69,6 +73,7 @@ export function ThemeStudio() {
       line: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.line, resolved),
       table: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.table, resolved),
       matrix: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.matrix, resolved),
+      pie: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.pie, resolved),
       slicer: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.slicer, resolved),
     }),
     [theme, resolved],
@@ -218,6 +223,7 @@ export function ThemeStudio() {
             cardStyle={cardStyle}
             slicerStyle={slicerStyle}
             matrixStyle={matrixStyle}
+            pieChartStyle={pieChartStyle}
             chromeStyles={chromeStyles}
             visibleVisuals={visibleVisuals}
             selected={selectedVisual}
@@ -235,6 +241,7 @@ export function ThemeStudio() {
           cardStyle={cardStyle}
           slicerStyle={slicerStyle}
           matrixStyle={matrixStyle}
+          pieChartStyle={pieChartStyle}
           chromeStyle={chromeStyles[selectedVisual]}
           sharedChromeStyle={sharedChromeStyle}
           activeVisualSchemaKey={VISUAL_SCHEMA_KEY[selectedVisual]}

@@ -746,6 +746,74 @@ button { color: inherit; }
   text-align: right;
 }
 
+.pie-preview {
+  height: 202px;
+  display: flex;
+  align-items: center;
+}
+
+.pie-preview__body {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.pie-preview__body--stacked {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pie-preview__chart-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pie-preview__circle {
+  width: 128px;
+  height: 128px;
+  border-radius: 999px;
+  position: relative;
+}
+
+.pie-preview__hole {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.pie-preview__label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pie-preview__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 9px;
+}
+
+.pie-preview__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pie-preview__legend-swatch {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
 .slicer-preview__layout-toggle {
   display: inline-flex;
   align-self: flex-start;

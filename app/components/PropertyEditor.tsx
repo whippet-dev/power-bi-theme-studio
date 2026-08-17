@@ -10,6 +10,8 @@ import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath 
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import { MATRIX_PROPERTIES, propertyThemePath as matrixPropertyThemePath } from "../lib/matrixProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
+import { PIE_CHART_PROPERTIES, propertyThemePath as pieChartPropertyThemePath } from "../lib/pieChartProperties";
+import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -32,6 +34,7 @@ type PropertyEditorProps = {
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
   matrixStyle: ResolvedMatrixStyle;
+  pieChartStyle: ResolvedPieChartStyle;
   chromeStyle: ResolvedChromeStyle;
   sharedChromeStyle: ResolvedChromeStyle;
   activeVisualSchemaKey: VisualSchemaKey;
@@ -47,6 +50,7 @@ const visualNames: Record<VisualKind, string> = {
   line: "Line chart",
   table: "Table",
   matrix: "Matrix",
+  pie: "Pie chart",
   slicer: "Slicer",
 };
 
@@ -72,6 +76,14 @@ const MATRIX_GROUP_LABELS: Record<keyof typeof MATRIX_PROPERTIES, string> = {
   columnFormatting: "Field formatting",
   sparklines: "Sparklines",
   accessibility: "Accessibility",
+  general: "General",
+};
+
+const PIE_CHART_GROUP_LABELS: Record<keyof typeof PIE_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  slices: "Shapes",
+  legend: "Legend",
+  labels: "Detail labels",
   general: "General",
 };
 
@@ -455,6 +467,7 @@ const LINE_CHART_ID_PREFIX = "line:";
 const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
 const MATRIX_ID_PREFIX = "matrix:";
+const PIE_CHART_ID_PREFIX = "pie:";
 
 export function PropertyEditor({
   theme,
@@ -466,6 +479,7 @@ export function PropertyEditor({
   cardStyle,
   slicerStyle,
   matrixStyle,
+  pieChartStyle,
   chromeStyle,
   sharedChromeStyle,
   activeVisualSchemaKey,
@@ -525,6 +539,13 @@ export function PropertyEditor({
           id: `${MATRIX_ID_PREFIX}${key}`,
           title: MATRIX_GROUP_LABELS[key],
           count: Object.keys(MATRIX_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "pie"
+      ? (Object.keys(PIE_CHART_PROPERTIES) as Array<keyof typeof PIE_CHART_PROPERTIES>).map((key) => ({
+          id: `${PIE_CHART_ID_PREFIX}${key}`,
+          title: PIE_CHART_GROUP_LABELS[key],
+          count: Object.keys(PIE_CHART_PROPERTIES[key]).length,
         }))
       : []),
     ...(selected === "bar"
@@ -686,6 +707,21 @@ export function PropertyEditor({
           groupValues={matrixStyle[key]}
           pathPrefix="visualStyles.pivotTable.*"
           getThemePath={matrixPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(PIE_CHART_ID_PREFIX)) {
+      const key = id.slice(PIE_CHART_ID_PREFIX.length) as keyof typeof PIE_CHART_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={PIE_CHART_PROPERTIES[key]}
+          groupValues={pieChartStyle[key]}
+          pathPrefix="visualStyles.pieChart.*"
+          getThemePath={pieChartPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />

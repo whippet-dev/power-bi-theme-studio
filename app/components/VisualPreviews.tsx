@@ -5,11 +5,12 @@ import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
+import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "matrix" | "slicer";
+export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "matrix" | "pie" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
@@ -20,6 +21,7 @@ type VisualGalleryProps = {
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
   matrixStyle: ResolvedMatrixStyle;
+  pieChartStyle: ResolvedPieChartStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
   selected: VisualKind;
@@ -176,6 +178,7 @@ export function VisualGallery({
   cardStyle,
   slicerStyle,
   matrixStyle,
+  pieChartStyle,
   chromeStyles,
   visibleVisuals,
   selected,
@@ -977,6 +980,82 @@ export function VisualGallery({
     </span>
   );
 
+  const pieSliceValues = [45, 30, 15, 10];
+  const pieColors = [palette[0], palette[1] ?? palette[0], palette[2] ?? palette[0], palette[3] ?? palette[0]];
+  let pieCumulative = 0;
+  const pieStops = pieSliceValues
+    .map((value, index) => {
+      const start = pieCumulative;
+      pieCumulative += value;
+      return `${pieColors[index]} ${start}% ${pieCumulative}%`;
+    })
+    .join(", ");
+  const pieLegendAtBottom = String(pieChartStyle.legend.position).startsWith("Bottom");
+
+  const pieContent = (
+    <span className="pie-preview" style={{ opacity: 1 - pieChartStyle.dataPoint.fillTransparency / 100 }}>
+      <span className={`pie-preview__body${pieLegendAtBottom ? " pie-preview__body--stacked" : ""}`}>
+        <span className="pie-preview__chart-wrap">
+          <span
+            className="pie-preview__circle"
+            style={{
+              background: `conic-gradient(from ${pieChartStyle.slices.startAngle}deg, ${pieStops})`,
+              border: pieChartStyle.dataPoint.borderShow
+                ? `${pieChartStyle.dataPoint.borderSize}px solid ${pieChartStyle.dataPoint.borderColor}`
+                : undefined,
+            }}
+          >
+            {pieChartStyle.slices.innerRadiusRatio > 0 && (
+              <span
+                className="pie-preview__hole"
+                style={{
+                  inset: `${pieChartStyle.slices.innerRadiusRatio}%`,
+                  backgroundColor: theme.background,
+                }}
+              />
+            )}
+          </span>
+          {pieChartStyle.labels.show && (
+            <span
+              className="pie-preview__label"
+              style={{
+                color: pieChartStyle.labels.color,
+                fontFamily: pieChartStyle.labels.fontFamily,
+                fontSize: pieChartStyle.labels.fontSize,
+                fontWeight: pieChartStyle.labels.bold ? 700 : 400,
+                fontStyle: pieChartStyle.labels.italic ? "italic" : "normal",
+                textDecoration: pieChartStyle.labels.underline ? "underline" : "none",
+              }}
+            >
+              45%
+            </span>
+          )}
+        </span>
+        {pieChartStyle.legend.show && (
+          <span className="pie-preview__legend">
+            {["North", "South", "East", "West"].map((label, index) => (
+              <span className="pie-preview__legend-item" key={label}>
+                <span className="pie-preview__legend-swatch" style={{ backgroundColor: pieColors[index] }} />
+                <span
+                  style={{
+                    color: pieChartStyle.legend.labelColor,
+                    fontFamily: pieChartStyle.legend.fontFamily,
+                    fontSize: pieChartStyle.legend.fontSize,
+                    fontWeight: pieChartStyle.legend.bold ? 700 : 400,
+                    fontStyle: pieChartStyle.legend.italic ? "italic" : "normal",
+                    textDecoration: pieChartStyle.legend.underline ? "underline" : "none",
+                  }}
+                >
+                  {label}
+                </span>
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+
   const slicerItemStyle: CSSProperties = {
     backgroundColor: slicerStyle.items.background,
     color: slicerStyle.items.fontColor,
@@ -1071,6 +1150,7 @@ export function VisualGallery({
     { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
+    { id: "pie", label: "Pie chart", defaultTitle: "Applications by region", chrome: chromeStyles.pie, content: pieContent },
     { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
   ];
 
