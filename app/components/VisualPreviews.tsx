@@ -2,16 +2,18 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
+import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "table" | "slicer";
+export type VisualKind = "card" | "bar" | "line" | "table" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
@@ -37,6 +39,12 @@ function mapLineStyle(value: string | number): "solid" | "dashed" | "dotted" {
   if (normalized === "dashed" || normalized === "custom") return "dashed";
   if (normalized === "dotted") return "dotted";
   return "solid";
+}
+
+function svgDashArray(style: "solid" | "dashed" | "dotted"): string | undefined {
+  if (style === "dashed") return "6 4";
+  if (style === "dotted") return "1.5 3";
+  return undefined;
 }
 
 function mapTextAlign(value: string | number): CSSProperties["textAlign"] | undefined {
@@ -159,6 +167,7 @@ export function VisualGallery({
   theme,
   tableStyle,
   barChartStyle,
+  lineChartStyle,
   cardStyle,
   slicerStyle,
   chromeStyles,
@@ -382,6 +391,191 @@ export function VisualGallery({
     </span>
   );
 
+  const lineLegendNode = lineChartStyle.legend.show && (
+    <span className="chart-preview__legend">
+      <span className="chart-preview__legend-swatch" style={{ backgroundColor: lineChartStyle.dataPoint.fill }} />
+      <span
+        style={{
+          color: lineChartStyle.legend.labelColor,
+          fontFamily: lineChartStyle.legend.fontFamily,
+          fontSize: lineChartStyle.legend.fontSize,
+          fontWeight: lineChartStyle.legend.bold ? 700 : 400,
+          fontStyle: lineChartStyle.legend.italic ? "italic" : "normal",
+          textDecoration: lineChartStyle.legend.underline ? "underline" : "none",
+        }}
+      >
+        Applications
+      </span>
+    </span>
+  );
+  const lineLegendAtBottom = String(lineChartStyle.legend.position).startsWith("Bottom");
+  const linePointValues = [42, 58, 30, 68, 48];
+  const linePointCoords = linePointValues.map((value, index) => ({
+    x: (index / (linePointValues.length - 1)) * 100,
+    y: 100 - value,
+  }));
+  const linePathD = linePointCoords.map((point) => `${point.x},${point.y}`).join(" ");
+  const lineDashStyle = mapLineStyle(lineChartStyle.lineStyles.lineStyle);
+  const lineAreaColor = lineChartStyle.lineStyles.areaMatchStrokeColor
+    ? lineChartStyle.dataPoint.fill
+    : lineChartStyle.lineStyles.areaColor;
+
+  const lineContent = (
+    <span className="chart-preview" style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100 }}>
+      {!lineLegendAtBottom && lineLegendNode}
+      {lineChartStyle.valueAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title"
+          style={{
+            color: lineChartStyle.valueAxis.titleColor,
+            fontFamily: lineChartStyle.valueAxis.titleFontFamily,
+            fontSize: lineChartStyle.valueAxis.titleFontSize,
+            fontWeight: lineChartStyle.valueAxis.titleBold ? 700 : 400,
+            fontStyle: lineChartStyle.valueAxis.titleItalic ? "italic" : "normal",
+            textDecoration: lineChartStyle.valueAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(lineChartStyle.valueAxis.titleText) || "Applications (k)"}
+        </span>
+      )}
+      <span
+        className="line-preview__plot"
+        style={{
+          position: "relative",
+          ...(lineChartStyle.categoryAxis.gridlineShow
+            ? {
+                backgroundImage: `repeating-linear-gradient(to right, ${lineChartStyle.categoryAxis.gridlineColor} 0, ${lineChartStyle.categoryAxis.gridlineColor} ${lineChartStyle.categoryAxis.gridlineThickness}px, transparent ${lineChartStyle.categoryAxis.gridlineThickness}px, transparent 25%)`,
+              }
+            : {}),
+        }}
+      >
+        {lineChartStyle.referenceLine.show && (
+          <span
+            className="chart-preview__reference-line"
+            aria-hidden="true"
+            style={{
+              left: "70%",
+              borderLeftWidth: lineChartStyle.referenceLine.width,
+              borderLeftColor: lineChartStyle.referenceLine.lineColor,
+              borderLeftStyle: mapLineStyle(lineChartStyle.referenceLine.style),
+              opacity: 1 - lineChartStyle.referenceLine.transparency / 100,
+            }}
+          />
+        )}
+        <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {lineChartStyle.lineStyles.areaShow && (
+            <polygon
+              points={`0,100 ${linePathD} 100,100`}
+              fill={hexWithAlpha(lineAreaColor, 78)}
+              stroke="none"
+            />
+          )}
+          <polyline
+            points={linePathD}
+            fill="none"
+            stroke={lineChartStyle.dataPoint.fill}
+            strokeWidth={lineChartStyle.lineStyles.strokeWidth}
+            strokeDasharray={svgDashArray(lineDashStyle)}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          {lineChartStyle.lineStyles.showMarker &&
+            linePointCoords.map((point, index) => (
+              <circle
+                key={index}
+                cx={point.x}
+                cy={point.y}
+                r={2.6}
+                fill={lineChartStyle.dataPoint.fill}
+                stroke={lineChartStyle.markers.borderShow ? lineChartStyle.markers.borderColor : "none"}
+                strokeWidth={lineChartStyle.markers.borderWidth}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+          {lineChartStyle.error.enabled && lineChartStyle.error.barShow && (
+            <line
+              x1={linePointCoords[3].x}
+              x2={linePointCoords[3].x}
+              y1={linePointCoords[3].y - 12}
+              y2={linePointCoords[3].y + 12}
+              stroke={lineChartStyle.error.barColor}
+              strokeWidth={lineChartStyle.error.barWidth}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </svg>
+        {lineChartStyle.trend.show && (
+          <span
+            className="chart-preview__trend-line"
+            aria-hidden="true"
+            style={{
+              borderTopWidth: lineChartStyle.trend.width,
+              borderTopColor: lineChartStyle.trend.lineColor,
+              borderTopStyle: mapLineStyle(lineChartStyle.trend.style),
+              opacity: 1 - lineChartStyle.trend.transparency / 100,
+            }}
+          />
+        )}
+        {lineChartStyle.labels.show && (
+          <span
+            className="line-preview__label"
+            style={{
+              left: `${linePointCoords[3].x}%`,
+              top: `${linePointCoords[3].y}%`,
+              color: lineChartStyle.labels.color,
+              fontFamily: lineChartStyle.labels.fontFamily,
+              fontSize: lineChartStyle.labels.fontSize,
+              fontWeight: lineChartStyle.labels.bold ? 700 : 400,
+              fontStyle: lineChartStyle.labels.italic ? "italic" : "normal",
+              textDecoration: lineChartStyle.labels.underline ? "underline" : "none",
+              backgroundColor: lineChartStyle.labels.enableBackground
+                ? hexWithAlpha(lineChartStyle.labels.backgroundColor, lineChartStyle.labels.backgroundTransparency)
+                : undefined,
+            }}
+          >
+            68k
+          </span>
+        )}
+      </span>
+      {lineChartStyle.categoryAxis.show && (
+        <span className="line-preview__axis-labels">
+          {["Jan", "Feb", "Mar", "Apr", "May"].map((label) => (
+            <span
+              key={label}
+              style={{
+                color: lineChartStyle.categoryAxis.labelColor,
+                fontFamily: lineChartStyle.categoryAxis.fontFamily,
+                fontSize: lineChartStyle.categoryAxis.fontSize,
+                fontWeight: lineChartStyle.categoryAxis.bold ? 700 : 400,
+                fontStyle: lineChartStyle.categoryAxis.italic ? "italic" : "normal",
+                textDecoration: lineChartStyle.categoryAxis.underline ? "underline" : "none",
+              }}
+            >
+              {label}
+            </span>
+          ))}
+        </span>
+      )}
+      {lineChartStyle.categoryAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title"
+          style={{
+            color: lineChartStyle.categoryAxis.titleColor,
+            fontFamily: lineChartStyle.categoryAxis.titleFontFamily,
+            fontSize: lineChartStyle.categoryAxis.titleFontSize,
+            fontWeight: lineChartStyle.categoryAxis.titleBold ? 700 : 400,
+            fontStyle: lineChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
+            textDecoration: lineChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(lineChartStyle.categoryAxis.titleText) || "Month"}
+        </span>
+      )}
+      {lineLegendAtBottom && lineLegendNode}
+    </span>
+  );
+
   const tableContent = (
     <span
       className="table-preview"
@@ -551,6 +745,7 @@ export function VisualGallery({
   }> = [
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
     { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barContent },
+    { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
   ];

@@ -4,6 +4,8 @@ import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import { CARD_PROPERTIES, propertyThemePath as cardPropertyThemePath } from "../lib/cardProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
+import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -21,6 +23,7 @@ type PropertyEditorProps = {
   resolved: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
   chromeStyle: ResolvedChromeStyle;
@@ -34,6 +37,7 @@ type PropertyEditorProps = {
 const visualNames: Record<VisualKind, string> = {
   card: "Card",
   bar: "Clustered bar chart",
+  line: "Line chart",
   table: "Table",
   slicer: "Slicer",
 };
@@ -78,6 +82,30 @@ const CARD_GROUP_LABELS: Record<keyof typeof CARD_PROPERTIES, string> = {
   labels: "Data label",
   general: "General",
   wordWrap: "Word wrap",
+};
+
+const LINE_CHART_GROUP_LABELS: Record<keyof typeof LINE_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  lineStyles: "Shapes",
+  markers: "Markers",
+  categoryAxis: "X axis",
+  valueAxis: "Y axis",
+  y2Axis: "Secondary Y axis",
+  legend: "Legend",
+  labels: "Data labels",
+  seriesLabels: "Series labels",
+  plotArea: "Plot area",
+  error: "Error bars",
+  trend: "Trend line",
+  forecast: "Forecast",
+  anomalyDetection: "Find anomalies",
+  referenceLine: "Constant line",
+  xAxisReferenceLine: "X-Axis constant line",
+  y1AxisReferenceLine: "Y-Axis constant line",
+  zoom: "Zoom slider",
+  smallMultiplesLayout: "Small multiples grid",
+  subheader: "Small multiple title",
+  general: "General",
 };
 
 const SLICER_GROUP_LABELS: Record<keyof typeof SLICER_PROPERTIES, string> = {
@@ -378,6 +406,7 @@ const TYPOGRAPHY_ID = "typography";
 const CHROME_ID_PREFIX = "chrome:";
 const TABLE_ID_PREFIX = "table:";
 const BAR_CHART_ID_PREFIX = "bar:";
+const LINE_CHART_ID_PREFIX = "line:";
 const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
 
@@ -386,6 +415,7 @@ export function PropertyEditor({
   resolved,
   tableStyle,
   barChartStyle,
+  lineChartStyle,
   cardStyle,
   slicerStyle,
   chromeStyle,
@@ -447,6 +477,13 @@ export function PropertyEditor({
           id: `${BAR_CHART_ID_PREFIX}${key}`,
           title: BAR_CHART_GROUP_LABELS[key],
           count: Object.keys(BAR_CHART_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "line"
+      ? (Object.keys(LINE_CHART_PROPERTIES) as Array<keyof typeof LINE_CHART_PROPERTIES>).map((key) => ({
+          id: `${LINE_CHART_ID_PREFIX}${key}`,
+          title: LINE_CHART_GROUP_LABELS[key],
+          count: Object.keys(LINE_CHART_PROPERTIES[key]).length,
         }))
       : []),
     ...(selected === "slicer"
@@ -587,6 +624,21 @@ export function PropertyEditor({
           groupValues={barChartStyle[key]}
           pathPrefix="visualStyles.clusteredBarChart.*"
           getThemePath={barChartPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(LINE_CHART_ID_PREFIX)) {
+      const key = id.slice(LINE_CHART_ID_PREFIX.length) as keyof typeof LINE_CHART_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={LINE_CHART_PROPERTIES[key]}
+          groupValues={lineChartStyle[key]}
+          pathPrefix="visualStyles.lineChart.*"
+          getThemePath={lineChartPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />
