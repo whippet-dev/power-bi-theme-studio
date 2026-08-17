@@ -1,6 +1,8 @@
-import { propertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
-import type { ResolvedTableStyle } from "../lib/tableProperties";
+import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
+import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { PropertyDefinition, PropertyValueType } from "../lib/properties";
+import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
+import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { PowerBITheme, ResolvedTheme } from "../lib/theme";
 import type { VisualKind } from "./VisualPreviews";
 
@@ -11,13 +13,14 @@ type PropertyEditorProps = {
   theme: PowerBITheme;
   resolved: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
+  barChartStyle: ResolvedBarChartStyle;
   selected: VisualKind;
   onChange: (path: ThemePath, value: PropertyValue) => void;
 };
 
 const visualNames: Record<VisualKind, string> = {
   card: "Card",
-  bar: "Bar chart",
+  bar: "Clustered bar chart",
   table: "Table",
   slicer: "Slicer",
 };
@@ -30,6 +33,30 @@ const TABLE_GROUP_LABELS: Record<keyof typeof TABLE_PROPERTIES, string> = {
   columnFormatting: "Field formatting",
   sparklines: "Sparklines",
 };
+
+// Power BI's own format-pane card names for each group, so the panel reads
+// the same way Power BI Desktop does.
+const BAR_CHART_GROUP_LABELS: Record<keyof typeof BAR_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  categoryAxis: "Y axis",
+  valueAxis: "X axis",
+  legend: "Legend",
+  labels: "Data labels",
+  plotArea: "Plot area",
+  error: "Error bars",
+  trend: "Trend line",
+  referenceLine: "Constant line",
+  xAxisReferenceLine: "X-Axis constant line",
+  y1AxisReferenceLine: "Y-Axis constant line",
+  zoom: "Zoom slider",
+  smallMultiplesLayout: "Small multiples grid",
+  subheader: "Small multiple title",
+};
+
+// Groups a typical user actually touches, open by default; the rest (error
+// bars, trend line, three reference-line groups, zoom, small multiples)
+// start collapsed since they're advanced/less common.
+const BAR_CHART_DEFAULT_OPEN = new Set<keyof typeof BAR_CHART_PROPERTIES>(["dataPoint"]);
 
 function ColorControl({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
   return (
@@ -164,40 +191,42 @@ function PropertyRow({
         <div className="info-toggle__panel">
           <p>{definition.description}</p>
           {definition.guidance && <p className="info-toggle__guidance">{definition.guidance}</p>}
-          <code>{`visualStyles.tableEx.* → ${definition.path.join(" → ")}`}</code>
+          <code>{`visualStyles.${definition.visual}.* → ${definition.path.join(" → ")}`}</code>
         </div>
       </details>
     </div>
   );
 }
 
-function TableGroupSection({
-  groupKey,
-  tableStyle,
+/** Renders one collapsible format-pane-style card (e.g. "Column headers", "Y axis") for any visual's property registry. */
+function PropertyGroupSection({
+  title,
+  group,
+  groupValues,
+  getThemePath,
   onChange,
   defaultOpen,
 }: {
-  groupKey: keyof typeof TABLE_PROPERTIES;
-  tableStyle: ResolvedTableStyle;
+  title: string;
+  group: Record<string, PropertyDefinition<PropertyValueType>>;
+  groupValues: Record<string, PropertyValue>;
+  getThemePath: (definition: PropertyDefinition) => ThemePath;
   onChange: (path: ThemePath, value: PropertyValue) => void;
   defaultOpen: boolean;
 }) {
-  const group = TABLE_PROPERTIES[groupKey];
-  const groupValues = tableStyle[groupKey] as Record<string, PropertyValue>;
-
   return (
     <details className="property-group" open={defaultOpen}>
       <summary>
-        {TABLE_GROUP_LABELS[groupKey]}
+        {title}
         <span className="property-group__count">{Object.keys(group).length}</span>
       </summary>
       <div className="property-group__body">
         {Object.entries(group).map(([key, definition]) => (
           <PropertyRow
             key={definition.id}
-            definition={definition as PropertyDefinition<PropertyValueType>}
+            definition={definition}
             value={groupValues[key]}
-            onChange={(next) => onChange(propertyThemePath(definition), next)}
+            onChange={(next) => onChange(getThemePath(definition), next)}
           />
         ))}
       </div>
@@ -205,7 +234,7 @@ function TableGroupSection({
   );
 }
 
-export function PropertyEditor({ theme, resolved, tableStyle, selected, onChange }: PropertyEditorProps) {
+export function PropertyEditor({ theme, resolved, tableStyle, barChartStyle, selected, onChange }: PropertyEditorProps) {
   return (
     <aside className="properties-panel" aria-label="Theme property editor">
       <div className="properties-panel__header">
@@ -216,109 +245,135 @@ export function PropertyEditor({ theme, resolved, tableStyle, selected, onChange
         <span className="selection-dot" title="Selected visual" />
       </div>
 
-      <section className="property-section">
-        <h3>Theme identity</h3>
-        <label className="text-property">
-          <span>Name</span>
-          <input
-            type="text"
-            value={typeof theme.name === "string" ? theme.name : resolved.name}
-            onChange={(event) => onChange(["name"], event.target.value)}
-          />
-        </label>
-      </section>
-
-      <section className="property-section">
-        <h3>Shared colours</h3>
-        <div className="property-row">
-          <span className="property-row__copy">
-            <span className="property-row__label">Canvas</span>
-          </span>
-          <ColorControl label="Canvas" value={resolved.background} onChange={(value) => onChange(["background"], value)} />
-        </div>
-        <div className="property-row">
-          <span className="property-row__copy">
-            <span className="property-row__label">Text</span>
-          </span>
-          <ColorControl label="Text" value={resolved.foreground} onChange={(value) => onChange(["foreground"], value)} />
-        </div>
-        <div className="property-row">
-          <span className="property-row__copy">
-            <span className="property-row__label">Table accent</span>
-          </span>
-          <ColorControl
-            label="Table accent"
-            value={resolved.tableAccent}
-            onChange={(value) => onChange(["tableAccent"], value)}
-          />
-        </div>
-      </section>
-
-      <section className="property-section">
-        <h3>Data palette</h3>
-        <div className="palette-editor">
-          {resolved.palette.slice(0, 5).map((color, index) => (
-            <label className="palette-editor__item" key={`${color}-${index}`}>
+      <div className="properties-panel__scroll">
+        <details className="property-group" open>
+          <summary>Theme identity</summary>
+          <div className="property-group__body">
+            <label className="text-property">
+              <span>Name</span>
               <input
-                type="color"
-                value={color}
-                onChange={(event) =>
-                  onChange(["dataColors", index], event.target.value.toUpperCase())
-                }
-                aria-label={`Data colour ${index + 1}`}
+                type="text"
+                value={typeof theme.name === "string" ? theme.name : resolved.name}
+                onChange={(event) => onChange(["name"], event.target.value)}
               />
-              <span style={{ backgroundColor: color }} />
-              <small>{index + 1}</small>
             </label>
+          </div>
+        </details>
+
+        <details className="property-group" open>
+          <summary>Shared colours</summary>
+          <div className="property-group__body">
+            <div className="property-row">
+              <span className="property-row__copy">
+                <span className="property-row__label">Canvas</span>
+              </span>
+              <ColorControl label="Canvas" value={resolved.background} onChange={(value) => onChange(["background"], value)} />
+            </div>
+            <div className="property-row">
+              <span className="property-row__copy">
+                <span className="property-row__label">Text</span>
+              </span>
+              <ColorControl label="Text" value={resolved.foreground} onChange={(value) => onChange(["foreground"], value)} />
+            </div>
+            <div className="property-row">
+              <span className="property-row__copy">
+                <span className="property-row__label">Table accent</span>
+              </span>
+              <ColorControl
+                label="Table accent"
+                value={resolved.tableAccent}
+                onChange={(value) => onChange(["tableAccent"], value)}
+              />
+            </div>
+          </div>
+        </details>
+
+        <details className="property-group" open>
+          <summary>Data palette</summary>
+          <div className="property-group__body">
+            <div className="palette-editor">
+              {resolved.palette.slice(0, 5).map((color, index) => (
+                <label className="palette-editor__item" key={`${color}-${index}`}>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(event) =>
+                      onChange(["dataColors", index], event.target.value.toUpperCase())
+                    }
+                    aria-label={`Data colour ${index + 1}`}
+                  />
+                  <span style={{ backgroundColor: color }} />
+                  <small>{index + 1}</small>
+                </label>
+              ))}
+            </div>
+          </div>
+        </details>
+
+        <details className="property-group" open>
+          <summary>Typography</summary>
+          <div className="property-group__body">
+            {selected === "card" ? (
+              <div className="property-row">
+                <span className="property-row__copy">
+                  <span className="property-row__label">Callout size</span>
+                </span>
+                <NumberControl
+                  value={resolved.calloutSize}
+                  min={18}
+                  max={48}
+                  onChange={(value) => onChange(["textClasses", "callout", "fontSize"], value)}
+                />
+              </div>
+            ) : (
+              <div className="property-row">
+                <span className="property-row__copy">
+                  <span className="property-row__label">Title size</span>
+                </span>
+                <NumberControl
+                  value={resolved.titleSize}
+                  min={9}
+                  max={24}
+                  onChange={(value) => onChange(["textClasses", "title", "fontSize"], value)}
+                />
+              </div>
+            )}
+          </div>
+        </details>
+
+        {selected === "table" &&
+          (Object.keys(TABLE_PROPERTIES) as Array<keyof typeof TABLE_PROPERTIES>).map((groupKey, index) => (
+            <PropertyGroupSection
+              key={groupKey}
+              title={TABLE_GROUP_LABELS[groupKey]}
+              group={TABLE_PROPERTIES[groupKey]}
+              groupValues={tableStyle[groupKey]}
+              getThemePath={tablePropertyThemePath}
+              onChange={onChange}
+              defaultOpen={index === 0}
+            />
           ))}
-        </div>
-      </section>
 
-      <section className="property-section">
-        <h3>Typography</h3>
-        {selected === "card" ? (
-          <div className="property-row">
-            <span className="property-row__copy">
-              <span className="property-row__label">Callout size</span>
-            </span>
-            <NumberControl
-              value={resolved.calloutSize}
-              min={18}
-              max={48}
-              onChange={(value) => onChange(["textClasses", "callout", "fontSize"], value)}
+        {selected === "bar" &&
+          (Object.keys(BAR_CHART_PROPERTIES) as Array<keyof typeof BAR_CHART_PROPERTIES>).map((groupKey) => (
+            <PropertyGroupSection
+              key={groupKey}
+              title={BAR_CHART_GROUP_LABELS[groupKey]}
+              group={BAR_CHART_PROPERTIES[groupKey]}
+              groupValues={barChartStyle[groupKey]}
+              getThemePath={barChartPropertyThemePath}
+              onChange={onChange}
+              defaultOpen={BAR_CHART_DEFAULT_OPEN.has(groupKey)}
             />
-          </div>
-        ) : (
-          <div className="property-row">
-            <span className="property-row__copy">
-              <span className="property-row__label">Title size</span>
-            </span>
-            <NumberControl
-              value={resolved.titleSize}
-              min={9}
-              max={24}
-              onChange={(value) => onChange(["textClasses", "title", "fontSize"], value)}
-            />
-          </div>
-        )}
-      </section>
-
-      {selected === "table" && (
-        <section className="property-section property-section--table">
-          <h3>Table</h3>
-          <TableGroupSection groupKey="columnHeaders" tableStyle={tableStyle} onChange={onChange} defaultOpen />
-          <TableGroupSection groupKey="values" tableStyle={tableStyle} onChange={onChange} defaultOpen={false} />
-          <TableGroupSection groupKey="total" tableStyle={tableStyle} onChange={onChange} defaultOpen={false} />
-          <TableGroupSection groupKey="grid" tableStyle={tableStyle} onChange={onChange} defaultOpen={false} />
-          <TableGroupSection groupKey="columnFormatting" tableStyle={tableStyle} onChange={onChange} defaultOpen={false} />
-          <TableGroupSection groupKey="sparklines" tableStyle={tableStyle} onChange={onChange} defaultOpen={false} />
-        </section>
-      )}
+          ))}
+      </div>
 
       <p className="properties-panel__note">
-        {selected === "table"
-          ? "Table settings above write directly to visualStyles.tableEx and take priority over Table accent."
-          : "This first slice edits shared Power BI theme tokens. Visual-specific schema controls come next."}
+        {selected === "table" &&
+          "Table settings above write directly to visualStyles.tableEx and take priority over Table accent."}
+        {selected === "bar" &&
+          "Bar chart settings above write directly to visualStyles.clusteredBarChart. Advanced groups (error bars, trend line, constant lines, zoom, small multiples) are editable here but not yet reflected in the preview."}
+        {selected !== "table" && selected !== "bar" && "This first slice edits shared Power BI theme tokens. Visual-specific schema controls come next."}
       </p>
     </aside>
   );

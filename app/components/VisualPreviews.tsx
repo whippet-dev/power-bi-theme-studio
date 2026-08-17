@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
@@ -7,6 +8,7 @@ export type VisualKind = "card" | "bar" | "table" | "slicer";
 type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
+  barChartStyle: ResolvedBarChartStyle;
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -54,7 +56,7 @@ function PreviewShell({
   );
 }
 
-export function VisualGallery({ theme, tableStyle, selected, onSelect }: VisualGalleryProps) {
+export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSelect }: VisualGalleryProps) {
   const palette = theme.palette;
 
   return (
@@ -89,34 +91,91 @@ export function VisualGallery({ theme, tableStyle, selected, onSelect }: VisualG
 
       <PreviewShell
         id="bar"
-        label="Bar chart"
+        label="Clustered bar chart"
         selected={selected === "bar"}
         theme={theme}
         onSelect={onSelect}
       >
-        <span className="chart-preview">
+        <span className="chart-preview" style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}>
           <span className="preview-title" style={{ fontSize: theme.titleSize }}>
             Applications by region
           </span>
-          <span className="chart-preview__plot">
+          {barChartStyle.legend.show && (
+            <span className="chart-preview__legend">
+              <span
+                className="chart-preview__legend-swatch"
+                style={{ backgroundColor: barChartStyle.dataPoint.fill }}
+              />
+              <span
+                style={{
+                  color: barChartStyle.legend.labelColor,
+                  fontFamily: barChartStyle.legend.fontFamily,
+                  fontSize: barChartStyle.legend.fontSize,
+                  fontWeight: barChartStyle.legend.bold ? 700 : 400,
+                  fontStyle: barChartStyle.legend.italic ? "italic" : "normal",
+                  textDecoration: barChartStyle.legend.underline ? "underline" : "none",
+                }}
+              >
+                Applications
+              </span>
+            </span>
+          )}
+          <span
+            className="chart-preview__plot"
+            style={
+              barChartStyle.valueAxis.gridlineShow
+                ? {
+                    backgroundImage: `repeating-linear-gradient(to right, ${barChartStyle.valueAxis.gridlineColor} 0, ${barChartStyle.valueAxis.gridlineColor} ${barChartStyle.valueAxis.gridlineThickness}px, transparent ${barChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
+                  }
+                : undefined
+            }
+          >
             {[
               ["London", 82],
               ["North West", 66],
               ["Scotland", 51],
               ["Wales", 38],
-            ].map(([label, value], index) => (
+            ].map(([label, value]) => (
               <span className="bar-row" key={label}>
-                <span className="bar-row__label">{label}</span>
+                {barChartStyle.categoryAxis.show && (
+                  <span
+                    className="bar-row__label"
+                    style={{
+                      color: barChartStyle.categoryAxis.labelColor,
+                      fontFamily: barChartStyle.categoryAxis.fontFamily,
+                      fontSize: barChartStyle.categoryAxis.fontSize,
+                      fontWeight: barChartStyle.categoryAxis.bold ? 700 : 400,
+                      fontStyle: barChartStyle.categoryAxis.italic ? "italic" : "normal",
+                      textDecoration: barChartStyle.categoryAxis.underline ? "underline" : "none",
+                    }}
+                  >
+                    {label}
+                  </span>
+                )}
                 <span className="bar-row__track">
                   <span
                     className="bar-row__fill"
                     style={{
                       width: `${value}%`,
-                      backgroundColor: palette[index % palette.length],
+                      backgroundColor: barChartStyle.dataPoint.fill,
                     }}
                   />
                 </span>
-                <span className="bar-row__value">{value}k</span>
+                {barChartStyle.labels.show && (
+                  <span
+                    className="bar-row__value"
+                    style={{
+                      color: barChartStyle.labels.color,
+                      fontFamily: barChartStyle.labels.fontFamily,
+                      fontSize: barChartStyle.labels.fontSize,
+                      fontWeight: barChartStyle.labels.bold ? 700 : 400,
+                      fontStyle: barChartStyle.labels.italic ? "italic" : "normal",
+                      textDecoration: barChartStyle.labels.underline ? "underline" : "none",
+                    }}
+                  >
+                    {value}k
+                  </span>
+                )}
               </span>
             ))}
           </span>

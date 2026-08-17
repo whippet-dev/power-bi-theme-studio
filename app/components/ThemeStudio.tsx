@@ -10,6 +10,7 @@ import {
   type JsonValue,
   type PowerBITheme,
 } from "../lib/theme";
+import { resolveBarChartStyle } from "../lib/barChartProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
@@ -22,6 +23,7 @@ export function ThemeStudio() {
   const fileInput = useRef<HTMLInputElement>(null);
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
+  const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -124,6 +126,7 @@ export function ThemeStudio() {
           <VisualGallery
             theme={resolved}
             tableStyle={tableStyle}
+            barChartStyle={barChartStyle}
             selected={selectedVisual}
             onSelect={setSelectedVisual}
           />
@@ -133,6 +136,7 @@ export function ThemeStudio() {
           theme={theme}
           resolved={resolved}
           tableStyle={tableStyle}
+          barChartStyle={barChartStyle}
           selected={selectedVisual}
           onChange={handleChange}
         />

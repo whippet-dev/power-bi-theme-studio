@@ -1,4 +1,13 @@
-import { propertyThemePath, resolvePropertyValue, type EnumOption, type PropertyDefinition } from "./properties";
+import {
+  boolProp as sharedBoolProp,
+  colorProp as sharedColorProp,
+  enumProp as sharedEnumProp,
+  numberProp as sharedNumberProp,
+  propertyThemePath,
+  resolvePropertyValue,
+  textProp as sharedTextProp,
+  type EnumOption,
+} from "./properties";
 import type { PowerBITheme, ResolvedTheme } from "./theme";
 
 /**
@@ -25,17 +34,10 @@ const ALIGNMENT_OPTIONS = [
   { value: "Right", label: "Right" },
 ] as const satisfies readonly EnumOption[];
 
-function colorProp(
-  id: string,
-  label: string,
-  description: string,
-  path: Array<string | number>,
-  guidance?: string,
-): PropertyDefinition<"color"> {
-  return { id, visual: "tableEx", valueType: "color", label, description, guidance, path };
-}
+const colorProp = (id: string, label: string, description: string, path: Array<string | number>, guidance?: string) =>
+  sharedColorProp("tableEx", id, label, description, path, guidance);
 
-function numberProp(
+const numberProp = (
   id: string,
   label: string,
   description: string,
@@ -43,40 +45,22 @@ function numberProp(
   min: number,
   max: number,
   guidance?: string,
-): PropertyDefinition<"number"> {
-  return { id, visual: "tableEx", valueType: "number", label, description, guidance, path, min, max };
-}
+) => sharedNumberProp("tableEx", id, label, description, path, min, max, guidance);
 
-function boolProp(
-  id: string,
-  label: string,
-  description: string,
-  path: Array<string | number>,
-  guidance?: string,
-): PropertyDefinition<"boolean"> {
-  return { id, visual: "tableEx", valueType: "boolean", label, description, guidance, path };
-}
+const boolProp = (id: string, label: string, description: string, path: Array<string | number>, guidance?: string) =>
+  sharedBoolProp("tableEx", id, label, description, path, guidance);
 
-function textProp(
-  id: string,
-  label: string,
-  description: string,
-  path: Array<string | number>,
-  guidance?: string,
-): PropertyDefinition<"text"> {
-  return { id, visual: "tableEx", valueType: "text", label, description, guidance, path };
-}
+const textProp = (id: string, label: string, description: string, path: Array<string | number>, guidance?: string) =>
+  sharedTextProp("tableEx", id, label, description, path, guidance);
 
-function enumProp(
+const enumProp = (
   id: string,
   label: string,
   description: string,
   path: Array<string | number>,
   options: readonly EnumOption[],
   guidance?: string,
-): PropertyDefinition<"enum"> {
-  return { id, visual: "tableEx", valueType: "enum", label, description, guidance, path, options };
-}
+) => sharedEnumProp("tableEx", id, label, description, path, options, guidance);
 
 export const TABLE_PROPERTIES = {
   columnHeaders: {

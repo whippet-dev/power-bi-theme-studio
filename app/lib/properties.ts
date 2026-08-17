@@ -10,7 +10,7 @@ import type { JsonValue, PowerBITheme } from "./theme";
  * reportThemeSchema-2.156.json (microsoft/powerbi-desktop-samples), not
  * guessed from example themes.
  */
-export type VisualSchemaKey = "tableEx";
+export type VisualSchemaKey = "tableEx" | "clusteredBarChart";
 
 export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
 
@@ -118,4 +118,65 @@ export function resolvePropertyValue<T extends PropertyValueType>(
 export function propertyThemePath(definition: Pick<PropertyDefinition, "visual" | "path" | "valueType">): Array<string | number> {
   const base = ["visualStyles", definition.visual, "*", ...definition.path];
   return definition.valueType === "color" ? [...base, "solid", "color"] : base;
+}
+
+// Shared factories for building PropertyDefinition entries, used by every
+// per-visual registry (app/lib/tableProperties.ts, app/lib/barChartProperties.ts, ...).
+
+export function colorProp(
+  visual: VisualSchemaKey,
+  id: string,
+  label: string,
+  description: string,
+  path: Array<string | number>,
+  guidance?: string,
+): PropertyDefinition<"color"> {
+  return { id, visual, valueType: "color", label, description, guidance, path };
+}
+
+export function numberProp(
+  visual: VisualSchemaKey,
+  id: string,
+  label: string,
+  description: string,
+  path: Array<string | number>,
+  min: number,
+  max: number,
+  guidance?: string,
+): PropertyDefinition<"number"> {
+  return { id, visual, valueType: "number", label, description, guidance, path, min, max };
+}
+
+export function boolProp(
+  visual: VisualSchemaKey,
+  id: string,
+  label: string,
+  description: string,
+  path: Array<string | number>,
+  guidance?: string,
+): PropertyDefinition<"boolean"> {
+  return { id, visual, valueType: "boolean", label, description, guidance, path };
+}
+
+export function textProp(
+  visual: VisualSchemaKey,
+  id: string,
+  label: string,
+  description: string,
+  path: Array<string | number>,
+  guidance?: string,
+): PropertyDefinition<"text"> {
+  return { id, visual, valueType: "text", label, description, guidance, path };
+}
+
+export function enumProp(
+  visual: VisualSchemaKey,
+  id: string,
+  label: string,
+  description: string,
+  path: Array<string | number>,
+  options: readonly EnumOption[],
+  guidance?: string,
+): PropertyDefinition<"enum"> {
+  return { id, visual, valueType: "enum", label, description, guidance, path, options };
 }
