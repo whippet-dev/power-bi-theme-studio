@@ -20,6 +20,8 @@ import { resolveMatrixStyle } from "../lib/matrixProperties";
 import { resolvePieChartStyle } from "../lib/pieChartProperties";
 import type { VisualSchemaKey } from "../lib/properties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
+import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
+import { resolveStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
@@ -31,6 +33,8 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   card: "card",
   bar: "clusteredBarChart",
   column: "clusteredColumnChart",
+  stackedBar: "barChart",
+  stackedColumn: "columnChart",
   line: "lineChart",
   table: "tableEx",
   matrix: "pivotTable",
@@ -38,7 +42,7 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   slicer: "slicer",
 };
 
-const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "line", "table", "matrix", "pie", "slicer"];
+const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "stackedBar", "stackedColumn", "line", "table", "matrix", "pie", "slicer"];
 
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
@@ -47,6 +51,8 @@ export function ThemeStudio() {
     card: true,
     bar: true,
     column: true,
+    stackedBar: true,
+    stackedColumn: true,
     line: true,
     table: true,
     matrix: true,
@@ -60,6 +66,8 @@ export function ThemeStudio() {
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
   const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
   const columnChartStyle = useMemo(() => resolveColumnChartStyle(theme, resolved), [theme, resolved]);
+  const stackedBarChartStyle = useMemo(() => resolveStackedBarChartStyle(theme, resolved), [theme, resolved]);
+  const stackedColumnChartStyle = useMemo(() => resolveStackedColumnChartStyle(theme, resolved), [theme, resolved]);
   const lineChartStyle = useMemo(() => resolveLineChartStyle(theme, resolved), [theme, resolved]);
   const cardStyle = useMemo(() => resolveCardStyle(theme, resolved), [theme, resolved]);
   const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
@@ -70,6 +78,8 @@ export function ThemeStudio() {
       card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
       bar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bar, resolved),
       column: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.column, resolved),
+      stackedBar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.stackedBar, resolved),
+      stackedColumn: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.stackedColumn, resolved),
       line: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.line, resolved),
       table: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.table, resolved),
       matrix: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.matrix, resolved),
@@ -219,6 +229,8 @@ export function ThemeStudio() {
             tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}
+            stackedBarChartStyle={stackedBarChartStyle}
+            stackedColumnChartStyle={stackedColumnChartStyle}
             lineChartStyle={lineChartStyle}
             cardStyle={cardStyle}
             slicerStyle={slicerStyle}
@@ -237,6 +249,8 @@ export function ThemeStudio() {
           tableStyle={tableStyle}
           barChartStyle={barChartStyle}
           columnChartStyle={columnChartStyle}
+          stackedBarChartStyle={stackedBarChartStyle}
+          stackedColumnChartStyle={stackedColumnChartStyle}
           lineChartStyle={lineChartStyle}
           cardStyle={cardStyle}
           slicerStyle={slicerStyle}

@@ -7,16 +7,20 @@ import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
+import type { ResolvedStackedBarChartStyle } from "../lib/stackedBarChartProperties";
+import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "matrix" | "pie" | "slicer";
+export type VisualKind = "card" | "bar" | "column" | "stackedBar" | "stackedColumn" | "line" | "table" | "matrix" | "pie" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
+  stackedBarChartStyle: ResolvedStackedBarChartStyle;
+  stackedColumnChartStyle: ResolvedStackedColumnChartStyle;
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
@@ -174,6 +178,8 @@ export function VisualGallery({
   tableStyle,
   barChartStyle,
   columnChartStyle,
+  stackedBarChartStyle,
+  stackedColumnChartStyle,
   lineChartStyle,
   cardStyle,
   slicerStyle,
@@ -400,6 +406,163 @@ export function VisualGallery({
     </span>
   );
 
+  const stackedBarLegendNode = stackedBarChartStyle.legend.show && (
+    <span className="chart-preview__legend">
+      <span className="chart-preview__legend-swatch" style={{ backgroundColor: stackedBarChartStyle.dataPoint.fill }} />
+      <span
+        style={{
+          color: stackedBarChartStyle.legend.labelColor,
+          fontFamily: stackedBarChartStyle.legend.fontFamily,
+          fontSize: stackedBarChartStyle.legend.fontSize,
+          fontWeight: stackedBarChartStyle.legend.bold ? 700 : 400,
+          fontStyle: stackedBarChartStyle.legend.italic ? "italic" : "normal",
+          textDecoration: stackedBarChartStyle.legend.underline ? "underline" : "none",
+        }}
+      >
+        Applications
+      </span>
+    </span>
+  );
+  const stackedBarLegendAtBottom = String(stackedBarChartStyle.legend.position).startsWith("Bottom");
+  const stackedSegmentColor = palette[1] ?? palette[0];
+  const stackedSegmentShare = 62; // fixed split — this app models one series' color, not per-series stacking
+
+  const stackedBarContent = (
+    <span className="chart-preview" style={{ opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100 }}>
+      {!stackedBarLegendAtBottom && stackedBarLegendNode}
+      {stackedBarChartStyle.categoryAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title"
+          style={{
+            color: stackedBarChartStyle.categoryAxis.titleColor,
+            fontFamily: stackedBarChartStyle.categoryAxis.titleFontFamily,
+            fontSize: stackedBarChartStyle.categoryAxis.titleFontSize,
+            fontWeight: stackedBarChartStyle.categoryAxis.titleBold ? 700 : 400,
+            fontStyle: stackedBarChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
+            textDecoration: stackedBarChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(stackedBarChartStyle.categoryAxis.titleText) || "Region"}
+        </span>
+      )}
+      <span
+        className="chart-preview__plot"
+        style={{
+          position: "relative",
+          ...(stackedBarChartStyle.valueAxis.gridlineShow
+            ? {
+                backgroundImage: `repeating-linear-gradient(to right, ${stackedBarChartStyle.valueAxis.gridlineColor} 0, ${stackedBarChartStyle.valueAxis.gridlineColor} ${stackedBarChartStyle.valueAxis.gridlineThickness}px, transparent ${stackedBarChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
+              }
+            : {}),
+        }}
+      >
+        {stackedBarChartStyle.trend.show && (
+          <span
+            className="chart-preview__trend-line"
+            aria-hidden="true"
+            style={{
+              borderTopWidth: stackedBarChartStyle.trend.width,
+              borderTopColor: stackedBarChartStyle.trend.lineColor,
+              borderTopStyle: mapLineStyle(stackedBarChartStyle.trend.style),
+              opacity: 1 - stackedBarChartStyle.trend.transparency / 100,
+            }}
+          />
+        )}
+        {[
+          ["London", 82],
+          ["North West", 66],
+          ["Scotland", 51],
+          ["Wales", 38],
+        ].map(([label, value], index) => (
+          <span className="bar-row" key={label}>
+            {stackedBarChartStyle.categoryAxis.show && (
+              <span
+                className="bar-row__label"
+                style={{
+                  color: stackedBarChartStyle.categoryAxis.labelColor,
+                  fontFamily: stackedBarChartStyle.categoryAxis.fontFamily,
+                  fontSize: stackedBarChartStyle.categoryAxis.fontSize,
+                  fontWeight: stackedBarChartStyle.categoryAxis.bold ? 700 : 400,
+                  fontStyle: stackedBarChartStyle.categoryAxis.italic ? "italic" : "normal",
+                  textDecoration: stackedBarChartStyle.categoryAxis.underline ? "underline" : "none",
+                }}
+              >
+                {label}
+              </span>
+            )}
+            <span className="bar-row__track-wrap">
+              <span className="bar-row__track">
+                <span
+                  className="bar-row__fill"
+                  style={{
+                    width: `${value}%`,
+                    opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
+                    background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
+                    border: stackedBarChartStyle.dataPoint.borderShow
+                      ? `${stackedBarChartStyle.dataPoint.borderSize}px solid ${stackedBarChartStyle.dataPoint.borderColor}`
+                      : undefined,
+                  }}
+                />
+              </span>
+              {index === 0 && stackedBarChartStyle.error.enabled && stackedBarChartStyle.error.barShow && (
+                <span
+                  className="bar-row__error"
+                  aria-hidden="true"
+                  title="Error bars are enabled — representative indicator, not a data-fit range"
+                  style={{ left: `${value}%` }}
+                >
+                  <span
+                    style={{
+                      height: `${stackedBarChartStyle.error.barWidth}px`,
+                      backgroundColor: stackedBarChartStyle.error.barColor,
+                      border: `${stackedBarChartStyle.error.barBorderSize}px solid ${stackedBarChartStyle.error.barBorderColor}`,
+                    }}
+                  />
+                </span>
+              )}
+            </span>
+            {stackedBarChartStyle.totals.show && (
+              <span
+                className="bar-row__value"
+                style={{
+                  color: stackedBarChartStyle.totals.color,
+                  fontFamily: stackedBarChartStyle.totals.fontFamily,
+                  fontSize: stackedBarChartStyle.totals.fontSize,
+                  fontWeight: stackedBarChartStyle.totals.bold ? 700 : 400,
+                  fontStyle: stackedBarChartStyle.totals.italic ? "italic" : "normal",
+                  textDecoration: stackedBarChartStyle.totals.underline ? "underline" : "none",
+                  backgroundColor: stackedBarChartStyle.totals.enableBackground
+                    ? hexWithAlpha(stackedBarChartStyle.totals.backgroundColor, stackedBarChartStyle.totals.backgroundTransparency)
+                    : undefined,
+                  padding: stackedBarChartStyle.totals.enableBackground ? "1px 4px" : undefined,
+                  borderRadius: stackedBarChartStyle.totals.enableBackground ? 3 : undefined,
+                }}
+              >
+                {value}k
+              </span>
+            )}
+          </span>
+        ))}
+      </span>
+      {stackedBarChartStyle.valueAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title chart-preview__axis-title--value"
+          style={{
+            color: stackedBarChartStyle.valueAxis.titleColor,
+            fontFamily: stackedBarChartStyle.valueAxis.titleFontFamily,
+            fontSize: stackedBarChartStyle.valueAxis.titleFontSize,
+            fontWeight: stackedBarChartStyle.valueAxis.titleBold ? 700 : 400,
+            fontStyle: stackedBarChartStyle.valueAxis.titleItalic ? "italic" : "normal",
+            textDecoration: stackedBarChartStyle.valueAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(stackedBarChartStyle.valueAxis.titleText) || "Applications (k)"}
+        </span>
+      )}
+      {stackedBarLegendAtBottom && stackedBarLegendNode}
+    </span>
+  );
+
   const columnLegendNode = columnChartStyle.legend.show && (
     <span className="chart-preview__legend">
       <span className="chart-preview__legend-swatch" style={{ backgroundColor: columnChartStyle.dataPoint.fill }} />
@@ -565,6 +728,162 @@ export function VisualGallery({
         </span>
       )}
       {columnLegendAtBottom && columnLegendNode}
+    </span>
+  );
+
+  const stackedColumnLegendNode = stackedColumnChartStyle.legend.show && (
+    <span className="chart-preview__legend">
+      <span className="chart-preview__legend-swatch" style={{ backgroundColor: stackedColumnChartStyle.dataPoint.fill }} />
+      <span
+        style={{
+          color: stackedColumnChartStyle.legend.labelColor,
+          fontFamily: stackedColumnChartStyle.legend.fontFamily,
+          fontSize: stackedColumnChartStyle.legend.fontSize,
+          fontWeight: stackedColumnChartStyle.legend.bold ? 700 : 400,
+          fontStyle: stackedColumnChartStyle.legend.italic ? "italic" : "normal",
+          textDecoration: stackedColumnChartStyle.legend.underline ? "underline" : "none",
+        }}
+      >
+        Applications
+      </span>
+    </span>
+  );
+  const stackedColumnLegendAtBottom = String(stackedColumnChartStyle.legend.position).startsWith("Bottom");
+
+  const stackedColumnContent = (
+    <span className="chart-preview" style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100 }}>
+      {!stackedColumnLegendAtBottom && stackedColumnLegendNode}
+      {stackedColumnChartStyle.valueAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title chart-preview__axis-title--value"
+          style={{
+            color: stackedColumnChartStyle.valueAxis.titleColor,
+            fontFamily: stackedColumnChartStyle.valueAxis.titleFontFamily,
+            fontSize: stackedColumnChartStyle.valueAxis.titleFontSize,
+            fontWeight: stackedColumnChartStyle.valueAxis.titleBold ? 700 : 400,
+            fontStyle: stackedColumnChartStyle.valueAxis.titleItalic ? "italic" : "normal",
+            textDecoration: stackedColumnChartStyle.valueAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications (k)"}
+        </span>
+      )}
+      <span
+        className="column-preview__plot"
+        style={{
+          ...(stackedColumnChartStyle.valueAxis.gridlineShow
+            ? {
+                backgroundImage: `repeating-linear-gradient(to top, ${stackedColumnChartStyle.valueAxis.gridlineColor} 0, ${stackedColumnChartStyle.valueAxis.gridlineColor} ${stackedColumnChartStyle.valueAxis.gridlineThickness}px, transparent ${stackedColumnChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
+              }
+            : {}),
+        }}
+      >
+        {stackedColumnChartStyle.trend.show && (
+          <span
+            className="chart-preview__trend-line"
+            aria-hidden="true"
+            style={{
+              borderTopWidth: stackedColumnChartStyle.trend.width,
+              borderTopColor: stackedColumnChartStyle.trend.lineColor,
+              borderTopStyle: mapLineStyle(stackedColumnChartStyle.trend.style),
+              opacity: 1 - stackedColumnChartStyle.trend.transparency / 100,
+            }}
+          />
+        )}
+        <span className="column-preview__columns">
+          {[
+            ["London", 82],
+            ["North West", 66],
+            ["Scotland", 51],
+            ["Wales", 38],
+          ].map(([label, value], index) => (
+            <span className="column-item" key={label}>
+              {stackedColumnChartStyle.totals.show && (
+                <span
+                  className="column-item__value"
+                  style={{
+                    color: stackedColumnChartStyle.totals.color,
+                    fontFamily: stackedColumnChartStyle.totals.fontFamily,
+                    fontSize: stackedColumnChartStyle.totals.fontSize,
+                    fontWeight: stackedColumnChartStyle.totals.bold ? 700 : 400,
+                    fontStyle: stackedColumnChartStyle.totals.italic ? "italic" : "normal",
+                    textDecoration: stackedColumnChartStyle.totals.underline ? "underline" : "none",
+                    backgroundColor: stackedColumnChartStyle.totals.enableBackground
+                      ? hexWithAlpha(stackedColumnChartStyle.totals.backgroundColor, stackedColumnChartStyle.totals.backgroundTransparency)
+                      : undefined,
+                    padding: stackedColumnChartStyle.totals.enableBackground ? "1px 4px" : undefined,
+                    borderRadius: stackedColumnChartStyle.totals.enableBackground ? 3 : undefined,
+                  }}
+                >
+                  {value}k
+                </span>
+              )}
+              <span className="column-item__track-wrap">
+                <span className="column-item__track">
+                  <span
+                    className="column-item__fill"
+                    style={{
+                      height: `${value}%`,
+                      opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
+                      background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
+                      border: stackedColumnChartStyle.dataPoint.borderShow
+                        ? `${stackedColumnChartStyle.dataPoint.borderSize}px solid ${stackedColumnChartStyle.dataPoint.borderColor}`
+                        : undefined,
+                    }}
+                  />
+                </span>
+                {index === 0 && stackedColumnChartStyle.error.enabled && stackedColumnChartStyle.error.barShow && (
+                  <span
+                    className="column-item__error"
+                    aria-hidden="true"
+                    title="Error bars are enabled — representative indicator, not a data-fit range"
+                    style={{ bottom: `${value}%` }}
+                  >
+                    <span
+                      style={{
+                        width: `${stackedColumnChartStyle.error.barWidth}px`,
+                        backgroundColor: stackedColumnChartStyle.error.barColor,
+                        border: `${stackedColumnChartStyle.error.barBorderSize}px solid ${stackedColumnChartStyle.error.barBorderColor}`,
+                      }}
+                    />
+                  </span>
+                )}
+              </span>
+              {stackedColumnChartStyle.categoryAxis.show && (
+                <span
+                  className="column-item__label"
+                  style={{
+                    color: stackedColumnChartStyle.categoryAxis.labelColor,
+                    fontFamily: stackedColumnChartStyle.categoryAxis.fontFamily,
+                    fontSize: stackedColumnChartStyle.categoryAxis.fontSize,
+                    fontWeight: stackedColumnChartStyle.categoryAxis.bold ? 700 : 400,
+                    fontStyle: stackedColumnChartStyle.categoryAxis.italic ? "italic" : "normal",
+                    textDecoration: stackedColumnChartStyle.categoryAxis.underline ? "underline" : "none",
+                  }}
+                >
+                  {label}
+                </span>
+              )}
+            </span>
+          ))}
+        </span>
+      </span>
+      {stackedColumnChartStyle.categoryAxis.showAxisTitle && (
+        <span
+          className="chart-preview__axis-title"
+          style={{
+            color: stackedColumnChartStyle.categoryAxis.titleColor,
+            fontFamily: stackedColumnChartStyle.categoryAxis.titleFontFamily,
+            fontSize: stackedColumnChartStyle.categoryAxis.titleFontSize,
+            fontWeight: stackedColumnChartStyle.categoryAxis.titleBold ? 700 : 400,
+            fontStyle: stackedColumnChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
+            textDecoration: stackedColumnChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(stackedColumnChartStyle.categoryAxis.titleText) || "Region"}
+        </span>
+      )}
+      {stackedColumnLegendAtBottom && stackedColumnLegendNode}
     </span>
   );
 
@@ -1147,6 +1466,8 @@ export function VisualGallery({
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
     { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barContent },
     { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnContent },
+    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarContent },
+    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnContent },
     { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },

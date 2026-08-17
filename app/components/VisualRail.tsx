@@ -6,6 +6,8 @@ const RAIL_VISUALS: RailEntry[] = [
   { id: "card", label: "Card", monogram: "C" },
   { id: "bar", label: "Bar chart", monogram: "B" },
   { id: "column", label: "Column chart", monogram: "Co" },
+  { id: "stackedBar", label: "Stacked bar chart", monogram: "SB" },
+  { id: "stackedColumn", label: "Stacked column chart", monogram: "SC" },
   { id: "line", label: "Line chart", monogram: "L" },
   { id: "table", label: "Table", monogram: "T" },
   { id: "matrix", label: "Matrix", monogram: "M" },

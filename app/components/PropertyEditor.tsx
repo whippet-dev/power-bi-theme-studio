@@ -15,6 +15,10 @@ import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
+import { propertyThemePath as stackedBarChartPropertyThemePath, STACKED_BAR_CHART_PROPERTIES } from "../lib/stackedBarChartProperties";
+import type { ResolvedStackedBarChartStyle } from "../lib/stackedBarChartProperties";
+import { propertyThemePath as stackedColumnChartPropertyThemePath, STACKED_COLUMN_CHART_PROPERTIES } from "../lib/stackedColumnChartProperties";
+import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import { hasThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
@@ -30,6 +34,8 @@ type PropertyEditorProps = {
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
+  stackedBarChartStyle: ResolvedStackedBarChartStyle;
+  stackedColumnChartStyle: ResolvedStackedColumnChartStyle;
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
@@ -47,6 +53,8 @@ const visualNames: Record<VisualKind, string> = {
   card: "Card",
   bar: "Clustered bar chart",
   column: "Clustered column chart",
+  stackedBar: "Stacked bar chart",
+  stackedColumn: "Stacked column chart",
   line: "Line chart",
   table: "Table",
   matrix: "Matrix",
@@ -120,6 +128,47 @@ const COLUMN_CHART_GROUP_LABELS: Record<keyof typeof COLUMN_CHART_PROPERTIES, st
   error: "Error bars",
   trend: "Trend line",
   referenceLine: "Constant line",
+  xAxisReferenceLine: "X-Axis constant line",
+  y1AxisReferenceLine: "Y-Axis constant line",
+  zoom: "Zoom slider",
+  smallMultiplesLayout: "Small multiples grid",
+  subheader: "Small multiple title",
+  layout: "Layout",
+};
+
+// Stacked bar/column charts share Clustered bar/column's shared groups but
+// add ribbonBands/totals/layout and drop referenceLine entirely (verified
+// against the schema, not assumed) — see stackedBarChartProperties.ts.
+const STACKED_BAR_CHART_GROUP_LABELS: Record<keyof typeof STACKED_BAR_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  categoryAxis: "Y axis",
+  valueAxis: "X axis",
+  legend: "Legend",
+  labels: "Data labels",
+  plotArea: "Plot area",
+  error: "Error bars",
+  trend: "Trend line",
+  ribbonBands: "Ribbons",
+  totals: "Total labels",
+  xAxisReferenceLine: "X-Axis constant line",
+  y1AxisReferenceLine: "Y-Axis constant line",
+  zoom: "Zoom slider",
+  smallMultiplesLayout: "Small multiples grid",
+  subheader: "Small multiple title",
+  layout: "Layout",
+};
+
+const STACKED_COLUMN_CHART_GROUP_LABELS: Record<keyof typeof STACKED_COLUMN_CHART_PROPERTIES, string> = {
+  dataPoint: "Data colors",
+  categoryAxis: "X axis",
+  valueAxis: "Y axis",
+  legend: "Legend",
+  labels: "Data labels",
+  plotArea: "Plot area",
+  error: "Error bars",
+  trend: "Trend line",
+  ribbonBands: "Ribbons",
+  totals: "Total labels",
   xAxisReferenceLine: "X-Axis constant line",
   y1AxisReferenceLine: "Y-Axis constant line",
   zoom: "Zoom slider",
@@ -465,6 +514,8 @@ const CHROME_ID_PREFIX = "chrome:";
 const TABLE_ID_PREFIX = "table:";
 const BAR_CHART_ID_PREFIX = "bar:";
 const COLUMN_CHART_ID_PREFIX = "column:";
+const STACKED_BAR_CHART_ID_PREFIX = "stackedBar:";
+const STACKED_COLUMN_CHART_ID_PREFIX = "stackedColumn:";
 const LINE_CHART_ID_PREFIX = "line:";
 const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
@@ -477,6 +528,8 @@ export function PropertyEditor({
   tableStyle,
   barChartStyle,
   columnChartStyle,
+  stackedBarChartStyle,
+  stackedColumnChartStyle,
   lineChartStyle,
   cardStyle,
   slicerStyle,
@@ -562,6 +615,20 @@ export function PropertyEditor({
           id: `${COLUMN_CHART_ID_PREFIX}${key}`,
           title: COLUMN_CHART_GROUP_LABELS[key],
           count: Object.keys(COLUMN_CHART_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "stackedBar"
+      ? (Object.keys(STACKED_BAR_CHART_PROPERTIES) as Array<keyof typeof STACKED_BAR_CHART_PROPERTIES>).map((key) => ({
+          id: `${STACKED_BAR_CHART_ID_PREFIX}${key}`,
+          title: STACKED_BAR_CHART_GROUP_LABELS[key],
+          count: Object.keys(STACKED_BAR_CHART_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "stackedColumn"
+      ? (Object.keys(STACKED_COLUMN_CHART_PROPERTIES) as Array<keyof typeof STACKED_COLUMN_CHART_PROPERTIES>).map((key) => ({
+          id: `${STACKED_COLUMN_CHART_ID_PREFIX}${key}`,
+          title: STACKED_COLUMN_CHART_GROUP_LABELS[key],
+          count: Object.keys(STACKED_COLUMN_CHART_PROPERTIES[key]).length,
         }))
       : []),
     ...(selected === "line"
@@ -754,6 +821,36 @@ export function PropertyEditor({
           groupValues={columnChartStyle[key]}
           pathPrefix="visualStyles.clusteredColumnChart.*"
           getThemePath={columnChartPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(STACKED_BAR_CHART_ID_PREFIX)) {
+      const key = id.slice(STACKED_BAR_CHART_ID_PREFIX.length) as keyof typeof STACKED_BAR_CHART_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={STACKED_BAR_CHART_PROPERTIES[key]}
+          groupValues={stackedBarChartStyle[key]}
+          pathPrefix="visualStyles.barChart.*"
+          getThemePath={stackedBarChartPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(STACKED_COLUMN_CHART_ID_PREFIX)) {
+      const key = id.slice(STACKED_COLUMN_CHART_ID_PREFIX.length) as keyof typeof STACKED_COLUMN_CHART_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={STACKED_COLUMN_CHART_PROPERTIES[key]}
+          groupValues={stackedColumnChartStyle[key]}
+          pathPrefix="visualStyles.columnChart.*"
+          getThemePath={stackedColumnChartPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />
