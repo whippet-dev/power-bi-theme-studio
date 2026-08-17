@@ -31,6 +31,14 @@ button { color: inherit; }
 
 .studio-shell { min-height: 100vh; }
 
+.build-footer {
+  padding: 10px 22px;
+  text-align: right;
+  color: #b3adbb;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+}
+
 .topbar {
   min-height: 68px;
   display: flex;
@@ -370,6 +378,17 @@ button { color: inherit; }
   border-radius: 2px;
 }
 
+.chart-preview__axis-title {
+  display: block;
+  margin-top: 8px;
+  font-size: 9px;
+}
+
+.chart-preview__axis-title--value {
+  margin-top: 10px;
+  text-align: center;
+}
+
 .chart-preview__plot {
   margin-top: 22px;
   display: flex;
@@ -386,7 +405,13 @@ button { color: inherit; }
   font-size: 9px;
 }
 
+.bar-row__track-wrap {
+  position: relative;
+  display: block;
+}
+
 .bar-row__track {
+  display: block;
   height: 11px;
   overflow: hidden;
   border-radius: 2px;
@@ -397,6 +422,38 @@ button { color: inherit; }
   height: 100%;
   display: block;
   border-radius: 2px;
+}
+
+.bar-row__error {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.bar-row__error span {
+  display: block;
+  width: 100%;
+  border-radius: 1px;
+}
+
+.chart-preview__reference-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left-style: solid;
+  pointer-events: none;
+}
+
+.chart-preview__trend-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 18%;
+  border-top-style: solid;
+  transform: rotate(-6deg);
+  pointer-events: none;
 }
 
 .bar-row__value {

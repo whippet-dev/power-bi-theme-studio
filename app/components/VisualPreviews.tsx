@@ -26,6 +26,21 @@ type PreviewShellProps = {
   children: ReactNode;
 };
 
+function mapLineStyle(value: string | number): "solid" | "dashed" | "dotted" {
+  const normalized = String(value).toLowerCase();
+  if (normalized === "dashed" || normalized === "custom") return "dashed";
+  if (normalized === "dotted") return "dotted";
+  return "solid";
+}
+
+function mapTextAlign(value: string | number): CSSProperties["textAlign"] | undefined {
+  const normalized = String(value).toLowerCase();
+  if (normalized === "left" || normalized === "center" || normalized === "right") {
+    return normalized as CSSProperties["textAlign"];
+  }
+  return undefined; // "Auto" — leave the per-column default alignment alone.
+}
+
 function hexWithAlpha(hex: string, transparencyPercent: number): string {
   const clean = hex.replace("#", "");
   const r = parseInt(clean.slice(0, 2), 16);
@@ -118,6 +133,25 @@ function PreviewShell({
 export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, selected, onSelect }: VisualGalleryProps) {
   const palette = theme.palette;
 
+  const legendNode = barChartStyle.legend.show && (
+    <span className="chart-preview__legend">
+      <span className="chart-preview__legend-swatch" style={{ backgroundColor: barChartStyle.dataPoint.fill }} />
+      <span
+        style={{
+          color: barChartStyle.legend.labelColor,
+          fontFamily: barChartStyle.legend.fontFamily,
+          fontSize: barChartStyle.legend.fontSize,
+          fontWeight: barChartStyle.legend.bold ? 700 : 400,
+          fontStyle: barChartStyle.legend.italic ? "italic" : "normal",
+          textDecoration: barChartStyle.legend.underline ? "underline" : "none",
+        }}
+      >
+        Applications
+      </span>
+    </span>
+  );
+  const legendAtBottom = String(barChartStyle.legend.position).startsWith("Bottom");
+
   return (
     <div className="visual-grid">
       <PreviewShell
@@ -157,42 +191,64 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
         onSelect={onSelect}
       >
         <span className="chart-preview" style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}>
-          {barChartStyle.legend.show && (
-            <span className="chart-preview__legend">
-              <span
-                className="chart-preview__legend-swatch"
-                style={{ backgroundColor: barChartStyle.dataPoint.fill }}
-              />
-              <span
-                style={{
-                  color: barChartStyle.legend.labelColor,
-                  fontFamily: barChartStyle.legend.fontFamily,
-                  fontSize: barChartStyle.legend.fontSize,
-                  fontWeight: barChartStyle.legend.bold ? 700 : 400,
-                  fontStyle: barChartStyle.legend.italic ? "italic" : "normal",
-                  textDecoration: barChartStyle.legend.underline ? "underline" : "none",
-                }}
-              >
-                Applications
-              </span>
+          {!legendAtBottom && legendNode}
+          {barChartStyle.categoryAxis.showAxisTitle && (
+            <span
+              className="chart-preview__axis-title"
+              style={{
+                color: barChartStyle.categoryAxis.titleColor,
+                fontFamily: barChartStyle.categoryAxis.titleFontFamily,
+                fontSize: barChartStyle.categoryAxis.titleFontSize,
+                fontWeight: barChartStyle.categoryAxis.titleBold ? 700 : 400,
+                fontStyle: barChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
+                textDecoration: barChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
+              }}
+            >
+              {String(barChartStyle.categoryAxis.titleText) || "Region"}
             </span>
           )}
           <span
             className="chart-preview__plot"
-            style={
-              barChartStyle.valueAxis.gridlineShow
+            style={{
+              position: "relative",
+              ...(barChartStyle.valueAxis.gridlineShow
                 ? {
                     backgroundImage: `repeating-linear-gradient(to right, ${barChartStyle.valueAxis.gridlineColor} 0, ${barChartStyle.valueAxis.gridlineColor} ${barChartStyle.valueAxis.gridlineThickness}px, transparent ${barChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
                   }
-                : undefined
-            }
+                : {}),
+            }}
           >
+            {barChartStyle.referenceLine.show && (
+              <span
+                className="chart-preview__reference-line"
+                aria-hidden="true"
+                style={{
+                  left: "65%",
+                  borderLeftWidth: barChartStyle.referenceLine.width,
+                  borderLeftColor: barChartStyle.referenceLine.lineColor,
+                  borderLeftStyle: mapLineStyle(barChartStyle.referenceLine.style),
+                  opacity: 1 - barChartStyle.referenceLine.transparency / 100,
+                }}
+              />
+            )}
+            {barChartStyle.trend.show && (
+              <span
+                className="chart-preview__trend-line"
+                aria-hidden="true"
+                style={{
+                  borderTopWidth: barChartStyle.trend.width,
+                  borderTopColor: barChartStyle.trend.lineColor,
+                  borderTopStyle: mapLineStyle(barChartStyle.trend.style),
+                  opacity: 1 - barChartStyle.trend.transparency / 100,
+                }}
+              />
+            )}
             {[
               ["London", 82],
               ["North West", 66],
               ["Scotland", 51],
               ["Wales", 38],
-            ].map(([label, value]) => (
+            ].map(([label, value], index) => (
               <span className="bar-row" key={label}>
                 {barChartStyle.categoryAxis.show && (
                   <span
@@ -209,14 +265,35 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
                     {label}
                   </span>
                 )}
-                <span className="bar-row__track">
-                  <span
-                    className="bar-row__fill"
-                    style={{
-                      width: `${value}%`,
-                      backgroundColor: barChartStyle.dataPoint.fill,
-                    }}
-                  />
+                <span className="bar-row__track-wrap">
+                  <span className="bar-row__track">
+                    <span
+                      className="bar-row__fill"
+                      style={{
+                        width: `${value}%`,
+                        backgroundColor: hexWithAlpha(barChartStyle.dataPoint.fill, barChartStyle.dataPoint.fillTransparency),
+                        border: barChartStyle.dataPoint.borderShow
+                          ? `${barChartStyle.dataPoint.borderSize}px solid ${barChartStyle.dataPoint.borderColor}`
+                          : undefined,
+                      }}
+                    />
+                  </span>
+                  {index === 0 && barChartStyle.error.enabled && barChartStyle.error.barShow && (
+                    <span
+                      className="bar-row__error"
+                      aria-hidden="true"
+                      title="Error bars are enabled — representative indicator, not a data-fit range"
+                      style={{ left: `${value}%` }}
+                    >
+                      <span
+                        style={{
+                          height: `${barChartStyle.error.barWidth}px`,
+                          backgroundColor: barChartStyle.error.barColor,
+                          border: `${barChartStyle.error.barBorderSize}px solid ${barChartStyle.error.barBorderColor}`,
+                        }}
+                      />
+                    </span>
+                  )}
                 </span>
                 {barChartStyle.labels.show && (
                   <span
@@ -228,6 +305,11 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
                       fontWeight: barChartStyle.labels.bold ? 700 : 400,
                       fontStyle: barChartStyle.labels.italic ? "italic" : "normal",
                       textDecoration: barChartStyle.labels.underline ? "underline" : "none",
+                      backgroundColor: barChartStyle.labels.enableBackground
+                        ? hexWithAlpha(barChartStyle.labels.backgroundColor, barChartStyle.labels.backgroundTransparency)
+                        : undefined,
+                      padding: barChartStyle.labels.enableBackground ? "1px 4px" : undefined,
+                      borderRadius: barChartStyle.labels.enableBackground ? 3 : undefined,
                     }}
                   >
                     {value}k
@@ -236,6 +318,22 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
               </span>
             ))}
           </span>
+          {barChartStyle.valueAxis.showAxisTitle && (
+            <span
+              className="chart-preview__axis-title chart-preview__axis-title--value"
+              style={{
+                color: barChartStyle.valueAxis.titleColor,
+                fontFamily: barChartStyle.valueAxis.titleFontFamily,
+                fontSize: barChartStyle.valueAxis.titleFontSize,
+                fontWeight: barChartStyle.valueAxis.titleBold ? 700 : 400,
+                fontStyle: barChartStyle.valueAxis.titleItalic ? "italic" : "normal",
+                textDecoration: barChartStyle.valueAxis.titleUnderline ? "underline" : "none",
+              }}
+            >
+              {String(barChartStyle.valueAxis.titleText) || "Applications (k)"}
+            </span>
+          )}
+          {legendAtBottom && legendNode}
         </span>
       </PreviewShell>
 
@@ -248,7 +346,12 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
         chrome={chromeStyles.table}
         onSelect={onSelect}
       >
-        <span className="table-preview">
+        <span
+          className="table-preview"
+          style={{
+            border: `${tableStyle.grid.outlineWeight}px solid ${tableStyle.grid.outlineColor}`,
+          }}
+        >
           <span
             className="table-preview__row table-preview__head"
             style={{
@@ -259,6 +362,8 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
               fontWeight: tableStyle.columnHeaders.bold ? 700 : 400,
               fontStyle: tableStyle.columnHeaders.italic ? "italic" : "normal",
               textDecoration: tableStyle.columnHeaders.underline ? "underline" : "none",
+              textAlign: mapTextAlign(tableStyle.columnHeaders.alignment),
+              whiteSpace: tableStyle.columnHeaders.wordWrap ? "normal" : "nowrap",
               padding: `${tableStyle.grid.rowPadding}px 8px`,
               borderRight: tableStyle.grid.gridVertical
                 ? `${tableStyle.grid.gridVerticalWeight}px solid ${tableStyle.grid.gridVerticalColor}`
@@ -285,7 +390,11 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, 
                   fontWeight: tableStyle.values.bold ? 700 : 400,
                   fontStyle: tableStyle.values.italic ? "italic" : "normal",
                   textDecoration: tableStyle.values.underline ? "underline" : "none",
+                  whiteSpace: tableStyle.values.wordWrap ? "normal" : "nowrap",
                   padding: `${tableStyle.grid.rowPadding}px 8px`,
+                  borderRight: tableStyle.grid.gridVertical
+                    ? `${tableStyle.grid.gridVerticalWeight}px solid ${tableStyle.grid.gridVerticalColor}`
+                    : undefined,
                   borderBottom: tableStyle.grid.gridHorizontal
                     ? `${tableStyle.grid.gridHorizontalWeight}px solid ${tableStyle.grid.gridHorizontalColor}`
                     : "none",

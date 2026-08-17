@@ -176,6 +176,10 @@ export function ThemeStudio() {
           onReset={handleReset}
         />
       </div>
+
+      <footer className="build-footer">
+        <span>build {__COMMIT_HASH__}</span>
+      </footer>
     </main>
   );
 }
