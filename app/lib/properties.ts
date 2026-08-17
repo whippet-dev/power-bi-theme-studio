@@ -4,13 +4,21 @@ import type { JsonValue, PowerBITheme } from "./theme";
  * Power BI theme JSON stores per-visual overrides at
  * `visualStyles[visualKey]["*"][propertyGroup][0][propertyName]`. The `"*"`
  * selector means "all instances of this visual type" (as opposed to a
- * specific visual's GUID) and is the only selector this app writes.
+ * specific visual's GUID) and is the only instance-selector this app writes.
+ *
+ * `visualKey` can also itself be `"*"` — Power BI's real schema permits
+ * `visualStyles["*"]["*"][group][0][prop]` as a default that applies to
+ * every visual type, overridden per-type by `visualStyles[specificType]["*"]`.
+ * "Chrome" properties shared across all visuals (title, subtitle,
+ * background, border — see app/lib/chromeProperties.ts) use this: reads
+ * check the specific visual's override first, then fall back to the shared
+ * `"*"` bucket, then to a plain default.
  *
  * Property coverage is pinned to Microsoft's published schema
  * reportThemeSchema-2.156.json (microsoft/powerbi-desktop-samples), not
  * guessed from example themes.
  */
-export type VisualSchemaKey = "tableEx" | "clusteredBarChart";
+export type VisualSchemaKey = "tableEx" | "clusteredBarChart" | "card" | "slicer" | "*";
 
 export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
 
@@ -118,6 +126,35 @@ export function resolvePropertyValue<T extends PropertyValueType>(
 export function propertyThemePath(definition: Pick<PropertyDefinition, "visual" | "path" | "valueType">): Array<string | number> {
   const base = ["visualStyles", definition.visual, "*", ...definition.path];
   return definition.valueType === "color" ? [...base, "solid", "color"] : base;
+}
+
+/**
+ * Resolves a "chrome" property (shared across every visual type) for a
+ * specific visual: that visual's own override wins if present, else the
+ * shared `visualStyles["*"]["*"]` default, else `fallback`.
+ */
+export function resolveChromeValue<T extends PropertyValueType>(
+  theme: PowerBITheme,
+  activeVisual: VisualSchemaKey,
+  definition: Pick<PropertyDefinition<T>, "path" | "valueType">,
+  fallback: ValueForType<T>,
+): ValueForType<T> {
+  const specific = readVisualStyleValue(theme, { visual: activeVisual, path: definition.path, valueType: definition.valueType });
+  if (specific !== undefined) return specific;
+  const shared = readVisualStyleValue(theme, { visual: "*", path: definition.path, valueType: definition.valueType });
+  return shared ?? fallback;
+}
+
+/**
+ * Absolute theme path for writing a chrome property against a specific
+ * visual context — `"*"` to edit the shared default, or a concrete
+ * `VisualSchemaKey` to create/update that visual's own override.
+ */
+export function chromeThemePath(
+  activeVisual: VisualSchemaKey,
+  definition: Pick<PropertyDefinition, "path" | "valueType">,
+): Array<string | number> {
+  return propertyThemePath({ visual: activeVisual, path: definition.path, valueType: definition.valueType });
 }
 
 // Shared factories for building PropertyDefinition entries, used by every

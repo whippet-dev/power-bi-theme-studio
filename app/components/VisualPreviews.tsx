@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
+import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
@@ -9,6 +10,7 @@ type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -16,26 +18,47 @@ type VisualGalleryProps = {
 type PreviewShellProps = {
   id: VisualKind;
   label: string;
+  defaultTitle: string;
   selected: boolean;
   theme: ResolvedTheme;
+  chrome: ResolvedChromeStyle;
   onSelect: (visual: VisualKind) => void;
   children: ReactNode;
 };
 
+function hexWithAlpha(hex: string, transparencyPercent: number): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const alpha = Math.max(0, Math.min(1, 1 - transparencyPercent / 100));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function PreviewShell({
   id,
   label,
+  defaultTitle,
   selected,
   theme,
+  chrome,
   onSelect,
   children,
 }: PreviewShellProps) {
-  const style = {
+  const frameStyle = {
     "--preview-bg": theme.background,
     "--preview-fg": theme.foreground,
     "--preview-muted": theme.muted,
     "--preview-font": theme.fontFamily,
+    ...(chrome.background.show
+      ? { backgroundColor: hexWithAlpha(chrome.background.color, chrome.background.transparency) }
+      : {}),
+    ...(chrome.border.show
+      ? { border: `${chrome.border.width}px solid ${chrome.border.color}`, borderRadius: chrome.border.radius }
+      : {}),
   } as CSSProperties;
+
+  const titleText = chrome.title.text || defaultTitle;
 
   return (
     <button
@@ -49,14 +72,50 @@ function PreviewShell({
         <span>{label}</span>
         <span className="visual-tile__action">{selected ? "Editing" : "Select"}</span>
       </span>
-      <span className="visual-frame" style={style}>
+      <span className="visual-frame" style={frameStyle}>
+        {chrome.title.show && (
+          <span
+            className="preview-title"
+            style={{
+              textAlign: chrome.title.alignment as CSSProperties["textAlign"],
+              backgroundColor: chrome.title.background,
+              color: chrome.title.fontColor,
+              fontFamily: chrome.title.fontFamily,
+              fontSize: chrome.title.fontSize,
+              fontWeight: chrome.title.bold ? 700 : 400,
+              fontStyle: chrome.title.italic ? "italic" : "normal",
+              textDecoration: chrome.title.underline ? "underline" : "none",
+              whiteSpace: chrome.title.titleWrap ? "normal" : "nowrap",
+              overflow: "hidden",
+              textOverflow: chrome.title.titleWrap ? "clip" : "ellipsis",
+            }}
+          >
+            {titleText}
+          </span>
+        )}
+        {chrome.subTitle.show && chrome.subTitle.text && (
+          <span
+            className="preview-subtitle"
+            style={{
+              textAlign: chrome.subTitle.alignment as CSSProperties["textAlign"],
+              color: chrome.subTitle.fontColor,
+              fontFamily: chrome.subTitle.fontFamily,
+              fontSize: chrome.subTitle.fontSize,
+              fontWeight: chrome.subTitle.bold ? 700 : 400,
+              fontStyle: chrome.subTitle.italic ? "italic" : "normal",
+              textDecoration: chrome.subTitle.underline ? "underline" : "none",
+            }}
+          >
+            {chrome.subTitle.text}
+          </span>
+        )}
         {children}
       </span>
     </button>
   );
 }
 
-export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSelect }: VisualGalleryProps) {
+export function VisualGallery({ theme, tableStyle, barChartStyle, chromeStyles, selected, onSelect }: VisualGalleryProps) {
   const palette = theme.palette;
 
   return (
@@ -64,14 +123,13 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSe
       <PreviewShell
         id="card"
         label="Card"
+        defaultTitle="Total support awarded"
         selected={selected === "card"}
         theme={theme}
+        chrome={chromeStyles.card}
         onSelect={onSelect}
       >
         <span className="card-preview">
-          <span className="preview-title" style={{ fontSize: theme.titleSize }}>
-            Total support awarded
-          </span>
           <span className="card-preview__value" style={{ fontSize: theme.calloutSize }}>
             £8.4m
           </span>
@@ -92,14 +150,13 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSe
       <PreviewShell
         id="bar"
         label="Clustered bar chart"
+        defaultTitle="Applications by region"
         selected={selected === "bar"}
         theme={theme}
+        chrome={chromeStyles.bar}
         onSelect={onSelect}
       >
         <span className="chart-preview" style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}>
-          <span className="preview-title" style={{ fontSize: theme.titleSize }}>
-            Applications by region
-          </span>
           {barChartStyle.legend.show && (
             <span className="chart-preview__legend">
               <span
@@ -185,14 +242,13 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSe
       <PreviewShell
         id="table"
         label="Table"
+        defaultTitle="Regional performance"
         selected={selected === "table"}
         theme={theme}
+        chrome={chromeStyles.table}
         onSelect={onSelect}
       >
         <span className="table-preview">
-          <span className="preview-title" style={{ fontSize: theme.titleSize }}>
-            Regional performance
-          </span>
           <span
             className="table-preview__row table-preview__head"
             style={{
@@ -262,14 +318,13 @@ export function VisualGallery({ theme, tableStyle, barChartStyle, selected, onSe
       <PreviewShell
         id="slicer"
         label="Slicer"
+        defaultTitle="Application status"
         selected={selected === "slicer"}
         theme={theme}
+        chrome={chromeStyles.slicer}
         onSelect={onSelect}
       >
         <span className="slicer-preview">
-          <span className="preview-title" style={{ fontSize: theme.titleSize }}>
-            Application status
-          </span>
           <span className="slicer-preview__search">Search</span>
           {["All statuses", "Approved", "In review", "Declined"].map((label, index) => (
             <span className="slicer-preview__option" key={label}>

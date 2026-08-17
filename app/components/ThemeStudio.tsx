@@ -11,9 +11,20 @@ import {
   type PowerBITheme,
 } from "../lib/theme";
 import { resolveBarChartStyle } from "../lib/barChartProperties";
+import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import type { VisualSchemaKey } from "../lib/properties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
+
+// Maps this app's UI visual identifiers to the schema's real visual-type
+// keys, so chrome (title/subtitle/background/border) resolves per visual.
+const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
+  card: "card",
+  bar: "clusteredBarChart",
+  table: "tableEx",
+  slicer: "slicer",
+};
 
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
@@ -24,6 +35,19 @@ export function ThemeStudio() {
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
   const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
+  const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
+    () => ({
+      card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
+      bar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bar, resolved),
+      table: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.table, resolved),
+      slicer: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.slicer, resolved),
+    }),
+    [theme, resolved],
+  );
+  // The shared default only (no visual-specific override blended in) — what
+  // the "Theme" tab shows and edits, distinct from a single visual's fully
+  // resolved chrome.
+  const sharedChromeStyle = useMemo(() => resolveChromeStyle(theme, "*", resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -127,6 +151,7 @@ export function ThemeStudio() {
             theme={resolved}
             tableStyle={tableStyle}
             barChartStyle={barChartStyle}
+            chromeStyles={chromeStyles}
             selected={selectedVisual}
             onSelect={setSelectedVisual}
           />
@@ -137,6 +162,9 @@ export function ThemeStudio() {
           resolved={resolved}
           tableStyle={tableStyle}
           barChartStyle={barChartStyle}
+          chromeStyle={chromeStyles[selectedVisual]}
+          sharedChromeStyle={sharedChromeStyle}
+          activeVisualSchemaKey={VISUAL_SCHEMA_KEY[selectedVisual]}
           selected={selectedVisual}
           onChange={handleChange}
         />
