@@ -29,7 +29,9 @@ export type VisualSchemaKey =
   | "lineChart"
   | "pivotTable"
   | "pieChart"
-  | "*";
+  | "*"
+  | "report"
+  | "page";
 
 export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
 

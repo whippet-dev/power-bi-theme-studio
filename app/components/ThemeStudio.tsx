@@ -14,6 +14,7 @@ import {
 import { resolveBarChartStyle } from "../lib/barChartProperties";
 import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import { resolveGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { resolveColumnChartStyle } from "../lib/columnChartProperties";
 import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import { resolveMatrixStyle } from "../lib/matrixProperties";
@@ -92,6 +93,7 @@ export function ThemeStudio() {
   // the "Theme" tab shows and edits, distinct from a single visual's fully
   // resolved chrome.
   const sharedChromeStyle = useMemo(() => resolveChromeStyle(theme, "*", resolved), [theme, resolved]);
+  const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(theme, resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -258,6 +260,7 @@ export function ThemeStudio() {
           pieChartStyle={pieChartStyle}
           chromeStyle={chromeStyles[selectedVisual]}
           sharedChromeStyle={sharedChromeStyle}
+          globalOptionsStyle={globalOptionsStyle}
           activeVisualSchemaKey={VISUAL_SCHEMA_KEY[selectedVisual]}
           selected={selectedVisual}
           onChange={handleChange}

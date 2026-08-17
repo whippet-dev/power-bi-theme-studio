@@ -6,6 +6,8 @@ import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import { COLUMN_CHART_PROPERTIES, propertyThemePath as columnChartPropertyThemePath } from "../lib/columnChartProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
+import { GLOBAL_OPTIONS_PROPERTIES, propertyThemePath as globalOptionsPropertyThemePath } from "../lib/globalOptionsProperties";
+import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import { MATRIX_PROPERTIES, propertyThemePath as matrixPropertyThemePath } from "../lib/matrixProperties";
@@ -26,7 +28,7 @@ import type { VisualKind } from "./VisualPreviews";
 
 type ThemePath = Array<string | number>;
 type PropertyValue = string | number | boolean;
-type Tab = "theme" | "visual";
+type Tab = "theme" | "visual" | "global";
 
 type PropertyEditorProps = {
   theme: PowerBITheme;
@@ -43,6 +45,7 @@ type PropertyEditorProps = {
   pieChartStyle: ResolvedPieChartStyle;
   chromeStyle: ResolvedChromeStyle;
   sharedChromeStyle: ResolvedChromeStyle;
+  globalOptionsStyle: ResolvedGlobalOptionsStyle;
   activeVisualSchemaKey: VisualSchemaKey;
   selected: VisualKind;
   onChange: (path: ThemePath, value: PropertyValue) => void;
@@ -193,6 +196,20 @@ const CHROME_GROUP_LABELS: Record<keyof typeof CHROME_PROPERTIES, string> = {
   visualHeaderTooltip: "Visual header tooltip",
   visualLink: "Action",
   visualTooltip: "Tooltip",
+};
+
+const GLOBAL_OPTIONS_GROUP_LABELS: Record<keyof typeof GLOBAL_OPTIONS_PROPERTIES, string> = {
+  reportFilterPaneState: "Filter pane (report default)",
+  reportPageAlignment: "Page alignment (report default)",
+  pageBackground: "Page background",
+  pageAlignment: "Page alignment",
+  pageFilterCards: "Filter cards",
+  pageWallpaper: "Wallpaper",
+  pageFilterPane: "Filter pane",
+  pageInformation: "Page information",
+  pageRefresh: "Page refresh",
+  pageSize: "Canvas settings",
+  personalizeVisual: "Personalize visual",
 };
 
 const CARD_GROUP_LABELS: Record<keyof typeof CARD_PROPERTIES, string> = {
@@ -532,6 +549,7 @@ const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
 const MATRIX_ID_PREFIX = "matrix:";
 const PIE_CHART_ID_PREFIX = "pie:";
+const GLOBAL_OPTIONS_ID_PREFIX = "global:";
 
 export function PropertyEditor({
   theme,
@@ -548,6 +566,7 @@ export function PropertyEditor({
   pieChartStyle,
   chromeStyle,
   sharedChromeStyle,
+  globalOptionsStyle,
   activeVisualSchemaKey,
   selected,
   onChange,
@@ -658,7 +677,14 @@ export function PropertyEditor({
       : []),
   ];
 
-  const activeGroups = tab === "theme" ? themeGroups : visualGroups;
+  const globalOptionsGroupKeys = Object.keys(GLOBAL_OPTIONS_PROPERTIES) as Array<keyof typeof GLOBAL_OPTIONS_PROPERTIES>;
+  const globalGroups: GroupMeta[] = globalOptionsGroupKeys.map((key) => ({
+    id: `${GLOBAL_OPTIONS_ID_PREFIX}${key}`,
+    title: GLOBAL_OPTIONS_GROUP_LABELS[key],
+    count: Object.keys(GLOBAL_OPTIONS_PROPERTIES[key]).length,
+  }));
+
+  const activeGroups = tab === "theme" ? themeGroups : tab === "global" ? globalGroups : visualGroups;
   const openGroup = openGroupId ? activeGroups.find((group) => group.id === openGroupId) : undefined;
 
   function renderGroupContent(id: string): ReactNode {
@@ -757,6 +783,21 @@ export function PropertyEditor({
           groupValues={sharedTab ? sharedChromeStyle[key] : chromeStyle[key]}
           pathPrefix={sharedTab ? "visualStyles.*.*" : `visualStyles.${activeVisualSchemaKey}.*`}
           getThemePath={(definition) => chromeThemePath(sharedTab ? "*" : activeVisualSchemaKey, definition)}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(GLOBAL_OPTIONS_ID_PREFIX)) {
+      const key = id.slice(GLOBAL_OPTIONS_ID_PREFIX.length) as keyof typeof GLOBAL_OPTIONS_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={GLOBAL_OPTIONS_PROPERTIES[key]}
+          groupValues={globalOptionsStyle[key]}
+          pathPrefix={key.startsWith("report") ? "visualStyles.report.*" : "visualStyles.page.*"}
+          getThemePath={globalOptionsPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />
@@ -944,6 +985,15 @@ export function PropertyEditor({
           onClick={() => setTab("theme")}
         >
           Theme
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "global"}
+          className={`properties-panel__tab${tab === "global" ? " is-active" : ""}`}
+          onClick={() => setTab("global")}
+        >
+          Global options
         </button>
       </div>
 
