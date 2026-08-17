@@ -48,6 +48,44 @@ test("resolveGlobalOptionsStyle picks up report- and page-level overrides indepe
   assert.equal(global.pageSize.pageSizeTypes, "Standard");
 });
 
+test("filter pane styling is read from the shared visualStyles['*']['*'] bucket, where real themes actually put it", () => {
+  // Regression: only the `page` bucket was read, so a theme styling its
+  // filter pane the common way (the shared bucket — which is what Power
+  // BI's own theme generator emits) appeared to do nothing at all.
+  const sharedBucketTheme: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: {
+      "*": {
+        "*": {
+          outspacePane: [{ backgroundColor: { solid: { color: "#12436D" } }, foregroundColor: { solid: { color: "#FFFFFF" } } }],
+          filterCard: [{ backgroundColor: { solid: { color: "#FFFFFF" } } }],
+          outspace: [{ color: { solid: { color: "#F3F2F1" } } }],
+        },
+      },
+    },
+  };
+
+  const global = resolveGlobalOptionsStyle(sharedBucketTheme, resolveTheme(sharedBucketTheme));
+  assert.equal(global.pageFilterPane.backgroundColor, "#12436D");
+  assert.equal(global.pageFilterPane.foregroundColor, "#FFFFFF");
+  assert.equal(global.pageFilterCards.backgroundColor, "#FFFFFF");
+  assert.equal(global.pageWallpaper.color, "#F3F2F1");
+});
+
+test("a page-specific value still beats the shared bucket, so both can be set at once", () => {
+  const bothBuckets: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: {
+      "*": { "*": { outspacePane: [{ backgroundColor: { solid: { color: "#12436D" } }, fontFamily: "Segoe UI" }] } },
+      page: { "*": { outspacePane: [{ fontFamily: "Arial" }] } },
+    },
+  };
+
+  const global = resolveGlobalOptionsStyle(bothBuckets, resolveTheme(bothBuckets));
+  assert.equal(global.pageFilterPane.fontFamily, "Arial", "the page bucket must win where it sets a value");
+  assert.equal(global.pageFilterPane.backgroundColor, "#12436D", "and fall through to shared where it doesn't");
+});
+
 test("propertyThemePath writes a page background colour round-trip through updateThemeValue and resolveGlobalOptionsStyle", () => {
   const path = propertyThemePath(GLOBAL_OPTIONS_PROPERTIES.pageBackground.color);
   assert.deepEqual(path, ["visualStyles", "page", "*", "background", 0, "color", "solid", "color"]);

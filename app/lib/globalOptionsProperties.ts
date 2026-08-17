@@ -1,4 +1,5 @@
-import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
+import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
+import type { PropertyDefinition, PropertyValueType } from "./properties";
 import type { PowerBITheme, ResolvedTheme } from "./theme";
 
 /**
@@ -12,9 +13,15 @@ import type { PowerBITheme, ResolvedTheme } from "./theme";
  * page-level styling group — kept as separate registry groups since their
  * field sets don't overlap even where the *concept* does.
  *
- * Uses plain resolvePropertyValue/propertyThemePath (not the chrome
- * shared/override resolver) because "report" and "page" are each a single
- * fixed bucket, not "one shared default across many visual-type instances."
+ * **Both buckets have a shared fallback.** Real themes commonly put filter
+ * pane, filter card, and wallpaper styling in `visualStyles["*"]["*"]`
+ * rather than under `page` — Power BI honours either, and Microsoft's own
+ * theme generator emits the shared form. Reading only the `page` bucket
+ * meant a theme that styled its filter pane the common way appeared to do
+ * nothing at all. Resolution therefore checks `visualStyles.page["*"]`
+ * first, then falls back to `visualStyles["*"]["*"]`, exactly like chrome.
+ * Writes still target the specific bucket, which correctly wins over a
+ * shared value.
  */
 
 const VERTICAL_ALIGNMENT_OPTIONS = [
@@ -405,69 +412,83 @@ export type ResolvedGlobalOptionsStyle = {
   personalizeVisual: { show: boolean; perspectiveRef: string };
 };
 
-/** Resolves report/page-level global options — plain theme reads, no shared/override cascade. */
+/**
+ * Reads a page/report-level property, falling back to the shared
+ * `visualStyles["*"]["*"]` bucket where many real themes actually put it.
+ */
+function resolveGlobalValue<T extends PropertyValueType>(
+  theme: PowerBITheme,
+  definition: PropertyDefinition<T>,
+  // Borrow the fallback's type from resolveChromeValue rather than
+  // restating its per-value-type mapping and drifting from it.
+  fallback: Parameters<typeof resolveChromeValue<T>>[3],
+) {
+  return resolveChromeValue<T>(theme, definition.visual, definition, fallback);
+}
+
+/** Resolves report/page-level global options, checking the specific bucket then the shared one. */
 export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedGlobalOptionsStyle {
   const p = GLOBAL_OPTIONS_PROPERTIES;
   return {
     reportFilterPaneState: {
-      expanded: resolvePropertyValue(theme, p.reportFilterPaneState.expanded, true),
-      visible: resolvePropertyValue(theme, p.reportFilterPaneState.visible, true),
+      expanded: resolveGlobalValue(theme, p.reportFilterPaneState.expanded, true),
+      visible: resolveGlobalValue(theme, p.reportFilterPaneState.visible, true),
     },
     reportPageAlignment: {
-      verticalAlignment: resolvePropertyValue(theme, p.reportPageAlignment.verticalAlignment, "Top"),
+      verticalAlignment: resolveGlobalValue(theme, p.reportPageAlignment.verticalAlignment, "Top"),
     },
     pageBackground: {
-      color: resolvePropertyValue(theme, p.pageBackground.color, base.background),
-      transparency: resolvePropertyValue(theme, p.pageBackground.transparency, 0),
+      color: resolveGlobalValue(theme, p.pageBackground.color, base.background),
+      transparency: resolveGlobalValue(theme, p.pageBackground.transparency, 0),
     },
     pageAlignment: {
-      verticalAlignment: resolvePropertyValue(theme, p.pageAlignment.verticalAlignment, "Top"),
+      verticalAlignment: resolveGlobalValue(theme, p.pageAlignment.verticalAlignment, "Top"),
     },
     pageFilterCards: {
-      backgroundColor: resolvePropertyValue(theme, p.pageFilterCards.backgroundColor, base.background),
-      border: resolvePropertyValue(theme, p.pageFilterCards.border, false),
-      borderColor: resolvePropertyValue(theme, p.pageFilterCards.borderColor, "#E3E3E3"),
-      fontFamily: resolvePropertyValue(theme, p.pageFilterCards.fontFamily, base.fontFamily),
-      foregroundColor: resolvePropertyValue(theme, p.pageFilterCards.foregroundColor, base.foreground),
-      inputBoxColor: resolvePropertyValue(theme, p.pageFilterCards.inputBoxColor, base.background),
-      textSize: resolvePropertyValue(theme, p.pageFilterCards.textSize, 10),
-      transparency: resolvePropertyValue(theme, p.pageFilterCards.transparency, 0),
+      backgroundColor: resolveGlobalValue(theme, p.pageFilterCards.backgroundColor, base.background),
+      border: resolveGlobalValue(theme, p.pageFilterCards.border, false),
+      borderColor: resolveGlobalValue(theme, p.pageFilterCards.borderColor, "#E3E3E3"),
+      fontFamily: resolveGlobalValue(theme, p.pageFilterCards.fontFamily, base.fontFamily),
+      foregroundColor: resolveGlobalValue(theme, p.pageFilterCards.foregroundColor, base.foreground),
+      inputBoxColor: resolveGlobalValue(theme, p.pageFilterCards.inputBoxColor, base.background),
+      textSize: resolveGlobalValue(theme, p.pageFilterCards.textSize, 10),
+      transparency: resolveGlobalValue(theme, p.pageFilterCards.transparency, 0),
     },
     pageWallpaper: {
-      color: resolvePropertyValue(theme, p.pageWallpaper.color, "#FFFFFF"),
-      transparency: resolvePropertyValue(theme, p.pageWallpaper.transparency, 100),
+      color: resolveGlobalValue(theme, p.pageWallpaper.color, "#FFFFFF"),
+      transparency: resolveGlobalValue(theme, p.pageWallpaper.transparency, 100),
     },
     pageFilterPane: {
-      backgroundColor: resolvePropertyValue(theme, p.pageFilterPane.backgroundColor, base.background),
-      border: resolvePropertyValue(theme, p.pageFilterPane.border, false),
-      borderColor: resolvePropertyValue(theme, p.pageFilterPane.borderColor, "#E3E3E3"),
-      checkboxAndApplyColor: resolvePropertyValue(theme, p.pageFilterPane.checkboxAndApplyColor, base.tableAccent),
-      fontFamily: resolvePropertyValue(theme, p.pageFilterPane.fontFamily, base.fontFamily),
-      foregroundColor: resolvePropertyValue(theme, p.pageFilterPane.foregroundColor, base.foreground),
-      headerSize: resolvePropertyValue(theme, p.pageFilterPane.headerSize, 12),
-      inputBoxColor: resolvePropertyValue(theme, p.pageFilterPane.inputBoxColor, base.background),
-      searchTextSize: resolvePropertyValue(theme, p.pageFilterPane.searchTextSize, 10),
-      titleSize: resolvePropertyValue(theme, p.pageFilterPane.titleSize, 12),
-      transparency: resolvePropertyValue(theme, p.pageFilterPane.transparency, 0),
-      width: resolvePropertyValue(theme, p.pageFilterPane.width, 320),
+      backgroundColor: resolveGlobalValue(theme, p.pageFilterPane.backgroundColor, base.background),
+      border: resolveGlobalValue(theme, p.pageFilterPane.border, false),
+      borderColor: resolveGlobalValue(theme, p.pageFilterPane.borderColor, "#E3E3E3"),
+      checkboxAndApplyColor: resolveGlobalValue(theme, p.pageFilterPane.checkboxAndApplyColor, base.tableAccent),
+      fontFamily: resolveGlobalValue(theme, p.pageFilterPane.fontFamily, base.fontFamily),
+      foregroundColor: resolveGlobalValue(theme, p.pageFilterPane.foregroundColor, base.foreground),
+      headerSize: resolveGlobalValue(theme, p.pageFilterPane.headerSize, 12),
+      inputBoxColor: resolveGlobalValue(theme, p.pageFilterPane.inputBoxColor, base.background),
+      searchTextSize: resolveGlobalValue(theme, p.pageFilterPane.searchTextSize, 10),
+      titleSize: resolveGlobalValue(theme, p.pageFilterPane.titleSize, 12),
+      transparency: resolveGlobalValue(theme, p.pageFilterPane.transparency, 0),
+      width: resolveGlobalValue(theme, p.pageFilterPane.width, 320),
     },
     pageInformation: {
-      pageInformationQnaPodEnabled: resolvePropertyValue(theme, p.pageInformation.pageInformationQnaPodEnabled, false),
-      pageInformationType: resolvePropertyValue(theme, p.pageInformation.pageInformationType, false),
+      pageInformationQnaPodEnabled: resolveGlobalValue(theme, p.pageInformation.pageInformationQnaPodEnabled, false),
+      pageInformationType: resolveGlobalValue(theme, p.pageInformation.pageInformationType, false),
     },
     pageRefresh: {
-      show: resolvePropertyValue(theme, p.pageRefresh.show, false),
-      refreshType: resolvePropertyValue(theme, p.pageRefresh.refreshType, "APR"),
-      duration: resolvePropertyValue(theme, p.pageRefresh.duration, ""),
+      show: resolveGlobalValue(theme, p.pageRefresh.show, false),
+      refreshType: resolveGlobalValue(theme, p.pageRefresh.refreshType, "APR"),
+      duration: resolveGlobalValue(theme, p.pageRefresh.duration, ""),
     },
     pageSize: {
-      pageSizeTypes: resolvePropertyValue(theme, p.pageSize.pageSizeTypes, "Widescreen"),
-      pageSizeWidth: resolvePropertyValue(theme, p.pageSize.pageSizeWidth, 1280),
-      pageSizeHeight: resolvePropertyValue(theme, p.pageSize.pageSizeHeight, 720),
+      pageSizeTypes: resolveGlobalValue(theme, p.pageSize.pageSizeTypes, "Widescreen"),
+      pageSizeWidth: resolveGlobalValue(theme, p.pageSize.pageSizeWidth, 1280),
+      pageSizeHeight: resolveGlobalValue(theme, p.pageSize.pageSizeHeight, 720),
     },
     personalizeVisual: {
-      show: resolvePropertyValue(theme, p.personalizeVisual.show, false),
-      perspectiveRef: resolvePropertyValue(theme, p.personalizeVisual.perspectiveRef, ""),
+      show: resolveGlobalValue(theme, p.personalizeVisual.show, false),
+      perspectiveRef: resolveGlobalValue(theme, p.personalizeVisual.perspectiveRef, ""),
     },
   };
 }

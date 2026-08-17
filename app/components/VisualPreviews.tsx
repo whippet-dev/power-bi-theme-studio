@@ -1355,6 +1355,137 @@ export function VisualGallery({
     );
   };
 
+  // Secondary value axis, drawn on the right. Its fields all carry a
+  // `sec` prefix in the schema, so it can't reuse the AxisStyle helpers.
+  const y2 = lineChartStyle.y2Axis;
+  const y2TextStyle: CSSProperties = {
+    color: y2.secLabelColor,
+    fontFamily: y2.secFontFamily || undefined,
+    fontSize: y2.secFontSize,
+    fontWeight: y2.secBold ? 700 : 400,
+    fontStyle: y2.secItalic ? "italic" : "normal",
+    textDecoration: y2.secUnderline ? "underline" : "none",
+  };
+  const y2Node = y2.show && (
+    <span className="chart-ticks chart-ticks--secondary">
+      {Array.from({ length: 5 }, (_, i) => {
+        const start = Number(y2.secStart) || 0;
+        const end = Number(y2.secEnd) > start ? Number(y2.secEnd) : 40_000;
+        return (
+          <span key={i} style={y2TextStyle}>
+            {formatValue(start + ((end - start) * i) / 4, y2.secLabelDisplayUnits, y2.secLabelPrecision)}
+          </span>
+        );
+      })}
+    </span>
+  );
+  const y2TitleNode = y2.show && y2.secShowAxisTitle && (
+    <span
+      className="chart-preview__axis-title chart-preview__axis-title--secondary"
+      style={{
+        color: y2.secTitleColor,
+        fontFamily: y2.secTitleFontFamily || undefined,
+        fontSize: y2.secTitleFontSize,
+        fontWeight: y2.secTitleBold ? 700 : 400,
+        fontStyle: y2.secTitleItalic ? "italic" : "normal",
+        textDecoration: y2.secTitleUnderline ? "underline" : "none",
+      }}
+    >
+      {String(y2.secTitleText) || "Secondary"}
+    </span>
+  );
+
+  // A series label sits at the end of its line, optionally with a leader
+  // line back to the series and its own background chip.
+  const sl = lineChartStyle.seriesLabels;
+  const seriesLabelNode = sl.show && (
+    <span
+      className="line-preview__series-label"
+      style={{
+        top: `${linePointCoords[linePointCoords.length - 1].y}%`,
+        color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
+        fontFamily: sl.seriesFontFamily || undefined,
+        fontSize: sl.textSize,
+        fontWeight: sl.bold ? 700 : 400,
+        fontStyle: sl.italic ? "italic" : "normal",
+        textDecoration: sl.underline ? "underline" : "none",
+        maxWidth: sl.seriesMaximumWidth || undefined,
+        whiteSpace: sl.seriesWordWrap ? "normal" : "nowrap",
+        marginLeft: sl.maximumOffset || undefined,
+        backgroundColor: sl.enableBackground
+          ? hexWithAlpha(sl.backgroundMatchColor ? lineChartStyle.dataPoint.fill : sl.backgroundColor, sl.backgroundTransparency)
+          : undefined,
+        padding: sl.enableBackground ? "1px 4px" : undefined,
+        borderRadius: sl.enableBackground ? 3 : undefined,
+        // "Left" puts the label at the start of the line instead.
+        ...(String(sl.seriesPosition).toLowerCase() === "left" ? { left: 0, right: "auto" } : {}),
+      }}
+    >
+      {sl.leaderLines && (
+        <span
+          className="line-preview__leader"
+          aria-hidden="true"
+          style={{
+            borderTopWidth: sl.leaderLineWidth,
+            borderTopStyle: mapLineStyle(sl.leaderLinePattern),
+            borderTopColor: hexWithAlpha(sl.leaderLineColor, sl.leaderLineTransparency),
+          }}
+        />
+      )}
+      Applications
+    </span>
+  );
+
+  // The small-multiples grid repeats the chart per category. Rendering it
+  // is the only way its layout and gridline settings mean anything.
+  const sm = lineChartStyle.smallMultiplesLayout;
+  const subheader = lineChartStyle.subheader;
+  const smallMultiplesNode = (content: ReactNode, titles: string[]) => (
+    <span
+      className="small-multiples"
+      style={{
+        gridTemplateColumns: `repeat(${Math.max(1, sm.columnCount || 2)}, 1fr)`,
+        gap: `${sm.rowPaddingInner || sm.gridPadding || 6}px ${sm.columnPaddingInner || sm.gridPadding || 6}px`,
+        padding: sm.advancedPaddingOptions ? `${sm.rowPaddingOuter}px ${sm.columnPaddingOuter}px` : undefined,
+        backgroundColor: hexWithAlpha(sm.backgroundColor, sm.backgroundTransparency),
+      }}
+    >
+      {titles.slice(0, Math.max(1, sm.columnCount || 2) * Math.max(1, sm.rowCount || 2)).map((title) => (
+        <span
+          className="small-multiples__cell"
+          key={title}
+          style={
+            sm.gridLineShow
+              ? {
+                  border: `${sm.gridLineWidth}px ${mapLineStyle(sm.gridLineStyle)} ${hexWithAlpha(sm.gridLineColor, sm.gridLineTransparency)}`,
+                }
+              : undefined
+          }
+        >
+          {subheader.show && (
+            <span
+              className="small-multiples__title"
+              style={{
+                color: subheader.fontColor,
+                fontFamily: subheader.fontFamily || undefined,
+                fontSize: subheader.fontSize,
+                fontWeight: subheader.bold ? 700 : 400,
+                fontStyle: subheader.italic ? "italic" : "normal",
+                textDecoration: subheader.underline ? "underline" : "none",
+                textAlign: mapTextAlign(subheader.alignment),
+                whiteSpace: subheader.titleWrap ? "normal" : "nowrap",
+                order: String(subheader.position).toLowerCase() === "bottom" ? 2 : 0,
+              }}
+            >
+              {title}
+            </span>
+          )}
+          {content}
+        </span>
+      ))}
+    </span>
+  );
+
   const lineConstantLines = (
     <>
       {constantLine(lineChartStyle.referenceLine, "vertical", 70, "ref")}
@@ -1427,6 +1558,10 @@ export function VisualGallery({
     </>
   );
 
+  // A small-multiples layout replaces the single plot with a grid of
+  // repeated mini-charts, one per category.
+  const lineUsesSmallMultiples = String(sm.layoutType).toLowerCase() !== "" && sm.columnCount > 0;
+
   const lineContent = (
     <span
       className={`chart-preview${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}`}
@@ -1438,10 +1573,13 @@ export function VisualGallery({
           {String(lineChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
+      {y2TitleNode}
       <span className="line-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
         <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
+        {y2Node}
+        {seriesLabelNode}
         {lineConstantLines}
         <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {anomalyNode}
@@ -2442,7 +2580,13 @@ export function VisualGallery({
     { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnContent },
     { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarContent },
     { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnContent },
-    { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
+    {
+      id: "line",
+      label: "Line chart",
+      defaultTitle: "Applications over time",
+      chrome: chromeStyles.line,
+      content: lineUsesSmallMultiples ? smallMultiplesNode(lineContent, ["London", "North West", "Scotland", "Wales"]) : lineContent,
+    },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
     { id: "pie", label: "Pie chart", defaultTitle: "Applications by region", chrome: chromeStyles.pie, content: pieContent },
