@@ -1,6 +1,8 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
+import type { ResolvedCardStyle } from "../lib/cardProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
+import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
@@ -10,6 +12,8 @@ type VisualGalleryProps = {
   theme: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  cardStyle: ResolvedCardStyle;
+  slicerStyle: ResolvedSlicerStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
   selected: VisualKind;
@@ -155,12 +159,20 @@ export function VisualGallery({
   theme,
   tableStyle,
   barChartStyle,
+  cardStyle,
+  slicerStyle,
   chromeStyles,
   visibleVisuals,
   selected,
   onSelect,
 }: VisualGalleryProps) {
   const palette = theme.palette;
+  // Power BI's slicer "type" (list/dropdown/between/relative date, ...) is a
+  // per-instance display setting, not something the theme JSON can actually
+  // drive — so this is a preview-only view toggle, not theme state, letting
+  // users check how their header/item styling looks in each layout without
+  // it affecting the exported JSON.
+  const [slicerLayout, setSlicerLayout] = useState<"list" | "dropdown">("list");
 
   const legendNode = barChartStyle.legend.show && (
     <span className="chart-preview__legend">
@@ -183,7 +195,32 @@ export function VisualGallery({
 
   const cardContent = (
     <span className="card-preview">
-      <span className="card-preview__value" style={{ fontSize: theme.calloutSize }}>
+      {cardStyle.categoryLabels.show && (
+        <span
+          className="card-preview__category"
+          style={{
+            color: cardStyle.categoryLabels.color,
+            fontFamily: cardStyle.categoryLabels.fontFamily || undefined,
+            fontWeight: cardStyle.categoryLabels.bold ? 700 : 400,
+            fontStyle: cardStyle.categoryLabels.italic ? "italic" : "normal",
+            textDecoration: cardStyle.categoryLabels.underline ? "underline" : "none",
+            whiteSpace: cardStyle.wordWrap.show ? "normal" : "nowrap",
+          }}
+        >
+          Applications approved
+        </span>
+      )}
+      <span
+        className="card-preview__value"
+        style={{
+          fontSize: cardStyle.labels.fontSize,
+          color: cardStyle.labels.color,
+          fontFamily: cardStyle.labels.fontFamily || undefined,
+          fontWeight: cardStyle.labels.bold ? 700 : 400,
+          fontStyle: cardStyle.labels.italic ? "italic" : "normal",
+          textDecoration: cardStyle.labels.underline ? "underline" : "none",
+        }}
+      >
         £8.4m
       </span>
       <span className="card-preview__trend" style={{ color: palette[1] ?? palette[0] }}>
@@ -424,22 +461,84 @@ export function VisualGallery({
     </span>
   );
 
+  const slicerItemStyle: CSSProperties = {
+    backgroundColor: slicerStyle.items.background,
+    color: slicerStyle.items.fontColor,
+    fontFamily: slicerStyle.items.fontFamily || undefined,
+    fontSize: slicerStyle.items.textSize,
+    fontWeight: slicerStyle.items.bold ? 700 : 400,
+    fontStyle: slicerStyle.items.italic ? "italic" : "normal",
+    textDecoration: slicerStyle.items.underline ? "underline" : "none",
+  };
+
   const slicerContent = (
     <span className="slicer-preview">
-      <span className="slicer-preview__search">Search</span>
-      {["All statuses", "Approved", "In review", "Declined"].map((label, index) => (
-        <span className="slicer-preview__option" key={label}>
-          <span
-            className={`slicer-preview__check${index < 2 ? " is-checked" : ""}`}
-            style={index < 2 ? { backgroundColor: palette[0], borderColor: palette[0] } : undefined}
-            aria-hidden="true"
-          >
-            {index < 2 ? "✓" : ""}
-          </span>
-          {label}
-          {index === 0 && <span className="slicer-preview__count">4</span>}
+      {/* Power BI's slicer "type" (list/dropdown/...) is a per-instance
+          display setting the theme JSON can't actually drive — this toggle
+          only changes what's rendered here, so header/item styling can be
+          checked in either layout without affecting the exported theme. */}
+      <span className="slicer-preview__layout-toggle" role="group" aria-label="Preview layout">
+        <button
+          type="button"
+          className={slicerLayout === "list" ? "is-active" : ""}
+          onClick={() => setSlicerLayout("list")}
+        >
+          List
+        </button>
+        <button
+          type="button"
+          className={slicerLayout === "dropdown" ? "is-active" : ""}
+          onClick={() => setSlicerLayout("dropdown")}
+        >
+          Dropdown
+        </button>
+      </span>
+
+      {slicerStyle.header.show && (
+        <span
+          className="slicer-preview__header"
+          style={{
+            backgroundColor: slicerStyle.header.background,
+            color: slicerStyle.header.fontColor,
+            fontFamily: slicerStyle.header.fontFamily || undefined,
+            fontSize: slicerStyle.header.textSize,
+            fontWeight: slicerStyle.header.bold ? 700 : 400,
+            fontStyle: slicerStyle.header.italic ? "italic" : "normal",
+            textDecoration: slicerStyle.header.underline ? "underline" : "none",
+          }}
+        >
+          {(slicerStyle.header.showRestatement && "3 of 4 selected") || String(slicerStyle.header.text) || "Status"}
         </span>
-      ))}
+      )}
+
+      {slicerLayout === "dropdown" ? (
+        <span className="slicer-preview__dropdown" style={slicerItemStyle}>
+          <span>Approved, In review +2</span>
+          <span aria-hidden="true">⌄</span>
+        </span>
+      ) : (
+        <>
+          <span
+            className="slicer-preview__search"
+            style={{ backgroundColor: slicerStyle.searchBox.background, borderColor: slicerStyle.searchBox.borderColor }}
+          >
+            Search
+          </span>
+          {["All statuses", "Approved", "In review", "Declined"].map((label, index) => (
+            <span className="slicer-preview__option" key={label} style={slicerItemStyle}>
+              <span
+                className={`slicer-preview__check${index < 2 ? " is-checked" : ""}`}
+                style={index < 2 ? { backgroundColor: palette[0], borderColor: palette[0] } : undefined}
+                aria-hidden="true"
+              >
+                {index < 2 ? "✓" : ""}
+              </span>
+              {label}
+              {index === 0 && <span className="slicer-preview__count">4</span>}
+            </span>
+          ))}
+        </>
+      )}
     </span>
   );
 

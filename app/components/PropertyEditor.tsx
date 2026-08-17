@@ -1,8 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
+import { CARD_PROPERTIES, propertyThemePath as cardPropertyThemePath } from "../lib/cardProperties";
+import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
+import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
+import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import { hasThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
@@ -17,6 +21,8 @@ type PropertyEditorProps = {
   resolved: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
+  cardStyle: ResolvedCardStyle;
+  slicerStyle: ResolvedSlicerStyle;
   chromeStyle: ResolvedChromeStyle;
   sharedChromeStyle: ResolvedChromeStyle;
   activeVisualSchemaKey: VisualSchemaKey;
@@ -65,6 +71,30 @@ const CHROME_GROUP_LABELS: Record<keyof typeof CHROME_PROPERTIES, string> = {
   subTitle: "Subtitle",
   background: "Background",
   border: "Border",
+};
+
+const CARD_GROUP_LABELS: Record<keyof typeof CARD_PROPERTIES, string> = {
+  categoryLabels: "Category label",
+  labels: "Data label",
+  general: "General",
+  wordWrap: "Word wrap",
+};
+
+const SLICER_GROUP_LABELS: Record<keyof typeof SLICER_PROPERTIES, string> = {
+  header: "Slicer header",
+  items: "Values",
+  general: "General",
+  selection: "Selection controls",
+  searchBox: "Search box",
+  date: "Date inputs",
+  dateRange: "Date range",
+  dateRangeText: "Date range text",
+  calendarButton: "Calendar button",
+  numericInputStyle: "Numeric inputs",
+  slider: "Slider",
+  relativeText: "Summary text",
+  pendingChangesIcon: "Pending changes icon",
+  selectionIcon: "Selection icon",
 };
 
 function ColorControl({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
@@ -348,12 +378,16 @@ const TYPOGRAPHY_ID = "typography";
 const CHROME_ID_PREFIX = "chrome:";
 const TABLE_ID_PREFIX = "table:";
 const BAR_CHART_ID_PREFIX = "bar:";
+const CARD_ID_PREFIX = "card:";
+const SLICER_ID_PREFIX = "slicer:";
 
 export function PropertyEditor({
   theme,
   resolved,
   tableStyle,
   barChartStyle,
+  cardStyle,
+  slicerStyle,
   chromeStyle,
   sharedChromeStyle,
   activeVisualSchemaKey,
@@ -394,6 +428,13 @@ export function PropertyEditor({
       count: Object.keys(CHROME_PROPERTIES[key]).length,
     })),
     ...(selected === "card" ? [{ id: TYPOGRAPHY_ID, title: "Typography", count: 1 }] : []),
+    ...(selected === "card"
+      ? (Object.keys(CARD_PROPERTIES) as Array<keyof typeof CARD_PROPERTIES>).map((key) => ({
+          id: `${CARD_ID_PREFIX}${key}`,
+          title: CARD_GROUP_LABELS[key],
+          count: Object.keys(CARD_PROPERTIES[key]).length,
+        }))
+      : []),
     ...(selected === "table"
       ? (Object.keys(TABLE_PROPERTIES) as Array<keyof typeof TABLE_PROPERTIES>).map((key) => ({
           id: `${TABLE_ID_PREFIX}${key}`,
@@ -406,6 +447,13 @@ export function PropertyEditor({
           id: `${BAR_CHART_ID_PREFIX}${key}`,
           title: BAR_CHART_GROUP_LABELS[key],
           count: Object.keys(BAR_CHART_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "slicer"
+      ? (Object.keys(SLICER_PROPERTIES) as Array<keyof typeof SLICER_PROPERTIES>).map((key) => ({
+          id: `${SLICER_ID_PREFIX}${key}`,
+          title: SLICER_GROUP_LABELS[key],
+          count: Object.keys(SLICER_PROPERTIES[key]).length,
         }))
       : []),
   ];
@@ -484,7 +532,7 @@ export function PropertyEditor({
         <div className="property-group__body">
           <div className="property-row">
             <span className="property-row__copy">
-              <span className="property-row__label">Callout size</span>
+              <span className="property-row__label">Callout size (global default)</span>
             </span>
             <span className="property-row__control">
               <NumberControl
@@ -539,6 +587,36 @@ export function PropertyEditor({
           groupValues={barChartStyle[key]}
           pathPrefix="visualStyles.clusteredBarChart.*"
           getThemePath={barChartPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(CARD_ID_PREFIX)) {
+      const key = id.slice(CARD_ID_PREFIX.length) as keyof typeof CARD_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={CARD_PROPERTIES[key]}
+          groupValues={cardStyle[key]}
+          pathPrefix="visualStyles.card.*"
+          getThemePath={cardPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(SLICER_ID_PREFIX)) {
+      const key = id.slice(SLICER_ID_PREFIX.length) as keyof typeof SLICER_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={SLICER_PROPERTIES[key]}
+          groupValues={slicerStyle[key]}
+          pathPrefix="visualStyles.slicer.*"
+          getThemePath={slicerPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />

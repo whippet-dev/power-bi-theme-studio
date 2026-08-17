@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "start": "vite preview",
-    "test": "npm run build && node --import tsx --test tests/static-output.test.mjs tests/theme.test.ts tests/properties.test.ts tests/barChartProperties.test.ts tests/chromeProperties.test.ts",
+    "test": "npm run build && node --import tsx --test tests/static-output.test.mjs tests/theme.test.ts tests/properties.test.ts tests/barChartProperties.test.ts tests/chromeProperties.test.ts tests/cardProperties.test.ts tests/slicerProperties.test.ts",
     "lint": "eslint . --ignore-pattern dist"
   },
   "dependencies": {

@@ -12,8 +12,10 @@ import {
   type PowerBITheme,
 } from "../lib/theme";
 import { resolveBarChartStyle } from "../lib/barChartProperties";
+import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { VisualSchemaKey } from "../lib/properties";
+import { resolveSlicerStyle } from "../lib/slicerProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
@@ -45,6 +47,8 @@ export function ThemeStudio() {
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
   const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
+  const cardStyle = useMemo(() => resolveCardStyle(theme, resolved), [theme, resolved]);
+  const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({
       card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
@@ -194,6 +198,8 @@ export function ThemeStudio() {
             theme={resolved}
             tableStyle={tableStyle}
             barChartStyle={barChartStyle}
+            cardStyle={cardStyle}
+            slicerStyle={slicerStyle}
             chromeStyles={chromeStyles}
             visibleVisuals={visibleVisuals}
             selected={selectedVisual}
@@ -206,6 +212,8 @@ export function ThemeStudio() {
           resolved={resolved}
           tableStyle={tableStyle}
           barChartStyle={barChartStyle}
+          cardStyle={cardStyle}
+          slicerStyle={slicerStyle}
           chromeStyle={chromeStyles[selectedVisual]}
           sharedChromeStyle={sharedChromeStyle}
           activeVisualSchemaKey={VISUAL_SCHEMA_KEY[selectedVisual]}
