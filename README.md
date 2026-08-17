@@ -7,7 +7,7 @@ theme properties, and export the updated JSON.
 ## Stack
 
 - React 19 and TypeScript for the editor UI and theme model
-- Vite 8 through the lightweight vinext runtime
+- Vite 8 for a standard static single-page application build
 - Plain CSS for the previews and application shell
 - No database, sign-in, or server-side theme processing
 
@@ -37,7 +37,7 @@ npm run dev
 ```
 
 Open the local address printed in the terminal, normally
-`http://localhost:3000`.
+`http://localhost:5173`.
 
 To make a production build:
 
@@ -81,7 +81,7 @@ app/
   lib/
     theme.ts              # parser, resolver, immutable updates
   globals.css             # application and preview styling
-  page.tsx                # application route
+  main.tsx                # browser entry point
 public/fixtures/
   private-starter-theme.json  # development theme
 tests/
@@ -94,3 +94,8 @@ The first version does not yet attempt full Power BI `visualStyles` schema
 coverage, schema-version validation, undo/redo, direct selection of individual
 chart parts, or pixel-perfect Power BI rendering. Those belong in later,
 separately testable milestones.
+
+## Deployment
+
+`npm run build` produces a static `dist/` folder, including `index.html`, that
+can be deployed directly to Cloudflare Pages.
