@@ -183,7 +183,7 @@ function PropertyRow({
     <div className="registry-property">
       <div className="property-row">
         <span className="property-row__copy">
-          <span className="property-row__label">
+          <span className="property-row__label" title={definition.label}>
             {hasOverride && <span className="property-row__override-dot" title="This value is set explicitly" />}
             {definition.label}
           </span>

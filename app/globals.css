@@ -752,12 +752,11 @@ button { color: inherit; }
 
 .property-row__label {
   display: block;
-  overflow: hidden;
   color: #403b47;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .property-row__control {
