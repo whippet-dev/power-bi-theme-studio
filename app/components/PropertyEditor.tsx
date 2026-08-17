@@ -9,6 +9,13 @@ import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import { GLOBAL_OPTIONS_PROPERTIES, propertyThemePath as globalOptionsPropertyThemePath } from "../lib/globalOptionsProperties";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
+import {
+  resolveTextClasses,
+  resolveThemeColors,
+  TEXT_CLASS_PROPERTIES,
+  THEME_COLOR_PROPERTIES,
+  themeGlobalThemePath,
+} from "../lib/themeGlobalsProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import { MATRIX_PROPERTIES, propertyThemePath as matrixPropertyThemePath } from "../lib/matrixProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
@@ -550,6 +557,8 @@ const SLICER_ID_PREFIX = "slicer:";
 const MATRIX_ID_PREFIX = "matrix:";
 const PIE_CHART_ID_PREFIX = "pie:";
 const GLOBAL_OPTIONS_ID_PREFIX = "global:";
+const SEMANTIC_COLORS_ID = "semanticColors";
+const TEXT_CLASSES_ID = "textClasses";
 
 export function PropertyEditor({
   theme,
@@ -591,6 +600,8 @@ export function PropertyEditor({
     { id: THEME_IDENTITY_ID, title: "Theme identity", count: 1 },
     { id: SHARED_COLOURS_ID, title: "Shared colours", count: 3 },
     { id: DATA_PALETTE_ID, title: "Data palette", count: Math.min(resolved.palette.length, 5) },
+    { id: SEMANTIC_COLORS_ID, title: "Semantic colours", count: Object.keys(THEME_COLOR_PROPERTIES).length },
+    { id: TEXT_CLASSES_ID, title: "Text classes", count: Object.keys(TEXT_CLASS_PROPERTIES).length },
     ...chromeGroupKeys.map((key) => ({
       id: `${CHROME_ID_PREFIX}${key}`,
       title: CHROME_GROUP_LABELS[key],
@@ -783,6 +794,34 @@ export function PropertyEditor({
           groupValues={sharedTab ? sharedChromeStyle[key] : chromeStyle[key]}
           pathPrefix={sharedTab ? "visualStyles.*.*" : `visualStyles.${activeVisualSchemaKey}.*`}
           getThemePath={(definition) => chromeThemePath(sharedTab ? "*" : activeVisualSchemaKey, definition)}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id === SEMANTIC_COLORS_ID) {
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={THEME_COLOR_PROPERTIES}
+          groupValues={resolveThemeColors(theme, resolved)}
+          pathPrefix="theme"
+          getThemePath={themeGlobalThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id === TEXT_CLASSES_ID) {
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={TEXT_CLASS_PROPERTIES}
+          groupValues={resolveTextClasses(theme, resolved)}
+          pathPrefix="theme.textClasses"
+          getThemePath={themeGlobalThemePath}
           onChange={onChange}
           onReset={onReset}
         />
