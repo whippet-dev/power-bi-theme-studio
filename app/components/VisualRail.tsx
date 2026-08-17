@@ -8,6 +8,7 @@ const RAIL_VISUALS: RailEntry[] = [
   { id: "column", label: "Column chart", monogram: "Co" },
   { id: "line", label: "Line chart", monogram: "L" },
   { id: "table", label: "Table", monogram: "T" },
+  { id: "matrix", label: "Matrix", monogram: "M" },
   { id: "slicer", label: "Slicer", monogram: "S" },
 ];
 

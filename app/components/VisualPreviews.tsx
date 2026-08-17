@@ -1,14 +1,15 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
+import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "slicer";
+export type VisualKind = "card" | "bar" | "column" | "line" | "table" | "matrix" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
@@ -18,6 +19,7 @@ type VisualGalleryProps = {
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
+  matrixStyle: ResolvedMatrixStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
   selected: VisualKind;
@@ -173,6 +175,7 @@ export function VisualGallery({
   lineChartStyle,
   cardStyle,
   slicerStyle,
+  matrixStyle,
   chromeStyles,
   visibleVisuals,
   selected,
@@ -826,6 +829,154 @@ export function VisualGallery({
     </span>
   );
 
+  const matrixHeaderCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.columnHeaders.backColor,
+    color: matrixStyle.columnHeaders.fontColor,
+    fontFamily: matrixStyle.columnHeaders.fontFamily,
+    fontSize: matrixStyle.columnHeaders.fontSize,
+    fontWeight: matrixStyle.columnHeaders.bold ? 700 : 400,
+    fontStyle: matrixStyle.columnHeaders.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.columnHeaders.underline ? "underline" : "none",
+  };
+  const matrixRowHeaderCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.rowHeaders.backColor,
+    color: matrixStyle.rowHeaders.fontColor,
+    fontFamily: matrixStyle.rowHeaders.fontFamily,
+    fontSize: matrixStyle.rowHeaders.fontSize,
+    fontWeight: matrixStyle.rowHeaders.bold ? 700 : 400,
+    fontStyle: matrixStyle.rowHeaders.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.rowHeaders.underline ? "underline" : "none",
+  };
+  const matrixValueCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.values.backColor,
+    color: matrixStyle.values.fontColor,
+    fontFamily: matrixStyle.values.fontFamily,
+    fontSize: matrixStyle.values.fontSize,
+    fontWeight: matrixStyle.values.bold ? 700 : 400,
+    fontStyle: matrixStyle.values.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.values.underline ? "underline" : "none",
+  };
+  const matrixColumnTotalCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.columnTotal.backColor,
+    color: matrixStyle.columnTotal.fontColor,
+    fontFamily: matrixStyle.columnTotal.fontFamily,
+    fontSize: matrixStyle.columnTotal.fontSize,
+    fontWeight: matrixStyle.columnTotal.bold ? 700 : 400,
+    fontStyle: matrixStyle.columnTotal.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.columnTotal.underline ? "underline" : "none",
+  };
+  const matrixRowTotalCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.rowTotal.backColor,
+    color: matrixStyle.rowTotal.fontColor,
+    fontFamily: matrixStyle.rowTotal.fontFamily,
+    fontSize: matrixStyle.rowTotal.fontSize,
+    fontWeight: matrixStyle.rowTotal.bold ? 700 : 400,
+    fontStyle: matrixStyle.rowTotal.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.rowTotal.underline ? "underline" : "none",
+  };
+  const matrixGrandTotalCellStyle: CSSProperties = {
+    backgroundColor: matrixStyle.total.backColor,
+    color: matrixStyle.total.fontColor,
+    fontFamily: matrixStyle.total.fontFamily,
+    fontSize: matrixStyle.total.fontSize,
+    fontWeight: matrixStyle.total.bold ? 700 : 400,
+    fontStyle: matrixStyle.total.italic ? "italic" : "normal",
+    textDecoration: matrixStyle.total.underline ? "underline" : "none",
+  };
+  const matrixGridBorder = (show: boolean, color: string, weight: number) =>
+    show ? `${weight}px solid ${color}` : undefined;
+
+  const matrixContent = (
+    <span
+      className="matrix-preview"
+      style={{
+        border: `${matrixStyle.grid.outlineWeight}px solid ${matrixStyle.grid.outlineColor}`,
+        fontSize: matrixStyle.grid.textSize,
+      }}
+    >
+      <span className="matrix-preview__cell matrix-preview__cell--corner" style={matrixHeaderCellStyle} />
+      {["Q1", "Q2"].map((label) => (
+        <span
+          key={label}
+          className="matrix-preview__cell"
+          style={{
+            ...matrixHeaderCellStyle,
+            textAlign: mapTextAlign(matrixStyle.columnHeaders.titleAlignment),
+            borderBottom: matrixGridBorder(matrixStyle.grid.gridHorizontal, matrixStyle.grid.gridHorizontalColor, matrixStyle.grid.gridHorizontalWeight),
+          }}
+        >
+          {label}
+        </span>
+      ))}
+      <span
+        className="matrix-preview__cell"
+        style={{
+          ...matrixHeaderCellStyle,
+          borderBottom: matrixGridBorder(matrixStyle.grid.gridHorizontal, matrixStyle.grid.gridHorizontalColor, matrixStyle.grid.gridHorizontalWeight),
+        }}
+      >
+        Total
+      </span>
+
+      {[
+        ["London", 82, 91],
+        ["Manchester", 66, 74],
+      ].map(([label, q1, q2]) => (
+        // Fragment, not a wrapping span — every cell must be a direct child
+        // of .matrix-preview for CSS grid column alignment to work.
+        <Fragment key={label as string}>
+          <span
+            className="matrix-preview__cell"
+            style={{
+              ...matrixRowHeaderCellStyle,
+              paddingLeft: matrixStyle.rowHeaders.stepped ? matrixStyle.rowHeaders.steppedLayoutIndentation : undefined,
+              borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+            }}
+          >
+            {label}
+          </span>
+          {[q1, q2].map((value, i) => (
+            <span
+              key={i}
+              className="matrix-preview__cell matrix-preview__cell--value"
+              style={{
+                ...matrixValueCellStyle,
+                borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
+              }}
+            >
+              {value}
+            </span>
+          ))}
+          <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixRowTotalCellStyle}>
+            {(q1 as number) + (q2 as number)}
+          </span>
+        </Fragment>
+      ))}
+
+      <span
+        className="matrix-preview__cell"
+        style={{ ...matrixColumnTotalCellStyle, borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight) }}
+      >
+        Total
+      </span>
+      <span
+        className="matrix-preview__cell matrix-preview__cell--value"
+        style={{ ...matrixColumnTotalCellStyle, borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight) }}
+      >
+        148
+      </span>
+      <span
+        className="matrix-preview__cell matrix-preview__cell--value"
+        style={{ ...matrixColumnTotalCellStyle, borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight) }}
+      >
+        165
+      </span>
+      <span className="matrix-preview__cell matrix-preview__cell--value" style={matrixGrandTotalCellStyle}>
+        313
+      </span>
+    </span>
+  );
+
   const slicerItemStyle: CSSProperties = {
     backgroundColor: slicerStyle.items.background,
     color: slicerStyle.items.fontColor,
@@ -919,6 +1070,7 @@ export function VisualGallery({
     { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnContent },
     { id: "line", label: "Line chart", defaultTitle: "Applications over time", chrome: chromeStyles.line, content: lineContent },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
+    { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
     { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
   ];
 

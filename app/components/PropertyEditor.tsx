@@ -8,6 +8,8 @@ import { COLUMN_CHART_PROPERTIES, propertyThemePath as columnChartPropertyThemeP
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
+import { MATRIX_PROPERTIES, propertyThemePath as matrixPropertyThemePath } from "../lib/matrixProperties";
+import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -29,6 +31,7 @@ type PropertyEditorProps = {
   lineChartStyle: ResolvedLineChartStyle;
   cardStyle: ResolvedCardStyle;
   slicerStyle: ResolvedSlicerStyle;
+  matrixStyle: ResolvedMatrixStyle;
   chromeStyle: ResolvedChromeStyle;
   sharedChromeStyle: ResolvedChromeStyle;
   activeVisualSchemaKey: VisualSchemaKey;
@@ -43,6 +46,7 @@ const visualNames: Record<VisualKind, string> = {
   column: "Clustered column chart",
   line: "Line chart",
   table: "Table",
+  matrix: "Matrix",
   slicer: "Slicer",
 };
 
@@ -53,6 +57,22 @@ const TABLE_GROUP_LABELS: Record<keyof typeof TABLE_PROPERTIES, string> = {
   grid: "Grid",
   columnFormatting: "Field formatting",
   sparklines: "Sparklines",
+};
+
+const MATRIX_GROUP_LABELS: Record<keyof typeof MATRIX_PROPERTIES, string> = {
+  columnHeaders: "Column headers",
+  rowHeaders: "Row headers",
+  values: "Values",
+  columnTotal: "Column grand total",
+  rowTotal: "Row grand total",
+  total: "Grand total",
+  subTotals: "Subtotals",
+  blankRows: "Blank rows",
+  grid: "Grid",
+  columnFormatting: "Field formatting",
+  sparklines: "Sparklines",
+  accessibility: "Accessibility",
+  general: "General",
 };
 
 // Power BI's own format-pane card names for each group, so the panel reads
@@ -434,6 +454,7 @@ const COLUMN_CHART_ID_PREFIX = "column:";
 const LINE_CHART_ID_PREFIX = "line:";
 const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
+const MATRIX_ID_PREFIX = "matrix:";
 
 export function PropertyEditor({
   theme,
@@ -444,6 +465,7 @@ export function PropertyEditor({
   lineChartStyle,
   cardStyle,
   slicerStyle,
+  matrixStyle,
   chromeStyle,
   sharedChromeStyle,
   activeVisualSchemaKey,
@@ -496,6 +518,13 @@ export function PropertyEditor({
           id: `${TABLE_ID_PREFIX}${key}`,
           title: TABLE_GROUP_LABELS[key],
           count: Object.keys(TABLE_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "matrix"
+      ? (Object.keys(MATRIX_PROPERTIES) as Array<keyof typeof MATRIX_PROPERTIES>).map((key) => ({
+          id: `${MATRIX_ID_PREFIX}${key}`,
+          title: MATRIX_GROUP_LABELS[key],
+          count: Object.keys(MATRIX_PROPERTIES[key]).length,
         }))
       : []),
     ...(selected === "bar"
@@ -642,6 +671,21 @@ export function PropertyEditor({
           groupValues={tableStyle[key]}
           pathPrefix="visualStyles.tableEx.*"
           getThemePath={tablePropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(MATRIX_ID_PREFIX)) {
+      const key = id.slice(MATRIX_ID_PREFIX.length) as keyof typeof MATRIX_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={MATRIX_PROPERTIES[key]}
+          groupValues={matrixStyle[key]}
+          pathPrefix="visualStyles.pivotTable.*"
+          getThemePath={matrixPropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />

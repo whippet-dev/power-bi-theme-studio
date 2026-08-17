@@ -719,6 +719,33 @@ button { color: inherit; }
   margin-top: 13px;
 }
 
+.matrix-preview {
+  height: 202px;
+  display: grid;
+  grid-template-columns: minmax(76px, 1fr) 40px 40px 46px;
+  grid-auto-rows: min-content;
+  align-content: start;
+  font-size: 9px;
+}
+
+.matrix-preview__cell {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix-preview__cell--corner {
+  background: transparent;
+}
+
+.matrix-preview__cell--value {
+  justify-content: flex-end;
+  text-align: right;
+}
+
 .slicer-preview__layout-toggle {
   display: inline-flex;
   align-self: flex-start;

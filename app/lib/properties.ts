@@ -18,7 +18,7 @@ import type { JsonValue, PowerBITheme } from "./theme";
  * reportThemeSchema-2.156.json (microsoft/powerbi-desktop-samples), not
  * guessed from example themes.
  */
-export type VisualSchemaKey = "tableEx" | "clusteredBarChart" | "clusteredColumnChart" | "card" | "slicer" | "lineChart" | "*";
+export type VisualSchemaKey = "tableEx" | "clusteredBarChart" | "clusteredColumnChart" | "card" | "slicer" | "lineChart" | "pivotTable" | "*";
 
 export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
 
