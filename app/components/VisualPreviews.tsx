@@ -844,56 +844,31 @@ export function VisualGallery({
     </span>
   );
 
-  const stackedBarLegendNode = stackedBarChartStyle.legend.show && (
-    <span className="chart-preview__legend">
-      <span className="chart-preview__legend-swatch" style={{ backgroundColor: stackedBarChartStyle.dataPoint.fill }} />
-      <span
-        style={{
-          color: stackedBarChartStyle.legend.labelColor,
-          fontFamily: stackedBarChartStyle.legend.fontFamily,
-          fontSize: stackedBarChartStyle.legend.fontSize,
-          fontWeight: stackedBarChartStyle.legend.bold ? 700 : 400,
-          fontStyle: stackedBarChartStyle.legend.italic ? "italic" : "normal",
-          textDecoration: stackedBarChartStyle.legend.underline ? "underline" : "none",
-        }}
-      >
-        Applications
-      </span>
-    </span>
-  );
-  const stackedBarLegendAtBottom = String(stackedBarChartStyle.legend.position).startsWith("Bottom");
   const stackedSegmentColor = palette[1] ?? palette[0];
   const stackedSegmentShare = 62; // fixed split — this app models one series' color, not per-series stacking
 
+  // Stacked charts genuinely draw two series, so their legend lists both.
+  const stackedBarSeries = [
+    { label: "Approved", color: stackedBarChartStyle.dataPoint.fill },
+    { label: "In review", color: stackedSegmentColor },
+  ];
+  const stackedBarLegendNode = <ChartLegend legend={stackedBarChartStyle.legend} items={stackedBarSeries} />;
+  const stackedBarLegendAtBottom = legendIsAfterPlot(stackedBarChartStyle.legend.position);
+  const stackedBarLegendVertical = legendIsVertical(stackedBarChartStyle.legend.position);
+
   const stackedBarContent = (
-    <span className="chart-preview" style={{ opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100 }}>
+    <span
+      className={`chart-preview${stackedBarLegendVertical ? " chart-preview--legend-side" : ""}${stackedBarLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100 }}
+    >
       {!stackedBarLegendAtBottom && stackedBarLegendNode}
       {stackedBarChartStyle.categoryAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title"
-          style={{
-            color: stackedBarChartStyle.categoryAxis.titleColor,
-            fontFamily: stackedBarChartStyle.categoryAxis.titleFontFamily,
-            fontSize: stackedBarChartStyle.categoryAxis.titleFontSize,
-            fontWeight: stackedBarChartStyle.categoryAxis.titleBold ? 700 : 400,
-            fontStyle: stackedBarChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
-            textDecoration: stackedBarChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
+        <span className="chart-preview__axis-title" style={axisTitleStyle(stackedBarChartStyle.categoryAxis)}>
           {String(stackedBarChartStyle.categoryAxis.titleText) || "Region"}
         </span>
       )}
-      <span
-        className="chart-preview__plot"
-        style={{
-          position: "relative",
-          ...(stackedBarChartStyle.valueAxis.gridlineShow
-            ? {
-                backgroundImage: `repeating-linear-gradient(to right, ${stackedBarChartStyle.valueAxis.gridlineColor} 0, ${stackedBarChartStyle.valueAxis.gridlineColor} ${stackedBarChartStyle.valueAxis.gridlineThickness}px, transparent ${stackedBarChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
-              }
-            : {}),
-        }}
-      >
+      <span className="chart-preview__plot" style={{ position: "relative" }}>
+        <Gridlines axis={stackedBarChartStyle.valueAxis} orientation="vertical" />
         {stackedBarChartStyle.trend.show && (
           <span
             className="chart-preview__trend-line"
@@ -906,25 +881,10 @@ export function VisualGallery({
             }}
           />
         )}
-        {[
-          ["London", 82],
-          ["North West", 66],
-          ["Scotland", 51],
-          ["Wales", 38],
-        ].map(([label, value], index) => (
+        {barCategories.map(([label, value], index) => (
           <span className="bar-row" key={label}>
             {stackedBarChartStyle.categoryAxis.show && (
-              <span
-                className="bar-row__label"
-                style={{
-                  color: stackedBarChartStyle.categoryAxis.labelColor,
-                  fontFamily: stackedBarChartStyle.categoryAxis.fontFamily,
-                  fontSize: stackedBarChartStyle.categoryAxis.fontSize,
-                  fontWeight: stackedBarChartStyle.categoryAxis.bold ? 700 : 400,
-                  fontStyle: stackedBarChartStyle.categoryAxis.italic ? "italic" : "normal",
-                  textDecoration: stackedBarChartStyle.categoryAxis.underline ? "underline" : "none",
-                }}
-              >
+              <span className="bar-row__label" style={textStyle(stackedBarChartStyle.categoryAxis)}>
                 {label}
               </span>
             )}
@@ -934,6 +894,7 @@ export function VisualGallery({
                   className="bar-row__fill"
                   style={{
                     width: `${value}%`,
+                    height: barThickness(stackedBarChartStyle.layout.stackedGapSize),
                     opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
                     background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
                     border: stackedBarChartStyle.dataPoint.borderShow
@@ -960,94 +921,43 @@ export function VisualGallery({
               )}
             </span>
             {stackedBarChartStyle.totals.show && (
-              <span
-                className="bar-row__value"
-                style={{
-                  color: stackedBarChartStyle.totals.color,
-                  fontFamily: stackedBarChartStyle.totals.fontFamily,
-                  fontSize: stackedBarChartStyle.totals.fontSize,
-                  fontWeight: stackedBarChartStyle.totals.bold ? 700 : 400,
-                  fontStyle: stackedBarChartStyle.totals.italic ? "italic" : "normal",
-                  textDecoration: stackedBarChartStyle.totals.underline ? "underline" : "none",
-                  backgroundColor: stackedBarChartStyle.totals.enableBackground
-                    ? hexWithAlpha(stackedBarChartStyle.totals.backgroundColor, stackedBarChartStyle.totals.backgroundTransparency)
-                    : undefined,
-                  padding: stackedBarChartStyle.totals.enableBackground ? "1px 4px" : undefined,
-                  borderRadius: stackedBarChartStyle.totals.enableBackground ? 3 : undefined,
-                }}
-              >
-                {value}k
+              <span className="bar-row__value" style={dataLabelStyle(stackedBarChartStyle.totals)}>
+                {formatValue(value * 1000, stackedBarChartStyle.totals.labelDisplayUnits, stackedBarChartStyle.totals.labelPrecision)}
               </span>
             )}
           </span>
         ))}
       </span>
+      <AxisTickLabels axis={stackedBarChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" />
       {stackedBarChartStyle.valueAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title chart-preview__axis-title--value"
-          style={{
-            color: stackedBarChartStyle.valueAxis.titleColor,
-            fontFamily: stackedBarChartStyle.valueAxis.titleFontFamily,
-            fontSize: stackedBarChartStyle.valueAxis.titleFontSize,
-            fontWeight: stackedBarChartStyle.valueAxis.titleBold ? 700 : 400,
-            fontStyle: stackedBarChartStyle.valueAxis.titleItalic ? "italic" : "normal",
-            textDecoration: stackedBarChartStyle.valueAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
-          {String(stackedBarChartStyle.valueAxis.titleText) || "Applications (k)"}
+        <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(stackedBarChartStyle.valueAxis)}>
+          {String(stackedBarChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
       {stackedBarLegendAtBottom && stackedBarLegendNode}
     </span>
   );
 
-  const columnLegendNode = columnChartStyle.legend.show && (
-    <span className="chart-preview__legend">
-      <span className="chart-preview__legend-swatch" style={{ backgroundColor: columnChartStyle.dataPoint.fill }} />
-      <span
-        style={{
-          color: columnChartStyle.legend.labelColor,
-          fontFamily: columnChartStyle.legend.fontFamily,
-          fontSize: columnChartStyle.legend.fontSize,
-          fontWeight: columnChartStyle.legend.bold ? 700 : 400,
-          fontStyle: columnChartStyle.legend.italic ? "italic" : "normal",
-          textDecoration: columnChartStyle.legend.underline ? "underline" : "none",
-        }}
-      >
-        Applications
-      </span>
-    </span>
+  const columnLegendNode = (
+    <ChartLegend legend={columnChartStyle.legend} items={[{ label: "Applications", color: columnChartStyle.dataPoint.fill }]} />
   );
-  const columnLegendAtBottom = String(columnChartStyle.legend.position).startsWith("Bottom");
+  const columnLegendAtBottom = legendIsAfterPlot(columnChartStyle.legend.position);
+  const columnLegendVertical = legendIsVertical(columnChartStyle.legend.position);
 
   const columnContent = (
-    <span className="chart-preview" style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100 }}>
+    <span
+      className={`chart-preview${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100 }}
+    >
       {!columnLegendAtBottom && columnLegendNode}
       {columnChartStyle.valueAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title chart-preview__axis-title--value"
-          style={{
-            color: columnChartStyle.valueAxis.titleColor,
-            fontFamily: columnChartStyle.valueAxis.titleFontFamily,
-            fontSize: columnChartStyle.valueAxis.titleFontSize,
-            fontWeight: columnChartStyle.valueAxis.titleBold ? 700 : 400,
-            fontStyle: columnChartStyle.valueAxis.titleItalic ? "italic" : "normal",
-            textDecoration: columnChartStyle.valueAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
-          {String(columnChartStyle.valueAxis.titleText) || "Applications (k)"}
+        <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(columnChartStyle.valueAxis)}>
+          {String(columnChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
-      <span
-        className="column-preview__plot"
-        style={{
-          ...(columnChartStyle.valueAxis.gridlineShow
-            ? {
-                backgroundImage: `repeating-linear-gradient(to top, ${columnChartStyle.valueAxis.gridlineColor} 0, ${columnChartStyle.valueAxis.gridlineColor} ${columnChartStyle.valueAxis.gridlineThickness}px, transparent ${columnChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
-              }
-            : {}),
-        }}
-      >
+      <span className="column-preview__plot" style={{ position: "relative" }}>
+        <Gridlines axis={columnChartStyle.valueAxis} orientation="horizontal" />
+        <AxisTickLabels axis={columnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
         {columnChartStyle.referenceLine.show && (
           <span
             className="column-preview__reference-line"
@@ -1074,31 +984,11 @@ export function VisualGallery({
           />
         )}
         <span className="column-preview__columns">
-          {[
-            ["London", 82],
-            ["North West", 66],
-            ["Scotland", 51],
-            ["Wales", 38],
-          ].map(([label, value], index) => (
+          {barCategories.map(([label, value], index) => (
             <span className="column-item" key={label}>
               {columnChartStyle.labels.show && (
-                <span
-                  className="column-item__value"
-                  style={{
-                    color: columnChartStyle.labels.color,
-                    fontFamily: columnChartStyle.labels.fontFamily,
-                    fontSize: columnChartStyle.labels.fontSize,
-                    fontWeight: columnChartStyle.labels.bold ? 700 : 400,
-                    fontStyle: columnChartStyle.labels.italic ? "italic" : "normal",
-                    textDecoration: columnChartStyle.labels.underline ? "underline" : "none",
-                    backgroundColor: columnChartStyle.labels.enableBackground
-                      ? hexWithAlpha(columnChartStyle.labels.backgroundColor, columnChartStyle.labels.backgroundTransparency)
-                      : undefined,
-                    padding: columnChartStyle.labels.enableBackground ? "1px 4px" : undefined,
-                    borderRadius: columnChartStyle.labels.enableBackground ? 3 : undefined,
-                  }}
-                >
-                  {value}k
+                <span className="column-item__value" style={dataLabelStyle(columnChartStyle.labels)}>
+                  {formatValue(value * 1000, columnChartStyle.labels.labelDisplayUnits, columnChartStyle.labels.labelPrecision)}
                 </span>
               )}
               <span className="column-item__track-wrap">
@@ -1107,6 +997,7 @@ export function VisualGallery({
                     className="column-item__fill"
                     style={{
                       height: `${value}%`,
+                      width: barThickness(columnChartStyle.layout.clusteredGapSize),
                       backgroundColor: hexWithAlpha(columnChartStyle.dataPoint.fill, columnChartStyle.dataPoint.fillTransparency),
                       border: columnChartStyle.dataPoint.borderShow
                         ? `${columnChartStyle.dataPoint.borderSize}px solid ${columnChartStyle.dataPoint.borderColor}`
@@ -1132,17 +1023,7 @@ export function VisualGallery({
                 )}
               </span>
               {columnChartStyle.categoryAxis.show && (
-                <span
-                  className="column-item__label"
-                  style={{
-                    color: columnChartStyle.categoryAxis.labelColor,
-                    fontFamily: columnChartStyle.categoryAxis.fontFamily,
-                    fontSize: columnChartStyle.categoryAxis.fontSize,
-                    fontWeight: columnChartStyle.categoryAxis.bold ? 700 : 400,
-                    fontStyle: columnChartStyle.categoryAxis.italic ? "italic" : "normal",
-                    textDecoration: columnChartStyle.categoryAxis.underline ? "underline" : "none",
-                  }}
-                >
+                <span className="column-item__label" style={textStyle(columnChartStyle.categoryAxis)}>
                   {label}
                 </span>
               )}
@@ -1151,17 +1032,7 @@ export function VisualGallery({
         </span>
       </span>
       {columnChartStyle.categoryAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title"
-          style={{
-            color: columnChartStyle.categoryAxis.titleColor,
-            fontFamily: columnChartStyle.categoryAxis.titleFontFamily,
-            fontSize: columnChartStyle.categoryAxis.titleFontSize,
-            fontWeight: columnChartStyle.categoryAxis.titleBold ? 700 : 400,
-            fontStyle: columnChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
-            textDecoration: columnChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
+        <span className="chart-preview__axis-title" style={axisTitleStyle(columnChartStyle.categoryAxis)}>
           {String(columnChartStyle.categoryAxis.titleText) || "Region"}
         </span>
       )}
@@ -1169,53 +1040,35 @@ export function VisualGallery({
     </span>
   );
 
-  const stackedColumnLegendNode = stackedColumnChartStyle.legend.show && (
-    <span className="chart-preview__legend">
-      <span className="chart-preview__legend-swatch" style={{ backgroundColor: stackedColumnChartStyle.dataPoint.fill }} />
-      <span
-        style={{
-          color: stackedColumnChartStyle.legend.labelColor,
-          fontFamily: stackedColumnChartStyle.legend.fontFamily,
-          fontSize: stackedColumnChartStyle.legend.fontSize,
-          fontWeight: stackedColumnChartStyle.legend.bold ? 700 : 400,
-          fontStyle: stackedColumnChartStyle.legend.italic ? "italic" : "normal",
-          textDecoration: stackedColumnChartStyle.legend.underline ? "underline" : "none",
-        }}
-      >
-        Applications
-      </span>
-    </span>
+  const stackedColumnLegendNode = (
+    <ChartLegend
+      legend={stackedColumnChartStyle.legend}
+      items={[
+        { label: "Approved", color: stackedColumnChartStyle.dataPoint.fill },
+        { label: "In review", color: stackedSegmentColor },
+      ]}
+    />
   );
-  const stackedColumnLegendAtBottom = String(stackedColumnChartStyle.legend.position).startsWith("Bottom");
+  const stackedColumnLegendAtBottom = legendIsAfterPlot(stackedColumnChartStyle.legend.position);
+  const stackedColumnLegendVertical = legendIsVertical(stackedColumnChartStyle.legend.position);
 
   const stackedColumnContent = (
-    <span className="chart-preview" style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100 }}>
+    <span
+      className={`chart-preview${stackedColumnLegendVertical ? " chart-preview--legend-side" : ""}${stackedColumnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100 }}
+    >
       {!stackedColumnLegendAtBottom && stackedColumnLegendNode}
       {stackedColumnChartStyle.valueAxis.showAxisTitle && (
         <span
           className="chart-preview__axis-title chart-preview__axis-title--value"
-          style={{
-            color: stackedColumnChartStyle.valueAxis.titleColor,
-            fontFamily: stackedColumnChartStyle.valueAxis.titleFontFamily,
-            fontSize: stackedColumnChartStyle.valueAxis.titleFontSize,
-            fontWeight: stackedColumnChartStyle.valueAxis.titleBold ? 700 : 400,
-            fontStyle: stackedColumnChartStyle.valueAxis.titleItalic ? "italic" : "normal",
-            textDecoration: stackedColumnChartStyle.valueAxis.titleUnderline ? "underline" : "none",
-          }}
+          style={axisTitleStyle(stackedColumnChartStyle.valueAxis)}
         >
-          {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications (k)"}
+          {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
-      <span
-        className="column-preview__plot"
-        style={{
-          ...(stackedColumnChartStyle.valueAxis.gridlineShow
-            ? {
-                backgroundImage: `repeating-linear-gradient(to top, ${stackedColumnChartStyle.valueAxis.gridlineColor} 0, ${stackedColumnChartStyle.valueAxis.gridlineColor} ${stackedColumnChartStyle.valueAxis.gridlineThickness}px, transparent ${stackedColumnChartStyle.valueAxis.gridlineThickness}px, transparent 25%)`,
-              }
-            : {}),
-        }}
-      >
+      <span className="column-preview__plot" style={{ position: "relative" }}>
+        <Gridlines axis={stackedColumnChartStyle.valueAxis} orientation="horizontal" />
+        <AxisTickLabels axis={stackedColumnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
         {stackedColumnChartStyle.trend.show && (
           <span
             className="chart-preview__trend-line"
@@ -1229,23 +1082,13 @@ export function VisualGallery({
           />
         )}
         <span className="column-preview__columns">
-          {[
-            ["London", 82],
-            ["North West", 66],
-            ["Scotland", 51],
-            ["Wales", 38],
-          ].map(([label, value], index) => (
+          {barCategories.map(([label, value], index) => (
             <span className="column-item" key={label}>
               {stackedColumnChartStyle.totals.show && (
                 <span
                   className="column-item__value"
                   style={{
-                    color: stackedColumnChartStyle.totals.color,
-                    fontFamily: stackedColumnChartStyle.totals.fontFamily,
-                    fontSize: stackedColumnChartStyle.totals.fontSize,
-                    fontWeight: stackedColumnChartStyle.totals.bold ? 700 : 400,
-                    fontStyle: stackedColumnChartStyle.totals.italic ? "italic" : "normal",
-                    textDecoration: stackedColumnChartStyle.totals.underline ? "underline" : "none",
+                    ...dataLabelStyle(stackedColumnChartStyle.totals),
                     backgroundColor: stackedColumnChartStyle.totals.enableBackground
                       ? hexWithAlpha(stackedColumnChartStyle.totals.backgroundColor, stackedColumnChartStyle.totals.backgroundTransparency)
                       : undefined,
@@ -1253,7 +1096,11 @@ export function VisualGallery({
                     borderRadius: stackedColumnChartStyle.totals.enableBackground ? 3 : undefined,
                   }}
                 >
-                  {value}k
+                  {formatValue(
+                    value * 1000,
+                    stackedColumnChartStyle.totals.labelDisplayUnits,
+                    stackedColumnChartStyle.totals.labelPrecision,
+                  )}
                 </span>
               )}
               <span className="column-item__track-wrap">
@@ -1262,6 +1109,7 @@ export function VisualGallery({
                     className="column-item__fill"
                     style={{
                       height: `${value}%`,
+                      width: barThickness(stackedColumnChartStyle.layout.stackedGapSize),
                       opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
                       background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
                       border: stackedColumnChartStyle.dataPoint.borderShow
@@ -1288,17 +1136,7 @@ export function VisualGallery({
                 )}
               </span>
               {stackedColumnChartStyle.categoryAxis.show && (
-                <span
-                  className="column-item__label"
-                  style={{
-                    color: stackedColumnChartStyle.categoryAxis.labelColor,
-                    fontFamily: stackedColumnChartStyle.categoryAxis.fontFamily,
-                    fontSize: stackedColumnChartStyle.categoryAxis.fontSize,
-                    fontWeight: stackedColumnChartStyle.categoryAxis.bold ? 700 : 400,
-                    fontStyle: stackedColumnChartStyle.categoryAxis.italic ? "italic" : "normal",
-                    textDecoration: stackedColumnChartStyle.categoryAxis.underline ? "underline" : "none",
-                  }}
-                >
+                <span className="column-item__label" style={textStyle(stackedColumnChartStyle.categoryAxis)}>
                   {label}
                 </span>
               )}
@@ -1325,24 +1163,11 @@ export function VisualGallery({
     </span>
   );
 
-  const lineLegendNode = lineChartStyle.legend.show && (
-    <span className="chart-preview__legend">
-      <span className="chart-preview__legend-swatch" style={{ backgroundColor: lineChartStyle.dataPoint.fill }} />
-      <span
-        style={{
-          color: lineChartStyle.legend.labelColor,
-          fontFamily: lineChartStyle.legend.fontFamily,
-          fontSize: lineChartStyle.legend.fontSize,
-          fontWeight: lineChartStyle.legend.bold ? 700 : 400,
-          fontStyle: lineChartStyle.legend.italic ? "italic" : "normal",
-          textDecoration: lineChartStyle.legend.underline ? "underline" : "none",
-        }}
-      >
-        Applications
-      </span>
-    </span>
+  const lineLegendNode = (
+    <ChartLegend legend={lineChartStyle.legend} items={[{ label: "Applications", color: lineChartStyle.dataPoint.fill }]} />
   );
-  const lineLegendAtBottom = String(lineChartStyle.legend.position).startsWith("Bottom");
+  const lineLegendAtBottom = legendIsAfterPlot(lineChartStyle.legend.position);
+  const lineLegendVertical = legendIsVertical(lineChartStyle.legend.position);
   const linePointValues = [42, 58, 30, 68, 48];
   const linePointCoords = linePointValues.map((value, index) => ({
     x: (index / (linePointValues.length - 1)) * 100,
@@ -1355,34 +1180,20 @@ export function VisualGallery({
     : lineChartStyle.lineStyles.areaColor;
 
   const lineContent = (
-    <span className="chart-preview" style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100 }}>
+    <span
+      className={`chart-preview${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100 }}
+    >
       {!lineLegendAtBottom && lineLegendNode}
       {lineChartStyle.valueAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title"
-          style={{
-            color: lineChartStyle.valueAxis.titleColor,
-            fontFamily: lineChartStyle.valueAxis.titleFontFamily,
-            fontSize: lineChartStyle.valueAxis.titleFontSize,
-            fontWeight: lineChartStyle.valueAxis.titleBold ? 700 : 400,
-            fontStyle: lineChartStyle.valueAxis.titleItalic ? "italic" : "normal",
-            textDecoration: lineChartStyle.valueAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
-          {String(lineChartStyle.valueAxis.titleText) || "Applications (k)"}
+        <span className="chart-preview__axis-title" style={axisTitleStyle(lineChartStyle.valueAxis)}>
+          {String(lineChartStyle.valueAxis.titleText) || "Applications"}
         </span>
       )}
-      <span
-        className="line-preview__plot"
-        style={{
-          position: "relative",
-          ...(lineChartStyle.categoryAxis.gridlineShow
-            ? {
-                backgroundImage: `repeating-linear-gradient(to right, ${lineChartStyle.categoryAxis.gridlineColor} 0, ${lineChartStyle.categoryAxis.gridlineColor} ${lineChartStyle.categoryAxis.gridlineThickness}px, transparent ${lineChartStyle.categoryAxis.gridlineThickness}px, transparent 25%)`,
-              }
-            : {}),
-        }}
-      >
+      <span className="line-preview__plot" style={{ position: "relative" }}>
+        <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
+        <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
+        <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
         {lineChartStyle.referenceLine.show && (
           <span
             className="chart-preview__reference-line"
@@ -1475,34 +1286,14 @@ export function VisualGallery({
       {lineChartStyle.categoryAxis.show && (
         <span className="line-preview__axis-labels">
           {["Jan", "Feb", "Mar", "Apr", "May"].map((label) => (
-            <span
-              key={label}
-              style={{
-                color: lineChartStyle.categoryAxis.labelColor,
-                fontFamily: lineChartStyle.categoryAxis.fontFamily,
-                fontSize: lineChartStyle.categoryAxis.fontSize,
-                fontWeight: lineChartStyle.categoryAxis.bold ? 700 : 400,
-                fontStyle: lineChartStyle.categoryAxis.italic ? "italic" : "normal",
-                textDecoration: lineChartStyle.categoryAxis.underline ? "underline" : "none",
-              }}
-            >
+            <span key={label} style={textStyle(lineChartStyle.categoryAxis)}>
               {label}
             </span>
           ))}
         </span>
       )}
       {lineChartStyle.categoryAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title"
-          style={{
-            color: lineChartStyle.categoryAxis.titleColor,
-            fontFamily: lineChartStyle.categoryAxis.titleFontFamily,
-            fontSize: lineChartStyle.categoryAxis.titleFontSize,
-            fontWeight: lineChartStyle.categoryAxis.titleBold ? 700 : 400,
-            fontStyle: lineChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
-            textDecoration: lineChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
-          }}
-        >
+        <span className="chart-preview__axis-title" style={axisTitleStyle(lineChartStyle.categoryAxis)}>
           {String(lineChartStyle.categoryAxis.titleText) || "Month"}
         </span>
       )}

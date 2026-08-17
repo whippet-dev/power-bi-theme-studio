@@ -748,9 +748,25 @@ button { color: inherit; }
   justify-content: space-between;
 }
 
+/* A vertical value axis sits in a gutter to the left of the plot. Absolute
+   so it can't change the plot's own height, which the bars are sized
+   against. */
 .chart-ticks--vertical {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
   flex-direction: column-reverse;
   justify-content: space-between;
+  align-items: flex-end;
+  margin: 0;
+  pointer-events: none;
+}
+
+.column-preview__plot .chart-ticks--vertical,
+.line-preview__plot .chart-ticks--vertical {
+  left: -4px;
+  transform: translateX(-100%);
 }
 
 .preview-header-tooltip {
