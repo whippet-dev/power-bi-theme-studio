@@ -11,6 +11,7 @@ import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
+import { shapeGeometry } from "../lib/shapeGeometry";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -102,23 +103,77 @@ function mapTextAlign(value: string | number): CSSProperties["textAlign"] | unde
  * fill/outline/shadow/text core, so one function renders the common tile
  * body; each caller adds its own extras (an icon, an accent bar, ...).
  */
-function shapeTile(style: ResolvedShapeFamilyCore, key: string, extra?: ReactNode): ReactNode {
+/** The glyph Power BI shows for each built-in action button icon. */
+function actionButtonGlyph(shapeType: string): string {
+  const glyphs: Record<string, string> = {
+    blank: "",
+    leftArrow: "←",
+    rightArrow: "→",
+    back: "↩",
+    reset: "↺",
+    help: "?",
+    information: "ℹ",
+    qna: "Q",
+    bookmarks: "🔖",
+    applyAllSlicers: "✓",
+    clearAllSlicers: "✕",
+    custom: "◆",
+    spinner: "◐",
+  };
+  return glyphs[shapeType] ?? "";
+}
+
+function shapeTile(
+  style: ResolvedShapeFamilyCore,
+  key: string,
+  extra?: ReactNode,
+  /** Where `extra` (an action button's icon) sits relative to the text. */
+  extraPlacement?: string,
+): ReactNode {
   const tileShape = String(style.shape.tileShape);
-  const cornerRadius = tileShape.startsWith("rectangleRounded") ? 10 : tileShape === "pill" || tileShape === "oval" ? 999 : 4;
+  const geometry = shapeGeometry(tileShape, style.shape);
+  const clipped = "clipPath" in geometry;
+
+  const fill = style.fill.show ? hexWithAlpha(style.fill.fillColor, style.fill.transparency) : "transparent";
+  const outlineColor = hexWithAlpha(style.outline.lineColor, style.outline.transparency);
+
+  const shadow = style.shadow.show
+    ? `${shapeShadowOffset(style.shadow)} ${style.shadow.shadowBlur}px ${hexWithAlpha(style.shadow.color, style.shadow.transparency)}`
+    : undefined;
+  const glow = style.glow.show ? `0 0 ${style.glow.shadowBlur}px ${hexWithAlpha(style.glow.color, style.glow.transparency)}` : undefined;
+  const shadows = [shadow, glow].filter(Boolean).join(", ") || undefined;
+
   return (
     <span
       className="shape-tile"
       key={key}
       style={{
-        backgroundColor: style.fill.show ? hexWithAlpha(style.fill.fillColor, style.fill.transparency) : "transparent",
-        border: style.outline.show ? `${style.outline.weight}px solid ${hexWithAlpha(style.outline.lineColor, style.outline.transparency)}` : "1px dashed transparent",
-        borderRadius: cornerRadius,
-        boxShadow: style.shadow.show
-          ? `0 ${style.shadow.shadowDistance}px ${style.shadow.shadowBlur}px ${hexWithAlpha(style.shadow.color, style.shadow.transparency)}`
-          : style.glow.show
-            ? `0 0 ${style.glow.shadowBlur}px ${hexWithAlpha(style.glow.color, style.glow.transparency)}`
-            : undefined,
-        transform: style.rotation.angle ? `rotate(${style.rotation.angle}deg)` : undefined,
+        // clip-path cuts off any CSS border, so a clipped shape draws its
+        // outline as an inset ring instead — otherwise turning the outline
+        // on would do nothing for most shapes.
+        backgroundColor: fill,
+        ...(style.outline.show
+          ? clipped
+            ? { boxShadow: `inset 0 0 0 ${style.outline.weight}px ${outlineColor}` }
+            : { border: `${style.outline.weight}px solid ${outlineColor}` }
+          : {}),
+        ...geometry,
+        // A clipped shape can't also cast a CSS shadow (the shadow is
+        // clipped too), so it goes on the wrapper via filter instead.
+        ...(shadows && !clipped ? { boxShadow: shadows } : {}),
+        ...(shadows && clipped
+          ? {
+              filter: `drop-shadow(${shapeShadowOffset(style.shadow)} ${hexWithAlpha(style.shadow.color, style.shadow.transparency)})`,
+            }
+          : {}),
+        transform: [
+          style.rotation.angle ? `rotate(${style.rotation.angle}deg)` : "",
+          style.rotation.shapeAngle ? `rotate(${style.rotation.shapeAngle}deg)` : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+        flexDirection: extraPlacement === "above" ? "column" : extraPlacement === "below" ? "column-reverse" : "row",
+        ...(extraPlacement === "right" ? { flexDirection: "row-reverse" } : {}),
       }}
     >
       {extra}
@@ -136,6 +191,8 @@ function shapeTile(style: ResolvedShapeFamilyCore, key: string, extra?: ReactNod
             justifyContent:
               style.text.verticalAlignment === "top" ? "flex-start" : style.text.verticalAlignment === "bottom" ? "flex-end" : "center",
             padding: `${style.text.topMargin}px ${style.text.rightMargin}px ${style.text.bottomMargin}px ${style.text.leftMargin}px`,
+            // Text rotates independently of the shape in Power BI.
+            transform: style.rotation.textAngle ? `rotate(${style.rotation.textAngle}deg)` : undefined,
           }}
         >
           {String(style.text.text) || key}
@@ -143,6 +200,26 @@ function shapeTile(style: ResolvedShapeFamilyCore, key: string, extra?: ReactNod
       )}
     </span>
   );
+}
+
+/** Offset for a shape-family shadow, from its named preset or its angle. */
+function shapeShadowOffset(shadow: ResolvedShapeFamilyCore["shadow"]): string {
+  const presets: Record<string, [number, number]> = {
+    top: [0, -1],
+    topLeft: [-1, -1],
+    topRight: [1, -1],
+    center: [0, 0],
+    centerLeft: [-1, 0],
+    centerRight: [1, 0],
+    bottom: [0, 1],
+    bottomLeft: [-1, 1],
+    bottomRight: [1, 1],
+  };
+  const preset = presets[String(shadow.shadowPositionPreset)];
+  const distance = shadow.shadowDistance;
+  if (preset) return `${(preset[0] * distance).toFixed(1)}px ${(preset[1] * distance).toFixed(1)}px`;
+  const radians = (shadow.angle * Math.PI) / 180;
+  return `${(Math.cos(radians) * distance).toFixed(1)}px ${(Math.sin(radians) * distance).toFixed(1)}px`;
 }
 
 /**
@@ -1852,20 +1929,31 @@ export function VisualGallery({
 
   const shapeContent = shapeTile(shapeStyle, "shape");
 
+  const actionIcon = actionButtonStyle.icon;
   const actionButtonContent = shapeTile(
     actionButtonStyle,
     "actionButton",
-    actionButtonStyle.icon.show && (
+    actionIcon.show && (
       <span
         className="shape-tile__icon"
         aria-hidden="true"
         style={{
-          borderColor: hexWithAlpha(actionButtonStyle.icon.lineColor, actionButtonStyle.icon.lineTransparency),
-          width: actionButtonStyle.icon.iconSize,
-          height: actionButtonStyle.icon.iconSize,
+          color: hexWithAlpha(actionIcon.lineColor, actionIcon.lineTransparency),
+          fontSize: actionIcon.iconSize,
+          // Power BI's stroke weight for the icon's line art; the glyphs
+          // here are text, so it maps to weight rather than a border.
+          fontWeight: actionIcon.lineWeight >= 3 ? 700 : 400,
+          textAlign: mapTextAlign(actionIcon.horizontalAlignment) ?? "center",
+          alignSelf:
+            actionIcon.verticalAlignment === "top" ? "flex-start" : actionIcon.verticalAlignment === "bottom" ? "flex-end" : "center",
+          margin: `${actionIcon.topMargin}px ${actionIcon.rightMargin}px ${actionIcon.bottomMargin}px ${actionIcon.leftMargin}px`,
         }}
-      />
+      >
+        {actionButtonGlyph(String(actionIcon.shapeType))}
+      </span>
     ),
+    // "Icon placement" positions the icon relative to the button's text.
+    String(actionIcon.placement),
   );
 
   const navigatorButtons = (

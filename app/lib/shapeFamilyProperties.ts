@@ -583,6 +583,38 @@ export type ResolvedShapeFamilyCore = {
   };
 };
 
+/**
+ * Defaults for the shape-tuning parameters. A generic 0 fallback is wrong
+ * for nearly all of these: a hexagon with 0 slant is a rectangle, a
+ * triangle with tip position 0 is a right triangle, an arrow with 0 stem
+ * width has no stem. Each needs the value that actually produces the
+ * shape it is named after — the same "zero default silently produces the
+ * wrong thing" trap as the compound `*Width` and divider-width bugs.
+ */
+const SHAPE_PARAM_DEFAULTS: Record<string, string | number> = {
+  tileShape: "rectangle",
+  speechBubbleTailPosition: "bottomLeft",
+  linecapType: "flat",
+  roundEdge: 10,
+  rectangleRoundedCurve: 10,
+  arrowStemWidth: 40,
+  arrowheadSize: 40,
+  chevronAngle: 25,
+  hexagonSlant: 25,
+  octagonSnipSize: 25,
+  parallelogramSlant: 20,
+  trapezoidSlant: 20,
+  isocelesTriangleTipPosition: 50,
+  speechBubbleHeight: 75,
+  speechBubbleTailAngle: 12,
+  tabCutCornerSnipSizeTop: 20,
+  tabCutCornerSnipSizeTopRight: 25,
+  tabCutCornerSnipSizeBottom: 0,
+  tabRoundCornerTop: 25,
+  tabRoundCornerTopRight: 25,
+  tabRoundCornerBottom: 0,
+};
+
 /** Shared resolver for the core groups — every shape-family visual calls this the same way, then resolves its own extra groups on top. */
 export function resolveShapeFamilyCore(
   theme: PowerBITheme,
@@ -592,10 +624,8 @@ export function resolveShapeFamilyCore(
 ): ResolvedShapeFamilyCore {
   const shape: Record<string, string | number> = {};
   for (const [key, definition] of Object.entries(core.shape)) {
-    let fallback: string | number = definition.valueType === "enum" ? (definition.options?.[0]?.value ?? "") : 0;
-    if (key === "tileShape") fallback = "rectangle";
-    else if (key === "speechBubbleTailPosition") fallback = "bottomLeft";
-    else if (key === "linecapType") fallback = "flat";
+    const fallback: string | number =
+      SHAPE_PARAM_DEFAULTS[key] ?? (definition.valueType === "enum" ? (definition.options?.[0]?.value ?? "") : 0);
     shape[key] = resolvePropertyValue(theme, definition, fallback);
   }
 
