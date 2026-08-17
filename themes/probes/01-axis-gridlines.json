@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/powerbi-desktop-samples/main/Report%20Theme%20JSON%20Schema/reportThemeSchema-2.156.json",
+  "name": "Probe 01 axis gridlines",
+  "dataColors": [
+    "#12436D",
+    "#28A197",
+    "#801650",
+    "#F46A25",
+    "#3D3D3D"
+  ],
+  "visualStyles": {
+    "*": {
+      "*": {
+        "valueAxis": [
+          {
+            "gridlineShow": true,
+            "gridlineColor": {
+              "solid": {
+                "color": "#FF00FF"
+              }
+            },
+            "gridlineThickness": 3,
+            "gridlineStyle": "dashed",
+            "start": "0",
+            "end": "100"
+          }
+        ],
+        "categoryAxis": [
+          {
+            "gridlineShow": true,
+            "gridlineColor": {
+              "solid": {
+                "color": "#00FF00"
+              }
+            },
+            "gridlineThickness": 1
+          }
+        ]
+      }
+    }
+  }
+}
