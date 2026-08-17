@@ -1386,11 +1386,19 @@ button { color: inherit; }
 }
 
 .pie-preview__chart-wrap {
+  display: block;
   position: relative;
   flex-shrink: 0;
 }
 
+/* Every preview element is a <span>, which is inline by default — and an
+   inline box ignores width and height entirely. The circle used to be
+   blockified implicitly by being a flex item; once it was nested one
+   level deeper it silently collapsed to 0x0 and the pie vanished while
+   still carrying a perfectly correct conic-gradient. Same trap as the
+   bar track. Anything with an explicit size needs display set. */
 .pie-preview__circle {
+  display: block;
   width: 128px;
   height: 128px;
   border-radius: 999px;

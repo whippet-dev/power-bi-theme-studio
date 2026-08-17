@@ -77,26 +77,19 @@ const ALL_VISUALS: VisualKind[] = [
   "image",
 ];
 
+/** The visual the studio opens on, and the only one on the canvas to start. */
+const INITIAL_VISUAL: VisualKind = "bar";
+
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
-  const [selectedVisual, setSelectedVisual] = useState<VisualKind>("bar");
-  const [visibility, setVisibility] = useState<Record<VisualKind, boolean>>({
-    card: true,
-    bar: true,
-    column: true,
-    stackedBar: true,
-    stackedColumn: true,
-    line: true,
-    table: true,
-    matrix: true,
-    pie: true,
-    slicer: true,
-    shape: true,
-    actionButton: true,
-    bookmarkNavigator: true,
-    pageNavigator: true,
-    textbox: true,
-    image: true,
+  const [selectedVisual, setSelectedVisual] = useState<VisualKind>(INITIAL_VISUAL);
+  // Only the selected visual starts on the canvas. With all sixteen shown
+  // the page opens as a wall of thumbnails, which buries the one being
+  // edited and makes the effect of a change hard to see; the rail is
+  // there to add more when they're wanted.
+  const [visibility, setVisibility] = useState<Record<VisualKind, boolean>>(() => {
+    const none = Object.fromEntries(ALL_VISUALS.map((visual) => [visual, false])) as Record<VisualKind, boolean>;
+    return { ...none, [INITIAL_VISUAL]: true };
   });
   const [fileLabel, setFileLabel] = useState("Starter theme");
   const [message, setMessage] = useState<string | null>(null);
