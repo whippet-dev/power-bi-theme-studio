@@ -31,7 +31,13 @@ export type VisualSchemaKey =
   | "pieChart"
   | "*"
   | "report"
-  | "page";
+  | "page"
+  | "bookmarkNavigator"
+  | "pageNavigator"
+  | "shape"
+  | "actionButton"
+  | "textbox"
+  | "image";
 
 export type PropertyValueType = "color" | "number" | "boolean" | "text" | "enum";
 

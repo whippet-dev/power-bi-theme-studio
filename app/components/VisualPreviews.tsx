@@ -1,18 +1,41 @@
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
+import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
+import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
+import type { ResolvedImageStyle } from "../lib/imageProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
+import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
+import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
+import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import type { ResolvedStackedBarChartStyle } from "../lib/stackedBarChartProperties";
 import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
+import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
-export type VisualKind = "card" | "bar" | "column" | "stackedBar" | "stackedColumn" | "line" | "table" | "matrix" | "pie" | "slicer";
+export type VisualKind =
+  | "card"
+  | "bar"
+  | "column"
+  | "stackedBar"
+  | "stackedColumn"
+  | "line"
+  | "table"
+  | "matrix"
+  | "pie"
+  | "slicer"
+  | "shape"
+  | "actionButton"
+  | "bookmarkNavigator"
+  | "pageNavigator"
+  | "textbox"
+  | "image";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
@@ -26,6 +49,12 @@ type VisualGalleryProps = {
   slicerStyle: ResolvedSlicerStyle;
   matrixStyle: ResolvedMatrixStyle;
   pieChartStyle: ResolvedPieChartStyle;
+  shapeStyle: ResolvedShapeStyle;
+  actionButtonStyle: ResolvedActionButtonStyle;
+  bookmarkNavigatorStyle: ResolvedBookmarkNavigatorStyle;
+  pageNavigatorStyle: ResolvedPageNavigatorStyle;
+  textboxStyle: ResolvedTextboxStyle;
+  imageStyle: ResolvedImageStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
   selected: VisualKind;
@@ -72,6 +101,55 @@ function hexWithAlpha(hex: string, transparencyPercent: number): string {
   const b = parseInt(clean.slice(4, 6), 16);
   const alpha = Math.max(0, Math.min(1, 1 - transparencyPercent / 100));
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Shared tile renderer for the "shape family" visuals (Shape, Action
+ * button, Bookmark navigator, Page navigator) — they all share the same
+ * fill/outline/shadow/text core, so one function renders the common tile
+ * body; each caller adds its own extras (an icon, an accent bar, ...).
+ */
+function shapeTile(style: ResolvedShapeFamilyCore, key: string, extra?: ReactNode): ReactNode {
+  const tileShape = String(style.shape.tileShape);
+  const cornerRadius = tileShape.startsWith("rectangleRounded") ? 10 : tileShape === "pill" || tileShape === "oval" ? 999 : 4;
+  return (
+    <span
+      className="shape-tile"
+      key={key}
+      style={{
+        backgroundColor: style.fill.show ? hexWithAlpha(style.fill.fillColor, style.fill.transparency) : "transparent",
+        border: style.outline.show ? `${style.outline.weight}px solid ${hexWithAlpha(style.outline.lineColor, style.outline.transparency)}` : "1px dashed transparent",
+        borderRadius: cornerRadius,
+        boxShadow: style.shadow.show
+          ? `0 ${style.shadow.shadowDistance}px ${style.shadow.shadowBlur}px ${hexWithAlpha(style.shadow.color, style.shadow.transparency)}`
+          : style.glow.show
+            ? `0 0 ${style.glow.shadowBlur}px ${hexWithAlpha(style.glow.color, style.glow.transparency)}`
+            : undefined,
+        transform: style.rotation.angle ? `rotate(${style.rotation.angle}deg)` : undefined,
+      }}
+    >
+      {extra}
+      {style.text.show && (
+        <span
+          className="shape-tile__text"
+          style={{
+            color: style.text.fontColor,
+            fontFamily: style.text.fontFamily || undefined,
+            fontSize: style.text.fontSize,
+            fontWeight: style.text.bold ? 700 : 400,
+            fontStyle: style.text.italic ? "italic" : "normal",
+            textDecoration: style.text.underline ? "underline" : "none",
+            textAlign: mapTextAlign(style.text.horizontalAlignment) ?? "center",
+            justifyContent:
+              style.text.verticalAlignment === "top" ? "flex-start" : style.text.verticalAlignment === "bottom" ? "flex-end" : "center",
+            padding: `${style.text.topMargin}px ${style.text.rightMargin}px ${style.text.bottomMargin}px ${style.text.leftMargin}px`,
+          }}
+        >
+          {String(style.text.text) || key}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -185,6 +263,12 @@ export function VisualGallery({
   slicerStyle,
   matrixStyle,
   pieChartStyle,
+  shapeStyle,
+  actionButtonStyle,
+  bookmarkNavigatorStyle,
+  pageNavigatorStyle,
+  textboxStyle,
+  imageStyle,
   chromeStyles,
   visibleVisuals,
   selected,
@@ -1456,6 +1540,90 @@ export function VisualGallery({
     </span>
   );
 
+  const shapeContent = shapeTile(shapeStyle, "shape");
+
+  const actionButtonContent = shapeTile(
+    actionButtonStyle,
+    "actionButton",
+    actionButtonStyle.icon.show && (
+      <span
+        className="shape-tile__icon"
+        aria-hidden="true"
+        style={{
+          borderColor: hexWithAlpha(actionButtonStyle.icon.lineColor, actionButtonStyle.icon.lineTransparency),
+          width: actionButtonStyle.icon.iconSize,
+          height: actionButtonStyle.icon.iconSize,
+        }}
+      />
+    ),
+  );
+
+  const navigatorButtons = (
+    style: ResolvedShapeFamilyCore,
+    accentBar: { show: boolean; color: string },
+    orientation: string | number,
+    labels: string[],
+  ) => (
+    <span className="navigator-preview" style={{ flexDirection: orientation === 1 ? "column" : "row" }}>
+      {labels.map((label, index) => (
+        <span className="navigator-preview__item" key={label}>
+          {shapeTile({ ...style, text: { ...style.text, text: label } }, label)}
+          {accentBar.show && index === 0 && <span className="navigator-preview__accent" style={{ backgroundColor: accentBar.color }} />}
+        </span>
+      ))}
+    </span>
+  );
+
+  const bookmarkNavigatorContent = navigatorButtons(
+    bookmarkNavigatorStyle,
+    bookmarkNavigatorStyle.accentBar,
+    bookmarkNavigatorStyle.layout.orientation,
+    ["Overview", "Detail", "Trends"],
+  );
+
+  const pageNavigatorContent = navigatorButtons(pageNavigatorStyle, pageNavigatorStyle.accentBar, pageNavigatorStyle.layout.orientation, [
+    "Page 1",
+    "Page 2",
+    "Page 3",
+  ]);
+
+  const textboxContent = (
+    <span
+      className="textbox-preview"
+      style={{
+        color: textboxStyle.text.color,
+        fontFamily: textboxStyle.text.fontFamily || undefined,
+        fontSize: textboxStyle.text.fontSize,
+      }}
+    >
+      Add a text box to annotate your report with headings, notes, or instructions.
+    </span>
+  );
+
+  const imageContent = (
+    <span
+      className="image-preview"
+      style={{
+        backgroundColor: imageStyle.image.backgroundEnabled
+          ? hexWithAlpha(imageStyle.image.backgroundColor, imageStyle.image.backgroundTransparency)
+          : "transparent",
+        border: imageStyle.image.strokeShow
+          ? `${imageStyle.image.strokeWidth}px ${imageStyle.image.strokePattern} ${hexWithAlpha(imageStyle.image.strokeColor, imageStyle.image.strokeTransparency)}`
+          : "1px dashed #C8C6C4",
+        borderRadius: imageStyle.image.cornerRadius,
+        opacity: 1 - imageStyle.image.transparency / 100,
+        filter: imageStyle.image.effects
+          ? `blur(${imageStyle.image.blur * 0.05}px) contrast(${100 + imageStyle.image.contrast}%) saturate(${100 + imageStyle.image.saturation}%)`
+          : undefined,
+      }}
+    >
+      <span className="image-preview__icon" aria-hidden="true">
+        🖼
+      </span>
+      <span className="image-preview__fit">{String(imageStyle.image.fit)}</span>
+    </span>
+  );
+
   const descriptors: Array<{
     id: VisualKind;
     label: string;
@@ -1473,6 +1641,24 @@ export function VisualGallery({
     { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
     { id: "pie", label: "Pie chart", defaultTitle: "Applications by region", chrome: chromeStyles.pie, content: pieContent },
     { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
+    { id: "shape", label: "Shape", defaultTitle: "Shape", chrome: chromeStyles.shape, content: shapeContent },
+    { id: "actionButton", label: "Action button", defaultTitle: "Action button", chrome: chromeStyles.actionButton, content: actionButtonContent },
+    {
+      id: "bookmarkNavigator",
+      label: "Bookmark navigator",
+      defaultTitle: "Bookmark navigator",
+      chrome: chromeStyles.bookmarkNavigator,
+      content: bookmarkNavigatorContent,
+    },
+    {
+      id: "pageNavigator",
+      label: "Page navigator",
+      defaultTitle: "Page navigator",
+      chrome: chromeStyles.pageNavigator,
+      content: pageNavigatorContent,
+    },
+    { id: "textbox", label: "Textbox", defaultTitle: "Textbox", chrome: chromeStyles.textbox, content: textboxContent },
+    { id: "image", label: "Image", defaultTitle: "Image", chrome: chromeStyles.image, content: imageContent },
   ];
 
   const visible = descriptors.filter((d) => visibleVisuals.includes(d.id));

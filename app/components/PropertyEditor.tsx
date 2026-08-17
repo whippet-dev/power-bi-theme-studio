@@ -1,11 +1,17 @@
 import { useState, type ReactNode } from "react";
+import { ACTION_BUTTON_PROPERTIES, propertyThemePath as actionButtonPropertyThemePath } from "../lib/actionButtonProperties";
+import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
+import { BOOKMARK_NAVIGATOR_PROPERTIES, propertyThemePath as bookmarkNavigatorPropertyThemePath } from "../lib/bookmarkNavigatorProperties";
+import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import { CARD_PROPERTIES, propertyThemePath as cardPropertyThemePath } from "../lib/cardProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { CHROME_PROPERTIES, chromeThemePath, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import { COLUMN_CHART_PROPERTIES, propertyThemePath as columnChartPropertyThemePath } from "../lib/columnChartProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
+import { IMAGE_PROPERTIES, propertyThemePath as imagePropertyThemePath } from "../lib/imageProperties";
+import type { ResolvedImageStyle } from "../lib/imageProperties";
 import { GLOBAL_OPTIONS_PROPERTIES, propertyThemePath as globalOptionsPropertyThemePath } from "../lib/globalOptionsProperties";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
@@ -19,9 +25,13 @@ import {
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import { MATRIX_PROPERTIES, propertyThemePath as matrixPropertyThemePath } from "../lib/matrixProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
+import { PAGE_NAVIGATOR_PROPERTIES, propertyThemePath as pageNavigatorPropertyThemePath } from "../lib/pageNavigatorProperties";
+import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { PIE_CHART_PROPERTIES, propertyThemePath as pieChartPropertyThemePath } from "../lib/pieChartProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
+import { propertyThemePath as shapePropertyThemePath, SHAPE_PROPERTIES } from "../lib/shapeProperties";
+import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
 import { propertyThemePath as stackedBarChartPropertyThemePath, STACKED_BAR_CHART_PROPERTIES } from "../lib/stackedBarChartProperties";
@@ -30,6 +40,8 @@ import { propertyThemePath as stackedColumnChartPropertyThemePath, STACKED_COLUM
 import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
+import { propertyThemePath as textboxPropertyThemePath, TEXTBOX_PROPERTIES } from "../lib/textboxProperties";
+import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
 import { hasThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
 import type { VisualKind } from "./VisualPreviews";
 
@@ -50,6 +62,12 @@ type PropertyEditorProps = {
   slicerStyle: ResolvedSlicerStyle;
   matrixStyle: ResolvedMatrixStyle;
   pieChartStyle: ResolvedPieChartStyle;
+  shapeStyle: ResolvedShapeStyle;
+  actionButtonStyle: ResolvedActionButtonStyle;
+  bookmarkNavigatorStyle: ResolvedBookmarkNavigatorStyle;
+  pageNavigatorStyle: ResolvedPageNavigatorStyle;
+  textboxStyle: ResolvedTextboxStyle;
+  imageStyle: ResolvedImageStyle;
   chromeStyle: ResolvedChromeStyle;
   sharedChromeStyle: ResolvedChromeStyle;
   globalOptionsStyle: ResolvedGlobalOptionsStyle;
@@ -70,6 +88,12 @@ const visualNames: Record<VisualKind, string> = {
   matrix: "Matrix",
   pie: "Pie chart",
   slicer: "Slicer",
+  shape: "Shape",
+  actionButton: "Action button",
+  bookmarkNavigator: "Bookmark navigator",
+  pageNavigator: "Page navigator",
+  textbox: "Textbox",
+  image: "Image",
 };
 
 const TABLE_GROUP_LABELS: Record<keyof typeof TABLE_PROPERTIES, string> = {
@@ -103,6 +127,50 @@ const PIE_CHART_GROUP_LABELS: Record<keyof typeof PIE_CHART_PROPERTIES, string> 
   legend: "Legend",
   labels: "Detail labels",
   general: "General",
+};
+
+// Shared group labels for the four "shape family" visuals (Shape, Action
+// button, Bookmark navigator, Page navigator) — they share the same core
+// fill/outline/shadow/glow/rotation/shape/text groups (see
+// shapeFamilyProperties.ts), so one label map covers all four.
+const SHAPE_FAMILY_CORE_LABELS = {
+  fill: "Fill",
+  outline: "Outline",
+  shadow: "Shadow",
+  glow: "Glow",
+  rotation: "Rotation",
+  shape: "Shape",
+  text: "Text",
+} as const;
+
+const SHAPE_GROUP_LABELS: Record<keyof typeof SHAPE_PROPERTIES, string> = SHAPE_FAMILY_CORE_LABELS;
+
+const ACTION_BUTTON_GROUP_LABELS: Record<keyof typeof ACTION_BUTTON_PROPERTIES, string> = {
+  ...SHAPE_FAMILY_CORE_LABELS,
+  icon: "Icon",
+};
+
+const BOOKMARK_NAVIGATOR_GROUP_LABELS: Record<keyof typeof BOOKMARK_NAVIGATOR_PROPERTIES, string> = {
+  ...SHAPE_FAMILY_CORE_LABELS,
+  accentBar: "Accent bar",
+  bookmarks: "Bookmarks",
+  layout: "Layout",
+};
+
+const PAGE_NAVIGATOR_GROUP_LABELS: Record<keyof typeof PAGE_NAVIGATOR_PROPERTIES, string> = {
+  ...SHAPE_FAMILY_CORE_LABELS,
+  accentBar: "Accent bar",
+  pages: "Pages",
+  layout: "Layout",
+};
+
+const TEXTBOX_GROUP_LABELS: Record<keyof typeof TEXTBOX_PROPERTIES, string> = {
+  text: "Text",
+};
+
+const IMAGE_GROUP_LABELS: Record<keyof typeof IMAGE_PROPERTIES, string> = {
+  image: "Image",
+  imageScaling: "Image scaling",
 };
 
 // Power BI's own format-pane card names for each group, so the panel reads
@@ -556,6 +624,12 @@ const CARD_ID_PREFIX = "card:";
 const SLICER_ID_PREFIX = "slicer:";
 const MATRIX_ID_PREFIX = "matrix:";
 const PIE_CHART_ID_PREFIX = "pie:";
+const SHAPE_ID_PREFIX = "shape:";
+const ACTION_BUTTON_ID_PREFIX = "actionButton:";
+const BOOKMARK_NAVIGATOR_ID_PREFIX = "bookmarkNavigator:";
+const PAGE_NAVIGATOR_ID_PREFIX = "pageNavigator:";
+const TEXTBOX_ID_PREFIX = "textbox:";
+const IMAGE_ID_PREFIX = "image:";
 const GLOBAL_OPTIONS_ID_PREFIX = "global:";
 const SEMANTIC_COLORS_ID = "semanticColors";
 const TEXT_CLASSES_ID = "textClasses";
@@ -573,6 +647,12 @@ export function PropertyEditor({
   slicerStyle,
   matrixStyle,
   pieChartStyle,
+  shapeStyle,
+  actionButtonStyle,
+  bookmarkNavigatorStyle,
+  pageNavigatorStyle,
+  textboxStyle,
+  imageStyle,
   chromeStyle,
   sharedChromeStyle,
   globalOptionsStyle,
@@ -684,6 +764,48 @@ export function PropertyEditor({
           id: `${SLICER_ID_PREFIX}${key}`,
           title: SLICER_GROUP_LABELS[key],
           count: Object.keys(SLICER_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "shape"
+      ? (Object.keys(SHAPE_PROPERTIES) as Array<keyof typeof SHAPE_PROPERTIES>).map((key) => ({
+          id: `${SHAPE_ID_PREFIX}${key}`,
+          title: SHAPE_GROUP_LABELS[key],
+          count: Object.keys(SHAPE_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "actionButton"
+      ? (Object.keys(ACTION_BUTTON_PROPERTIES) as Array<keyof typeof ACTION_BUTTON_PROPERTIES>).map((key) => ({
+          id: `${ACTION_BUTTON_ID_PREFIX}${key}`,
+          title: ACTION_BUTTON_GROUP_LABELS[key],
+          count: Object.keys(ACTION_BUTTON_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "bookmarkNavigator"
+      ? (Object.keys(BOOKMARK_NAVIGATOR_PROPERTIES) as Array<keyof typeof BOOKMARK_NAVIGATOR_PROPERTIES>).map((key) => ({
+          id: `${BOOKMARK_NAVIGATOR_ID_PREFIX}${key}`,
+          title: BOOKMARK_NAVIGATOR_GROUP_LABELS[key],
+          count: Object.keys(BOOKMARK_NAVIGATOR_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "pageNavigator"
+      ? (Object.keys(PAGE_NAVIGATOR_PROPERTIES) as Array<keyof typeof PAGE_NAVIGATOR_PROPERTIES>).map((key) => ({
+          id: `${PAGE_NAVIGATOR_ID_PREFIX}${key}`,
+          title: PAGE_NAVIGATOR_GROUP_LABELS[key],
+          count: Object.keys(PAGE_NAVIGATOR_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "textbox"
+      ? (Object.keys(TEXTBOX_PROPERTIES) as Array<keyof typeof TEXTBOX_PROPERTIES>).map((key) => ({
+          id: `${TEXTBOX_ID_PREFIX}${key}`,
+          title: TEXTBOX_GROUP_LABELS[key],
+          count: Object.keys(TEXTBOX_PROPERTIES[key]).length,
+        }))
+      : []),
+    ...(selected === "image"
+      ? (Object.keys(IMAGE_PROPERTIES) as Array<keyof typeof IMAGE_PROPERTIES>).map((key) => ({
+          id: `${IMAGE_ID_PREFIX}${key}`,
+          title: IMAGE_GROUP_LABELS[key],
+          count: Object.keys(IMAGE_PROPERTIES[key]).length,
         }))
       : []),
   ];
@@ -837,6 +959,96 @@ export function PropertyEditor({
           groupValues={globalOptionsStyle[key]}
           pathPrefix={key.startsWith("report") ? "visualStyles.report.*" : "visualStyles.page.*"}
           getThemePath={globalOptionsPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(SHAPE_ID_PREFIX)) {
+      const key = id.slice(SHAPE_ID_PREFIX.length) as keyof typeof SHAPE_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={SHAPE_PROPERTIES[key]}
+          groupValues={shapeStyle[key]}
+          pathPrefix="visualStyles.shape.*"
+          getThemePath={shapePropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(ACTION_BUTTON_ID_PREFIX)) {
+      const key = id.slice(ACTION_BUTTON_ID_PREFIX.length) as keyof typeof ACTION_BUTTON_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={ACTION_BUTTON_PROPERTIES[key]}
+          groupValues={actionButtonStyle[key]}
+          pathPrefix="visualStyles.actionButton.*"
+          getThemePath={actionButtonPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(BOOKMARK_NAVIGATOR_ID_PREFIX)) {
+      const key = id.slice(BOOKMARK_NAVIGATOR_ID_PREFIX.length) as keyof typeof BOOKMARK_NAVIGATOR_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={BOOKMARK_NAVIGATOR_PROPERTIES[key]}
+          groupValues={bookmarkNavigatorStyle[key]}
+          pathPrefix="visualStyles.bookmarkNavigator.*"
+          getThemePath={bookmarkNavigatorPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(PAGE_NAVIGATOR_ID_PREFIX)) {
+      const key = id.slice(PAGE_NAVIGATOR_ID_PREFIX.length) as keyof typeof PAGE_NAVIGATOR_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={PAGE_NAVIGATOR_PROPERTIES[key]}
+          groupValues={pageNavigatorStyle[key]}
+          pathPrefix="visualStyles.pageNavigator.*"
+          getThemePath={pageNavigatorPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(TEXTBOX_ID_PREFIX)) {
+      const key = id.slice(TEXTBOX_ID_PREFIX.length) as keyof typeof TEXTBOX_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={TEXTBOX_PROPERTIES[key]}
+          groupValues={textboxStyle[key]}
+          pathPrefix="visualStyles.textbox.*"
+          getThemePath={textboxPropertyThemePath}
+          onChange={onChange}
+          onReset={onReset}
+        />
+      );
+    }
+
+    if (id.startsWith(IMAGE_ID_PREFIX)) {
+      const key = id.slice(IMAGE_ID_PREFIX.length) as keyof typeof IMAGE_PROPERTIES;
+      return (
+        <RegistryGroupBody
+          theme={theme}
+          group={IMAGE_PROPERTIES[key]}
+          groupValues={imageStyle[key]}
+          pathPrefix="visualStyles.image.*"
+          getThemePath={imagePropertyThemePath}
           onChange={onChange}
           onReset={onReset}
         />

@@ -14,16 +14,22 @@ import {
 import { resolveBarChartStyle } from "../lib/barChartProperties";
 import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
+import { resolveActionButtonStyle } from "../lib/actionButtonProperties";
+import { resolveBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import { resolveGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { resolveColumnChartStyle } from "../lib/columnChartProperties";
+import { resolveImageStyle } from "../lib/imageProperties";
 import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import { resolveMatrixStyle } from "../lib/matrixProperties";
+import { resolvePageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { resolvePieChartStyle } from "../lib/pieChartProperties";
 import type { VisualSchemaKey } from "../lib/properties";
+import { resolveShapeStyle } from "../lib/shapeProperties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
 import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
 import { resolveStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
+import { resolveTextboxStyle } from "../lib/textboxProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
 import { VisualRail } from "./VisualRail";
@@ -41,9 +47,32 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   matrix: "pivotTable",
   pie: "pieChart",
   slicer: "slicer",
+  shape: "shape",
+  actionButton: "actionButton",
+  bookmarkNavigator: "bookmarkNavigator",
+  pageNavigator: "pageNavigator",
+  textbox: "textbox",
+  image: "image",
 };
 
-const ALL_VISUALS: VisualKind[] = ["card", "bar", "column", "stackedBar", "stackedColumn", "line", "table", "matrix", "pie", "slicer"];
+const ALL_VISUALS: VisualKind[] = [
+  "card",
+  "bar",
+  "column",
+  "stackedBar",
+  "stackedColumn",
+  "line",
+  "table",
+  "matrix",
+  "pie",
+  "slicer",
+  "shape",
+  "actionButton",
+  "bookmarkNavigator",
+  "pageNavigator",
+  "textbox",
+  "image",
+];
 
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
@@ -59,6 +88,12 @@ export function ThemeStudio() {
     matrix: true,
     pie: true,
     slicer: true,
+    shape: true,
+    actionButton: true,
+    bookmarkNavigator: true,
+    pageNavigator: true,
+    textbox: true,
+    image: true,
   });
   const [fileLabel, setFileLabel] = useState("Starter theme");
   const [message, setMessage] = useState<string | null>(null);
@@ -74,6 +109,12 @@ export function ThemeStudio() {
   const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
   const matrixStyle = useMemo(() => resolveMatrixStyle(theme, resolved), [theme, resolved]);
   const pieChartStyle = useMemo(() => resolvePieChartStyle(theme, resolved), [theme, resolved]);
+  const shapeStyle = useMemo(() => resolveShapeStyle(theme, resolved), [theme, resolved]);
+  const actionButtonStyle = useMemo(() => resolveActionButtonStyle(theme, resolved), [theme, resolved]);
+  const bookmarkNavigatorStyle = useMemo(() => resolveBookmarkNavigatorStyle(theme, resolved), [theme, resolved]);
+  const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(theme, resolved), [theme, resolved]);
+  const textboxStyle = useMemo(() => resolveTextboxStyle(theme, resolved), [theme, resolved]);
+  const imageStyle = useMemo(() => resolveImageStyle(theme, resolved), [theme, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({
       card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
@@ -86,6 +127,12 @@ export function ThemeStudio() {
       matrix: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.matrix, resolved),
       pie: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.pie, resolved),
       slicer: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.slicer, resolved),
+      shape: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.shape, resolved),
+      actionButton: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.actionButton, resolved),
+      bookmarkNavigator: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bookmarkNavigator, resolved),
+      pageNavigator: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.pageNavigator, resolved),
+      textbox: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.textbox, resolved),
+      image: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.image, resolved),
     }),
     [theme, resolved],
   );
@@ -238,6 +285,12 @@ export function ThemeStudio() {
             slicerStyle={slicerStyle}
             matrixStyle={matrixStyle}
             pieChartStyle={pieChartStyle}
+            shapeStyle={shapeStyle}
+            actionButtonStyle={actionButtonStyle}
+            bookmarkNavigatorStyle={bookmarkNavigatorStyle}
+            pageNavigatorStyle={pageNavigatorStyle}
+            textboxStyle={textboxStyle}
+            imageStyle={imageStyle}
             chromeStyles={chromeStyles}
             visibleVisuals={visibleVisuals}
             selected={selectedVisual}
@@ -258,6 +311,12 @@ export function ThemeStudio() {
           slicerStyle={slicerStyle}
           matrixStyle={matrixStyle}
           pieChartStyle={pieChartStyle}
+          shapeStyle={shapeStyle}
+          actionButtonStyle={actionButtonStyle}
+          bookmarkNavigatorStyle={bookmarkNavigatorStyle}
+          pageNavigatorStyle={pageNavigatorStyle}
+          textboxStyle={textboxStyle}
+          imageStyle={imageStyle}
           chromeStyle={chromeStyles[selectedVisual]}
           sharedChromeStyle={sharedChromeStyle}
           globalOptionsStyle={globalOptionsStyle}

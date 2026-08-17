@@ -13,6 +13,12 @@ const RAIL_VISUALS: RailEntry[] = [
   { id: "matrix", label: "Matrix", monogram: "M" },
   { id: "pie", label: "Pie chart", monogram: "P" },
   { id: "slicer", label: "Slicer", monogram: "S" },
+  { id: "shape", label: "Shape", monogram: "Sh" },
+  { id: "actionButton", label: "Action button", monogram: "AB" },
+  { id: "bookmarkNavigator", label: "Bookmark navigator", monogram: "BN" },
+  { id: "pageNavigator", label: "Page navigator", monogram: "PN" },
+  { id: "textbox", label: "Textbox", monogram: "Tx" },
+  { id: "image", label: "Image", monogram: "Im" },
 ];
 
 type VisualRailProps = {
