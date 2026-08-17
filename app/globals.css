@@ -389,20 +389,12 @@ button { color: inherit; }
   display: grid;
   grid-template-columns: 1.3fr 0.8fr 0.7fr;
   gap: 8px;
-  padding: 11px 8px;
-  border-bottom: 1px solid #e7e3e8;
-  color: var(--preview-muted);
-  font-size: 9px;
 }
 
 .table-preview__row span:nth-child(n+2) { text-align: right; }
 
 .table-preview__head {
   margin-top: 13px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid currentColor;
-  background: color-mix(in srgb, currentColor 7%, transparent);
   font-weight: 700;
 }
 
@@ -619,6 +611,50 @@ button { color: inherit; }
   color: #5f5967;
   font-size: 10px;
   text-align: center;
+}
+
+.registry-property {
+  padding: 12px 0;
+  border-bottom: 1px solid #efedf0;
+}
+
+.registry-property:last-child { border-bottom: 0; }
+
+.registry-property__description {
+  margin: 0 0 8px;
+  color: #6d627b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.registry-property__guidance {
+  margin: 8px 0 0;
+  color: #8a8490;
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.registry-property__technical {
+  margin-top: 6px;
+}
+
+.registry-property__technical summary {
+  color: #a49db0;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.registry-property__technical code {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: #f7f4fb;
+  color: #5f5967;
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  word-break: break-word;
 }
 
 .properties-panel__note {

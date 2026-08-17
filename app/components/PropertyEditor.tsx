@@ -1,13 +1,17 @@
+import { propertyThemePath, TABLE_PROPERTIES } from "../lib/tableProperties";
+import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { PowerBITheme, ResolvedTheme } from "../lib/theme";
 import type { VisualKind } from "./VisualPreviews";
 
 type ThemePath = Array<string | number>;
+type PropertyValue = string | number | boolean;
 
 type PropertyEditorProps = {
   theme: PowerBITheme;
   resolved: ResolvedTheme;
+  tableStyle: ResolvedTableStyle;
   selected: VisualKind;
-  onChange: (path: ThemePath, value: string | number) => void;
+  onChange: (path: ThemePath, value: PropertyValue) => void;
 };
 
 const visualNames: Record<VisualKind, string> = {
@@ -75,7 +79,88 @@ function NumberField({
   );
 }
 
-export function PropertyEditor({ theme, resolved, selected, onChange }: PropertyEditorProps) {
+function BooleanField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="property-row">
+      <span className="property-row__copy">
+        <span className="property-row__label">{label}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
+/**
+ * Renders every TABLE_PROPERTIES entry against its resolved value, with the
+ * friendly label/description/guidance from the registry and the underlying
+ * schema path as supporting technical detail.
+ */
+function TablePropertySection({
+  tableStyle,
+  onChange,
+}: {
+  tableStyle: ResolvedTableStyle;
+  onChange: (path: ThemePath, value: PropertyValue) => void;
+}) {
+  return (
+    <section className="property-section">
+      <h3>Table</h3>
+      {(Object.entries(TABLE_PROPERTIES) as Array<[keyof ResolvedTableStyle, (typeof TABLE_PROPERTIES)[keyof typeof TABLE_PROPERTIES]]>).map(([key, definition]) => {
+        const path = propertyThemePath(definition);
+        const value = tableStyle[key];
+
+        return (
+          <div className="registry-property" key={definition.id}>
+            <p className="registry-property__description">{definition.description}</p>
+            {definition.valueType === "color" && (
+              <ColorField
+                label={definition.label}
+                value={value as string}
+                onChange={(next) => onChange(path, next)}
+              />
+            )}
+            {definition.valueType === "number" && (
+              <NumberField
+                label={definition.label}
+                value={value as number}
+                min={definition.min ?? 0}
+                max={definition.max ?? 100}
+                onChange={(next) => onChange(path, next)}
+              />
+            )}
+            {definition.valueType === "boolean" && (
+              <BooleanField
+                label={definition.label}
+                value={value as boolean}
+                onChange={(next) => onChange(path, next)}
+              />
+            )}
+            {definition.guidance && <p className="registry-property__guidance">{definition.guidance}</p>}
+            <details className="registry-property__technical">
+              <summary>Technical details</summary>
+              <code>{`visualStyles.tableEx.* → ${definition.path.join(" → ")}`}</code>
+            </details>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+export function PropertyEditor({ theme, resolved, tableStyle, selected, onChange }: PropertyEditorProps) {
   return (
     <aside className="properties-panel" aria-label="Theme property editor">
       <div className="properties-panel__header">
@@ -158,8 +243,12 @@ export function PropertyEditor({ theme, resolved, selected, onChange }: Property
         )}
       </section>
 
+      {selected === "table" && <TablePropertySection tableStyle={tableStyle} onChange={onChange} />}
+
       <p className="properties-panel__note">
-        This first slice edits shared Power BI theme tokens. Visual-specific schema controls come next.
+        {selected === "table"
+          ? "Table settings above write directly to visualStyles.tableEx and take priority over Table accent."
+          : "This first slice edits shared Power BI theme tokens. Visual-specific schema controls come next."}
       </p>
     </aside>
   );

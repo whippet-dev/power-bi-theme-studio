@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTheme } from "../lib/theme";
 
 export type VisualKind = "card" | "bar" | "table" | "slicer";
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
+  tableStyle: ResolvedTableStyle;
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -52,7 +54,7 @@ function PreviewShell({
   );
 }
 
-export function VisualGallery({ theme, selected, onSelect }: VisualGalleryProps) {
+export function VisualGallery({ theme, tableStyle, selected, onSelect }: VisualGalleryProps) {
   const palette = theme.palette;
 
   return (
@@ -134,7 +136,12 @@ export function VisualGallery({ theme, selected, onSelect }: VisualGalleryProps)
           </span>
           <span
             className="table-preview__row table-preview__head"
-            style={{ color: theme.tableAccent }}
+            style={{
+              backgroundColor: tableStyle.headerBackground,
+              color: tableStyle.headerText,
+              fontSize: tableStyle.headerFontSize,
+              padding: `${tableStyle.rowPadding}px 8px`,
+            }}
           >
             <span>Region</span><span>Approved</span><span>Value</span>
           </span>
@@ -142,8 +149,20 @@ export function VisualGallery({ theme, selected, onSelect }: VisualGalleryProps)
             ["London", "82%", "£2.8m"],
             ["North West", "76%", "£2.1m"],
             ["Scotland", "71%", "£1.9m"],
-          ].map((row) => (
-            <span className="table-preview__row" key={row[0]}>
+          ].map((row, index) => (
+            <span
+              className="table-preview__row"
+              key={row[0]}
+              style={{
+                backgroundColor: index % 2 === 0 ? tableStyle.rowBaseBackground : tableStyle.rowAltBackground,
+                color: tableStyle.valuesText,
+                fontSize: tableStyle.valuesFontSize,
+                padding: `${tableStyle.rowPadding}px 8px`,
+                borderBottom: tableStyle.gridlinesVisible
+                  ? `1px solid ${tableStyle.gridlineColor}`
+                  : "none",
+              }}
+            >
               {row.map((cell) => <span key={cell}>{cell}</span>)}
             </span>
           ))}

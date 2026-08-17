@@ -10,6 +10,7 @@ import {
   type JsonValue,
   type PowerBITheme,
 } from "../lib/theme";
+import { resolveTableStyle } from "../lib/tableProperties";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
 
@@ -20,6 +21,7 @@ export function ThemeStudio() {
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
+  const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -36,7 +38,7 @@ export function ThemeStudio() {
     }
   };
 
-  const handleChange = (path: Array<string | number>, value: string | number) => {
+  const handleChange = (path: Array<string | number>, value: string | number | boolean) => {
     setTheme((current) => updateThemeValue(current, path, value as JsonValue));
     setMessage(null);
   };
@@ -121,6 +123,7 @@ export function ThemeStudio() {
 
           <VisualGallery
             theme={resolved}
+            tableStyle={tableStyle}
             selected={selectedVisual}
             onSelect={setSelectedVisual}
           />
@@ -129,6 +132,7 @@ export function ThemeStudio() {
         <PropertyEditor
           theme={theme}
           resolved={resolved}
+          tableStyle={tableStyle}
           selected={selectedVisual}
           onChange={handleChange}
         />
