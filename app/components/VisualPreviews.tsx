@@ -16,7 +16,10 @@ import {
   labelVisibleAt,
   legendIsAfterPlot,
   legendIsVertical,
+  mapTextAlign,
+  SmallMultiplesGrid,
   textStyle,
+  ZoomSliders,
 } from "./ChartParts";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
@@ -34,7 +37,7 @@ import type { ResolvedStackedBarChartStyle } from "../lib/stackedBarChartPropert
 import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
-import type { ResolvedTheme } from "../lib/theme";
+import { readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
 
 export type VisualKind =
   | "card"
@@ -54,8 +57,24 @@ export type VisualKind =
   | "textbox"
   | "image";
 
+/**
+ * Whether the user has actually opened a chart's small-multiples grid and
+ * changed something. Power BI only turns small multiples on by binding a
+ * field to that data role — a concept the theme JSON has no signal for —
+ * so `smallMultiplesLayout.columnCount` always resolves to a sensible
+ * default (2) whether or not the feature is in use. Gating the preview on
+ * that resolved value alone would make every chart open as a small
+ * multiples grid; checking for a real override is the closest proxy this
+ * theme-only tool has for "the user is looking at this setting".
+ */
+function hasSmallMultiplesOverride(theme: PowerBITheme, visual: string): boolean {
+  const group = readThemeValueAtPath(theme, ["visualStyles", visual, "*", "smallMultiplesLayout"]);
+  return Array.isArray(group) && group.length > 0;
+}
+
 type VisualGalleryProps = {
   theme: ResolvedTheme;
+  rawTheme: PowerBITheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
@@ -101,14 +120,6 @@ function svgDashArray(style: "solid" | "dashed" | "dotted"): string | undefined 
   if (style === "dashed") return "6 4";
   if (style === "dotted") return "1.5 3";
   return undefined;
-}
-
-function mapTextAlign(value: string | number): CSSProperties["textAlign"] | undefined {
-  const normalized = String(value).toLowerCase();
-  if (normalized === "left" || normalized === "center" || normalized === "right") {
-    return normalized as CSSProperties["textAlign"];
-  }
-  return undefined; // "Auto" — leave the per-column default alignment alone.
 }
 
 
@@ -723,6 +734,7 @@ function PreviewShell({
 
 export function VisualGallery({
   theme,
+  rawTheme,
   tableStyle,
   barChartStyle,
   columnChartStyle,
@@ -838,6 +850,7 @@ export function VisualGallery({
       )}
       <span className="chart-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={barChartStyle.valueAxis} orientation="vertical" />
+        <ZoomSliders zoom={barChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
         {barChartStyle.referenceLine.show && (
           <span
             className="chart-preview__reference-line"
@@ -951,6 +964,7 @@ export function VisualGallery({
       )}
       <span className="chart-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={stackedBarChartStyle.valueAxis} orientation="vertical" />
+        <ZoomSliders zoom={stackedBarChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
         {stackedBarChartStyle.trend.show && (
           <span
             className="chart-preview__trend-line"
@@ -1040,6 +1054,7 @@ export function VisualGallery({
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={columnChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={columnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
+        <ZoomSliders zoom={columnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
         {columnChartStyle.referenceLine.show && (
           <span
             className="column-preview__reference-line"
@@ -1151,6 +1166,7 @@ export function VisualGallery({
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={stackedColumnChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={stackedColumnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
+        <ZoomSliders zoom={stackedColumnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
         {stackedColumnChartStyle.trend.show && (
           <span
             className="chart-preview__trend-line"
@@ -1441,77 +1457,9 @@ export function VisualGallery({
     </span>
   );
 
-  // The small-multiples grid repeats the chart per category. Rendering it
-  // is the only way its layout and gridline settings mean anything.
-  const sm = lineChartStyle.smallMultiplesLayout;
-  const subheader = lineChartStyle.subheader;
-  const smallMultiplesNode = (content: ReactNode, titles: string[]) => (
-    <span
-      className="small-multiples"
-      style={{
-        gridTemplateColumns: `repeat(${Math.max(1, sm.columnCount || 2)}, 1fr)`,
-        gap: `${sm.rowPaddingInner || sm.gridPadding || 6}px ${sm.columnPaddingInner || sm.gridPadding || 6}px`,
-        padding: sm.advancedPaddingOptions ? `${sm.rowPaddingOuter}px ${sm.columnPaddingOuter}px` : undefined,
-        backgroundColor: hexWithAlpha(sm.backgroundColor, sm.backgroundTransparency),
-      }}
-    >
-      {titles.slice(0, Math.max(1, sm.columnCount || 2) * Math.max(1, sm.rowCount || 2)).map((title) => (
-        <span
-          className="small-multiples__cell"
-          key={title}
-          style={
-            sm.gridLineShow
-              ? {
-                  border: `${sm.gridLineWidth}px ${mapLineStyle(sm.gridLineStyle)} ${hexWithAlpha(sm.gridLineColor, sm.gridLineTransparency)}`,
-                }
-              : undefined
-          }
-        >
-          {subheader.show && (
-            <span
-              className="small-multiples__title"
-              style={{
-                color: subheader.fontColor,
-                fontFamily: subheader.fontFamily || undefined,
-                fontSize: subheader.fontSize,
-                fontWeight: subheader.bold ? 700 : 400,
-                fontStyle: subheader.italic ? "italic" : "normal",
-                textDecoration: subheader.underline ? "underline" : "none",
-                textAlign: mapTextAlign(subheader.alignment),
-                whiteSpace: subheader.titleWrap ? "normal" : "nowrap",
-                order: String(subheader.position).toLowerCase() === "bottom" ? 2 : 0,
-              }}
-            >
-              {title}
-            </span>
-          )}
-          {content}
-        </span>
-      ))}
-    </span>
-  );
-
-  // Zoom sliders sit against whichever axes they're enabled for. Their
-  // size is a thickness in pixels, and labels show the visible range.
-  const zoom = lineChartStyle.zoom;
-  const zoomSlider = (orientation: "horizontal" | "vertical", size: number, min: number, max: number, key: string) => (
-    <span className={`chart-zoom chart-zoom--${orientation}`} key={key} style={{ [orientation === "horizontal" ? "height" : "width"]: size || 8 }}>
-      <span className="chart-zoom__thumb" />
-      {zoom.showLabels && (
-        <>
-          <span className="chart-zoom__label chart-zoom__label--start">{min || 0}</span>
-          <span className="chart-zoom__label chart-zoom__label--end">{max || 100}</span>
-        </>
-      )}
-    </span>
-  );
-  const zoomNodes = zoom.show && (
-    <>
-      {zoom.showOnValueAxis && zoomSlider("vertical", zoom.valueSize, zoom.valueMin, zoom.valueMax, "v")}
-      {zoom.showOnValueSecAxis && zoomSlider("vertical", zoom.valueSecSize, zoom.valueSecMin, zoom.valueSecMax, "v2")}
-      {zoom.showOnCategoryAxis && zoomSlider("horizontal", zoom.categorySize, zoom.categoryMin, zoom.categoryMax, "h")}
-    </>
-  );
+  const lineSmallMultiples = lineChartStyle.smallMultiplesLayout;
+  const lineSubheader = lineChartStyle.subheader;
+  const zoomNodes = <ZoomSliders zoom={lineChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />;
 
   // Error bars can carry their own label and a shaded band around the
   // series — 20-odd properties with nothing to render against before.
@@ -1620,7 +1568,7 @@ export function VisualGallery({
 
   // A small-multiples layout replaces the single plot with a grid of
   // repeated mini-charts, one per category.
-  const lineUsesSmallMultiples = String(sm.layoutType).toLowerCase() !== "" && sm.columnCount > 0;
+  const lineUsesSmallMultiples = hasSmallMultiplesOverride(rawTheme, "lineChart");
 
   const lineContent = (
     <span
@@ -2631,6 +2579,30 @@ export function VisualGallery({
     </span>
   );
 
+  // Small multiples replace a chart's single plot with a grid of repeated
+  // mini-charts, one per category — same treatment as the line chart above.
+  const barSmallMultipleTitles = ["London", "North West", "Scotland", "Wales"];
+  const barFinalContent = hasSmallMultiplesOverride(rawTheme, "clusteredBarChart") ? (
+    <SmallMultiplesGrid layout={barChartStyle.smallMultiplesLayout} subheader={barChartStyle.subheader} content={barContent} titles={barSmallMultipleTitles} />
+  ) : (
+    barContent
+  );
+  const columnFinalContent = hasSmallMultiplesOverride(rawTheme, "clusteredColumnChart") ? (
+    <SmallMultiplesGrid layout={columnChartStyle.smallMultiplesLayout} subheader={columnChartStyle.subheader} content={columnContent} titles={barSmallMultipleTitles} />
+  ) : (
+    columnContent
+  );
+  const stackedBarFinalContent = hasSmallMultiplesOverride(rawTheme, "barChart") ? (
+    <SmallMultiplesGrid layout={stackedBarChartStyle.smallMultiplesLayout} subheader={stackedBarChartStyle.subheader} content={stackedBarContent} titles={barSmallMultipleTitles} />
+  ) : (
+    stackedBarContent
+  );
+  const stackedColumnFinalContent = hasSmallMultiplesOverride(rawTheme, "columnChart") ? (
+    <SmallMultiplesGrid layout={stackedColumnChartStyle.smallMultiplesLayout} subheader={stackedColumnChartStyle.subheader} content={stackedColumnContent} titles={barSmallMultipleTitles} />
+  ) : (
+    stackedColumnContent
+  );
+
   const descriptors: Array<{
     id: VisualKind;
     label: string;
@@ -2639,16 +2611,25 @@ export function VisualGallery({
     content: ReactNode;
   }> = [
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
-    { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barContent },
-    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnContent },
-    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarContent },
-    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnContent },
+    { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent },
+    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent },
+    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent },
+    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent },
     {
       id: "line",
       label: "Line chart",
       defaultTitle: "Applications over time",
       chrome: chromeStyles.line,
-      content: lineUsesSmallMultiples ? smallMultiplesNode(lineContent, ["London", "North West", "Scotland", "Wales"]) : lineContent,
+      content: lineUsesSmallMultiples
+        ? (
+            <SmallMultiplesGrid
+              layout={lineSmallMultiples}
+              subheader={lineSubheader}
+              content={lineContent}
+              titles={["London", "North West", "Scotland", "Wales"]}
+            />
+          )
+        : lineContent,
     },
     { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
     { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },

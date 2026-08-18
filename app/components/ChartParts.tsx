@@ -61,6 +61,14 @@ export function mapLineStyle(value: string | number): "solid" | "dashed" | "dott
   return "solid";
 }
 
+export function mapTextAlign(value: string | number): CSSProperties["textAlign"] | undefined {
+  const normalized = String(value).toLowerCase();
+  if (normalized === "left" || normalized === "center" || normalized === "right") {
+    return normalized as CSSProperties["textAlign"];
+  }
+  return undefined; // "Auto" — leave the per-column default alignment alone.
+}
+
 /** Text styling shared by axis tick labels and legend entries. */
 export function textStyle(source: {
   labelColor?: string;
@@ -373,6 +381,174 @@ export function DataLabel({
           {formatValue(detail as number, labels.detailLabelDisplayUnits, labels.detailLabelPrecision)}
         </span>
       )}
+    </span>
+  );
+}
+
+/** The subset of a zoom-slider group every cartesian chart shares. */
+export type ZoomStyle = {
+  show: boolean;
+  showLabels: boolean;
+  showOnCategoryAxis: boolean;
+  showOnValueAxis: boolean;
+  showOnValueSecAxis?: boolean;
+  categoryMin: number;
+  categoryMax: number;
+  categorySize: number;
+  valueMin: number;
+  valueMax: number;
+  valueSize: number;
+  valueSecMin?: number;
+  valueSecMax?: number;
+  valueSecSize?: number;
+};
+
+/**
+ * Zoom sliders sit against whichever axes they're enabled for. Which axis
+ * is drawn horizontal vs vertical flips between chart families: a bar
+ * chart's category axis runs top-to-bottom (vertical) while a column or
+ * line chart's runs left-to-right (horizontal), so callers pass the
+ * physical orientation for each rather than this component guessing it
+ * from the field name.
+ */
+export function ZoomSliders({
+  zoom,
+  categoryOrientation,
+  valueOrientation,
+}: {
+  zoom: ZoomStyle;
+  categoryOrientation: "horizontal" | "vertical";
+  valueOrientation: "horizontal" | "vertical";
+}): ReactNode {
+  if (!zoom.show) return null;
+
+  const slider = (orientation: "horizontal" | "vertical", size: number, min: number, max: number, key: string) => (
+    <span className={`chart-zoom chart-zoom--${orientation}`} key={key} style={{ [orientation === "horizontal" ? "height" : "width"]: size || 8 }}>
+      <span className="chart-zoom__thumb" />
+      {zoom.showLabels && (
+        <>
+          <span className="chart-zoom__label chart-zoom__label--start">{min || 0}</span>
+          <span className="chart-zoom__label chart-zoom__label--end">{max || 100}</span>
+        </>
+      )}
+    </span>
+  );
+
+  return (
+    <>
+      {zoom.showOnValueAxis && slider(valueOrientation, zoom.valueSize, zoom.valueMin, zoom.valueMax, "v")}
+      {zoom.showOnValueSecAxis && zoom.valueSecSize !== undefined && (
+        slider(valueOrientation, zoom.valueSecSize, zoom.valueSecMin ?? 0, zoom.valueSecMax ?? 0, "v2")
+      )}
+      {zoom.showOnCategoryAxis && slider(categoryOrientation, zoom.categorySize, zoom.categoryMin, zoom.categoryMax, "h")}
+    </>
+  );
+}
+
+/** The subset of a small-multiples layout group every cartesian chart shares. */
+export type SmallMultiplesLayoutStyle = {
+  layoutType: string | number;
+  columnCount: number;
+  rowCount: number;
+  gridPadding: number;
+  rowPaddingInner: number;
+  columnPaddingInner: number;
+  advancedPaddingOptions: boolean;
+  rowPaddingOuter: number;
+  columnPaddingOuter: number;
+  backgroundColor: string;
+  backgroundTransparency: number;
+  gridLineShow: boolean;
+  gridLineWidth: number;
+  gridLineStyle: string | number;
+  gridLineColor: string;
+  gridLineTransparency: number;
+};
+
+/** The subset of a small-multiples subheader (per-tile title) group every cartesian chart shares. */
+export type SubheaderStyle = {
+  show: boolean;
+  fontColor: string;
+  fontFamily: string;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  alignment: string | number;
+  titleWrap: boolean;
+  position: string | number;
+};
+
+/**
+ * True when a chart's small-multiples layout is actually switched on.
+ * `layoutType` is never empty in the resolved style (it defaults to
+ * "auto"), so column count is what actually gates the grid.
+ */
+export function usesSmallMultiples(layout: SmallMultiplesLayoutStyle): boolean {
+  return layout.columnCount > 0;
+}
+
+/**
+ * A small-multiples grid repeats one chart per category — it's the only
+ * way its layout, padding, and gridline settings mean anything. `content`
+ * is the single-chart plot to repeat into every cell; `titles` names each
+ * cell, and is truncated to however many the row/column counts allow.
+ */
+export function SmallMultiplesGrid({
+  layout,
+  subheader,
+  content,
+  titles,
+}: {
+  layout: SmallMultiplesLayoutStyle;
+  subheader: SubheaderStyle;
+  content: ReactNode;
+  titles: string[];
+}): ReactNode {
+  const columns = Math.max(1, layout.columnCount || 2);
+  const rows = Math.max(1, layout.rowCount || 2);
+
+  return (
+    <span
+      className="small-multiples"
+      style={{
+        gridTemplateColumns: `repeat(${columns}, 1fr)`,
+        gap: `${layout.rowPaddingInner || layout.gridPadding || 6}px ${layout.columnPaddingInner || layout.gridPadding || 6}px`,
+        padding: layout.advancedPaddingOptions ? `${layout.rowPaddingOuter}px ${layout.columnPaddingOuter}px` : undefined,
+        backgroundColor: hexWithAlpha(layout.backgroundColor, layout.backgroundTransparency),
+      }}
+    >
+      {titles.slice(0, columns * rows).map((title) => (
+        <span
+          className="small-multiples__cell"
+          key={title}
+          style={
+            layout.gridLineShow
+              ? { border: `${layout.gridLineWidth}px ${mapLineStyle(layout.gridLineStyle)} ${hexWithAlpha(layout.gridLineColor, layout.gridLineTransparency)}` }
+              : undefined
+          }
+        >
+          {subheader.show && (
+            <span
+              className="small-multiples__title"
+              style={{
+                color: subheader.fontColor,
+                fontFamily: subheader.fontFamily || undefined,
+                fontSize: subheader.fontSize,
+                fontWeight: subheader.bold ? 700 : 400,
+                fontStyle: subheader.italic ? "italic" : "normal",
+                textDecoration: subheader.underline ? "underline" : "none",
+                textAlign: mapTextAlign(subheader.alignment),
+                whiteSpace: subheader.titleWrap ? "normal" : "nowrap",
+                order: String(subheader.position).toLowerCase() === "bottom" ? 2 : 0,
+              }}
+            >
+              {title}
+            </span>
+          )}
+          {content}
+        </span>
+      ))}
     </span>
   );
 }

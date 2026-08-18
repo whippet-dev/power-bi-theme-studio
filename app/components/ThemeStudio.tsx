@@ -292,6 +292,7 @@ export function ThemeStudio() {
             >
               <VisualGallery
                 theme={resolved}
+                rawTheme={theme}
                 tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}
