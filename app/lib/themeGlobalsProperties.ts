@@ -323,16 +323,20 @@ export type TextClassKey =
   | "smallLightLabel"
   | "smallDataLabel";
 
-// Descriptions, default sizes, and default colours below are quoted or
-// derived from Microsoft's own "Set formatted text defaults" table (Create
-// custom report themes docs), not inferred — the only two classes without
-// published documentation (dataTitle, smallDataLabel, both schema-only)
-// keep this app's own best-guess text, flagged as such below. Four
-// primary classes (title/header/label/callout) can be set directly; the
-// rest are secondary classes that inherit the primary's colour/font/size
-// except for the one property Microsoft's table lists as their own
-// override — reflected here by each secondary's `color`/`fontSize` either
-// matching its primary or diverging exactly where documented.
+// Descriptions below are quoted or derived from Microsoft's own "Set
+// formatted text defaults" table (Create custom report themes docs) — the
+// only two classes without published documentation (dataTitle,
+// smallDataLabel, both schema-only) keep this app's own best-guess text,
+// flagged as such below. Four primary classes (title/header/label/callout)
+// can be set directly; the rest are secondary classes that inherit the
+// primary's colour/font/size except for the one property Microsoft's table
+// lists as their own override. Default *values* (fontSize/color) for the
+// four primary classes are now verified against themes/base/
+// classic2026.json (the real Classic 2026 base theme) rather than the docs
+// prose, where the two disagree — see callout's fontSize for the one place
+// they genuinely do (the docs describe Classic 2018's 45pt, not Classic
+// 2026's real 24pt). Secondary classes remain docs-derived; no verified
+// data source for them yet.
 const TEXT_CLASS_META: Record<
   TextClassKey,
   { label: string; description: string; fontSize: number; bold: boolean; color: string }
@@ -361,7 +365,11 @@ const TEXT_CLASS_META: Record<
   callout: {
     label: "Callout",
     description: "Card data labels, KPI indicators.",
-    fontSize: 45,
+    // 24pt is Classic 2026's real, verified value (themes/base/
+    // classic2026.json) — not Microsoft's general docs page, which states
+    // 45pt (Classic 2018's value, stable CY19SU06-CY25SU10 before Classic
+    // 2026 dropped it starting CY25SU11).
+    fontSize: 24,
     bold: false,
     color: "#252423",
   },
@@ -510,48 +518,59 @@ export function resolveThemeColors(theme: PowerBITheme, base: ResolvedTheme): Re
     const value = theme[key];
     return typeof value === "string" ? value : fallback;
   };
+  // Values below marked "verified" are read directly from
+  // themes/base/classic2026.json — the real Classic 2026 base theme,
+  // sourced from the Power BI Desktop install itself (see that file's
+  // _note) and confirmed via the app's own code to be the exact theme
+  // backing new reports today. Values marked "inferred" have no base-theme
+  // evidence either way (Classic 2026's export doesn't set that field) and
+  // are this app's own best guess, unchanged.
   return {
-    good: read("good", "#107C10"),
-    neutral: read("neutral", "#FFC83D"),
-    bad: read("bad", "#D64550"),
-    minimum: read("minimum", "#F8696B"),
-    center: read("center", "#FFEB84"),
-    maximum: read("maximum", "#63BE7B"),
-    nullValue: read("null", "#A6A6A6"),
-    // firstLevelElements..fourthLevelElements below are corrected against
-    // Microsoft's own docs (Create custom report themes): each is paired
-    // with an "also called" Fluent name that must resolve to the same
-    // default, and fourthLevelElements' #605E5C is independently confirmed
-    // — it's what a real Power BI report renders for Card's category label
-    // when a theme (verified against the user's own) leaves it unset.
-    firstLevelElements: read("firstLevelElements", "#252423"),
-    secondLevelElements: read("secondLevelElements", "#605E5C"),
-    thirdLevelElements: read("thirdLevelElements", "#F3F2F1"),
-    fourthLevelElements: read("fourthLevelElements", "#605E5C"),
-    accent: read("accent", base.tableAccent),
-    foregroundLight: read("foregroundLight", "#605E5C"),
-    foregroundDark: read("foregroundDark", "#201F1E"),
-    foregroundNeutralLight: read("foregroundNeutralLight", "#A19F9D"),
-    foregroundNeutralDark: read("foregroundNeutralDark", "#484644"),
-    // "Also called" secondLevelElements per Microsoft's docs — kept equal.
-    foregroundNeutralSecondary: read("foregroundNeutralSecondary", "#605E5C"),
-    foregroundNeutralSecondaryAlt: read("foregroundNeutralSecondaryAlt", "#69797E"),
-    foregroundNeutralSecondaryAlt2: read("foregroundNeutralSecondaryAlt2", "#69797E"),
-    // "Also called" fourthLevelElements per Microsoft's docs — kept equal.
-    foregroundNeutralTertiary: read("foregroundNeutralTertiary", "#605E5C"),
-    foregroundNeutralTertiaryAlt: read("foregroundNeutralTertiaryAlt", "#C8C6C4"),
-    foregroundSelected: read("foregroundSelected", base.tableAccent),
-    foregroundButton: read("foregroundButton", "#FFFFFF"),
-    // "Also called" backgroundNeutral per Microsoft's docs — kept equal.
-    secondaryBackground: read("secondaryBackground", "#C8C6C4"),
-    backgroundLight: read("backgroundLight", "#FAF9F8"),
-    backgroundNeutral: read("backgroundNeutral", "#C8C6C4"),
-    backgroundDark: read("backgroundDark", "#201F1E"),
-    hyperlink: read("hyperlink", "#106EBE"),
-    visitedHyperlink: read("visitedHyperlink", "#551A8B"),
-    shapeStroke: read("shapeStroke", "#605E5C"),
-    disabledText: read("disabledText", "#A19F9D"),
-    mapPushpin: read("mapPushpin", base.palette[0] ?? "#005EA5"),
+    good: read("good", "#1AAB40"), // verified
+    neutral: read("neutral", "#D9B300"), // verified
+    bad: read("bad", "#D64554"), // verified
+    minimum: read("minimum", "#DEEFFF"), // verified
+    center: read("center", "#D9B300"), // verified
+    maximum: read("maximum", "#118DFF"), // verified
+    nullValue: read("null", "#FF7F48"), // verified
+    // firstLevelElements..fourthLevelElements aren't literal keys Classic
+    // 2026's export sets — it sets foreground/foregroundNeutralSecondary/
+    // foregroundNeutralTertiary/backgroundLight instead (both families are
+    // independently valid schema keys, confirmed against the cached
+    // reportThemeSchema). Values below match those verified siblings,
+    // since Power BI's renderer falls back from one family to the other —
+    // confirmed empirically: fourthLevelElements is NOT the same value as
+    // secondLevelElements (a wrong assumption this app made earlier, from
+    // an "also called" doc pairing that doesn't hold against real data).
+    firstLevelElements: read("firstLevelElements", "#252423"), // verified (= foreground)
+    secondLevelElements: read("secondLevelElements", "#605E5C"), // verified (= foregroundNeutralSecondary)
+    thirdLevelElements: read("thirdLevelElements", "#F3F2F1"), // verified (= backgroundLight)
+    fourthLevelElements: read("fourthLevelElements", "#B3B0AD"), // verified (= foregroundNeutralTertiary)
+    accent: read("accent", base.tableAccent), // inferred
+    foregroundLight: read("foregroundLight", "#605E5C"), // inferred
+    foregroundDark: read("foregroundDark", "#201F1E"), // inferred
+    foregroundNeutralLight: read("foregroundNeutralLight", "#A19F9D"), // inferred
+    foregroundNeutralDark: read("foregroundNeutralDark", "#484644"), // inferred
+    foregroundNeutralSecondary: read("foregroundNeutralSecondary", "#605E5C"), // verified
+    foregroundNeutralSecondaryAlt: read("foregroundNeutralSecondaryAlt", "#69797E"), // inferred
+    foregroundNeutralSecondaryAlt2: read("foregroundNeutralSecondaryAlt2", "#69797E"), // inferred
+    foregroundNeutralTertiary: read("foregroundNeutralTertiary", "#B3B0AD"), // verified
+    foregroundNeutralTertiaryAlt: read("foregroundNeutralTertiaryAlt", "#C8C6C4"), // inferred
+    foregroundSelected: read("foregroundSelected", base.tableAccent), // inferred
+    foregroundButton: read("foregroundButton", "#FFFFFF"), // inferred
+    // Classic 2026's export doesn't set secondaryBackground as its own key
+    // either — it sets backgroundNeutral (#C8C6C4), which this already
+    // matches, so kept as-is rather than "corrected" without real evidence
+    // the literal secondaryBackground key differs.
+    secondaryBackground: read("secondaryBackground", "#C8C6C4"), // inferred (matches backgroundNeutral)
+    backgroundLight: read("backgroundLight", "#F3F2F1"), // verified
+    backgroundNeutral: read("backgroundNeutral", "#C8C6C4"), // verified
+    backgroundDark: read("backgroundDark", "#201F1E"), // inferred
+    hyperlink: read("hyperlink", "#0078d4"), // verified
+    visitedHyperlink: read("visitedHyperlink", "#0078d4"), // verified
+    shapeStroke: read("shapeStroke", "#605E5C"), // inferred
+    disabledText: read("disabledText", "#A19F9D"), // inferred
+    mapPushpin: read("mapPushpin", base.palette[0] ?? "#005EA5"), // inferred
   };
 }
 

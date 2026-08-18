@@ -118,7 +118,7 @@ export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): Reso
       color: resolvePropertyValue(theme, p.labels.color, base.calloutColor),
       fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
       // Card's big value is typically much larger than other visuals' text —
-      // 45 matches textClasses.callout's own Microsoft-documented default
+      // matches textClasses.callout's own verified Classic 2026 default
       // (this per-visual override wins over that global default when set).
       fontSize: resolvePropertyValue(theme, p.labels.fontSize, base.calloutSize),
       italic: resolvePropertyValue(theme, p.labels.italic, false),

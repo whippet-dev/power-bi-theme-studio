@@ -125,9 +125,13 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
         ? label.fontFace
         : "Segoe UI",
     titleSize: readSize(title.fontSize, 12),
-    // 45pt is Microsoft's documented default for the "callout" text class
-    // (Create custom report themes docs' text-class table), not a guess.
-    calloutSize: readSize(callout.fontSize, 45),
+    // 24pt is Classic 2026's real value (themes/base/classic2026.json,
+    // sourced directly from the Power BI Desktop install) — Microsoft's
+    // general docs page states 45pt, but that's Classic 2018's value
+    // (confirmed stable from CY19SU06 through CY25SU10 in the app's own
+    // BaseThemes history); Classic 2026 dropped it to 24pt starting
+    // CY25SU11, and Classic 2026 is the actual default for new reports.
+    calloutSize: readSize(callout.fontSize, 24),
     calloutColor: readColor(callout.color, "#252423"),
     // Microsoft's docs list "Card category labels" under the largeLightLabel
     // text class specifically, not a structural colour token — confirmed

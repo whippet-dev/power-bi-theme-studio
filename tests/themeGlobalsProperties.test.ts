@@ -21,7 +21,7 @@ const STARTER_THEME: PowerBITheme = {
 test("resolveThemeColors falls back to app-chosen defaults when nothing is set, and reads plain hex strings (not fill-wrapped) when set", () => {
   const base = resolveTheme(STARTER_THEME);
   const colors = resolveThemeColors(STARTER_THEME, base);
-  assert.equal(colors.good, "#107C10");
+  assert.equal(colors.good, "#1AAB40");
   assert.equal(colors.accent, base.tableAccent);
 
   const withOverride: PowerBITheme = { ...STARTER_THEME, good: "#00FF00" };
@@ -29,15 +29,16 @@ test("resolveThemeColors falls back to app-chosen defaults when nothing is set, 
   assert.equal(overrideColors.good, "#00FF00");
 });
 
-// Defaults below are Microsoft's own documented values (Create custom
-// report themes docs' "Set formatted text defaults" table), not guesses —
-// callout's 45pt is also what Card's own calloutSize reads by default.
-test("resolveTextClasses falls back to Microsoft's documented per-class defaults", () => {
+// Defaults below are verified against themes/base/classic2026.json (the
+// real Classic 2026 base theme, sourced from the Power BI Desktop install
+// — see that file's _note) — callout's 24pt is also what Card's own
+// calloutSize reads by default.
+test("resolveTextClasses falls back to Classic 2026's verified per-class defaults", () => {
   const base = resolveTheme(STARTER_THEME);
   const classes = resolveTextClasses(STARTER_THEME, base);
-  assert.equal(classes.calloutFontSize, 45);
+  assert.equal(classes.calloutFontSize, 24);
   assert.equal(classes.calloutColor, "#252423");
-  assert.equal(base.calloutSize, 45);
+  assert.equal(base.calloutSize, 24);
   // Title (DIN, unstyled) isn't documented as bold; header (Segoe UI
   // Semibold) is approximated as bold since this app has no weight dial.
   assert.equal(classes.titleFontWeight, "normal");
