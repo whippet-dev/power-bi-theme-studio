@@ -159,7 +159,8 @@ export function resolvePieChartStyle(theme: PowerBITheme, base: ResolvedTheme): 
       fontSize: resolvePropertyValue(theme, p.legend.fontSize, 6),
       italic: resolvePropertyValue(theme, p.legend.italic, false),
       labelColor: resolvePropertyValue(theme, p.legend.labelColor, base.foreground),
-      position: resolvePropertyValue(theme, p.legend.position, "Top"),
+      // Verified against themes/base/classic2026.json's pieChart override.
+      position: resolvePropertyValue(theme, p.legend.position, "RightCenter"),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
       showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
@@ -174,7 +175,8 @@ export function resolvePieChartStyle(theme: PowerBITheme, base: ResolvedTheme): 
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelDisplayUnits: resolvePropertyValue(theme, p.labels.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.labels.labelPrecision, 0),
-      labelStyle: resolvePropertyValue(theme, p.labels.labelStyle, "Category"),
+      // Verified against classic2026.json's pieChart override.
+      labelStyle: resolvePropertyValue(theme, p.labels.labelStyle, "Data value, percent of total"),
       overflow: resolvePropertyValue(theme, p.labels.overflow, false),
       percentageLabelPrecision: resolvePropertyValue(theme, p.labels.percentageLabelPrecision, 0),
       position: resolvePropertyValue(theme, p.labels.position, "outside"),

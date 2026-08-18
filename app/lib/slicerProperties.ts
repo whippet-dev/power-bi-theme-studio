@@ -338,7 +338,8 @@ export function resolveSlicerStyle(theme: PowerBITheme, base: ResolvedTheme): Re
       fontFamily: resolvePropertyValue(theme, p.items.fontFamily, ""),
       italic: resolvePropertyValue(theme, p.items.italic, false),
       outlineStyle: resolvePropertyValue(theme, p.items.outlineStyle, 0),
-      padding: resolvePropertyValue(theme, p.items.padding, 10),
+      // Verified against themes/base/classic2026.json's slicer override.
+      padding: resolvePropertyValue(theme, p.items.padding, 4),
       steppedLayoutIndentation: resolvePropertyValue(theme, p.items.steppedLayoutIndentation, 10),
       textSize: resolvePropertyValue(theme, p.items.textSize, 6),
       underline: resolvePropertyValue(theme, p.items.underline, false),

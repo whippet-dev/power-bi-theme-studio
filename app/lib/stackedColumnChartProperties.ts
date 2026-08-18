@@ -808,7 +808,8 @@ export function resolveStackedColumnChartStyle(theme: PowerBITheme, base: Resolv
       italic: resolvePropertyValue(theme, p.legend.italic, false),
       labelColor: resolvePropertyValue(theme, p.legend.labelColor, base.foreground),
       position: resolvePropertyValue(theme, p.legend.position, "Top"),
-      showGradientLegend: resolvePropertyValue(theme, p.legend.showGradientLegend, false),
+      // Verified against themes/base/classic2026.json's columnChart override.
+      showGradientLegend: resolvePropertyValue(theme, p.legend.showGradientLegend, true),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
       showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
@@ -1023,7 +1024,8 @@ export function resolveStackedColumnChartStyle(theme: PowerBITheme, base: Resolv
       gridLineShow: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineShow, false),
       gridLineStyle: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineStyle, "solid"),
       gridLineTransparency: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineTransparency, 0),
-      gridLineType: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineType, "all"),
+      // Verified against classic2026.json's columnChart override.
+      gridLineType: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineType, "inner"),
       gridLineWidth: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineWidth, 1),
       gridPadding: resolvePropertyValue(theme, p.smallMultiplesLayout.gridPadding, 10),
     },
