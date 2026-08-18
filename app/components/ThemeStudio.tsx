@@ -31,7 +31,7 @@ import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
 import { resolveStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import { resolveTableStyle } from "../lib/tableProperties";
 import { resolveTextboxStyle } from "../lib/textboxProperties";
-import { resolveThemeColors } from "../lib/themeGlobalsProperties";
+import { resolveTextClasses, resolveThemeColors } from "../lib/themeGlobalsProperties";
 import { FilterPanePreview, PaletteLegend } from "./GlobalPreviews";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
@@ -142,6 +142,7 @@ export function ThemeStudio() {
   const sharedChromeStyle = useMemo(() => resolveChromeStyle(theme, "*", resolved), [theme, resolved]);
   const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(theme, resolved), [theme, resolved]);
   const themeColors = useMemo(() => resolveThemeColors(theme, resolved), [theme, resolved]);
+  const textClasses = useMemo(() => resolveTextClasses(theme, resolved), [theme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -332,7 +333,7 @@ export function ThemeStudio() {
             {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} />}
           </div>
 
-          {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} />}
+          {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} textClasses={textClasses} />}
         </section>
 
         <PropertyEditor

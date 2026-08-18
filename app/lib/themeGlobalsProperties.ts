@@ -307,7 +307,7 @@ export const THEME_COLOR_PROPERTIES = {
   ),
 } as const;
 
-type TextClassKey =
+export type TextClassKey =
   | "title"
   | "header"
   | "label"
@@ -491,6 +491,13 @@ export const TEXT_CLASS_LABELS: Record<TextClassKey, string> = Object.fromEntrie
   (Object.entries(TEXT_CLASS_META) as Array<[TextClassKey, (typeof TEXT_CLASS_META)[TextClassKey]]>).map(([key, meta]) => [
     key,
     meta.label,
+  ]),
+) as Record<TextClassKey, string>;
+/** Microsoft's "Associated visual objects" text for each class — see TEXT_CLASS_META. */
+export const TEXT_CLASS_DESCRIPTIONS: Record<TextClassKey, string> = Object.fromEntries(
+  (Object.entries(TEXT_CLASS_META) as Array<[TextClassKey, (typeof TEXT_CLASS_META)[TextClassKey]]>).map(([key, meta]) => [
+    key,
+    meta.description,
   ]),
 ) as Record<TextClassKey, string>;
 

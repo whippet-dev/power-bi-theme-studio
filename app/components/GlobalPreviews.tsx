@@ -1,8 +1,15 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import type { ResolvedTheme } from "../lib/theme";
-import type { ResolvedThemeColors } from "../lib/themeGlobalsProperties";
+import {
+  TEXT_CLASS_DESCRIPTIONS,
+  TEXT_CLASS_KEYS,
+  TEXT_CLASS_LABELS,
+  type ResolvedTextClasses,
+  type ResolvedThemeColors,
+  type TextClassKey,
+} from "../lib/themeGlobalsProperties";
 
 /**
  * The report-level filter pane, styled from `visualStyles.page["*"]`'s
@@ -124,11 +131,63 @@ type SwatchDemo = { color: string; label: string; impact: string };
  * as a miniature of the thing it controls (a colour scale as a gradient, a
  * KPI chip, link text) so the effect is legible, not just the value.
  */
-export function PaletteLegend({ theme, colors }: { theme: ResolvedTheme; colors: ResolvedThemeColors }) {
+export function PaletteLegend({
+  theme,
+  colors,
+  textClasses,
+}: {
+  theme: ResolvedTheme;
+  colors: ResolvedThemeColors;
+  textClasses: ResolvedTextClasses;
+}) {
   const conditional: SwatchDemo[] = [
     { color: colors.good, label: "Good", impact: "positive KPI indicators" },
     { color: colors.neutral, label: "Neutral", impact: "neutral KPI indicators" },
     { color: colors.bad, label: "Bad", impact: "negative KPI indicators" },
+  ];
+
+  // Microsoft's own structural-colour docs pair each token with a Fluent
+  // "also called" name and a full list of what it formats — full text
+  // lives on THEME_COLOR_PROPERTIES' descriptions (shown via the property
+  // panel's ⓘ toggle); these are short, representative samples of that
+  // same list, not the whole thing.
+  const structural: Array<{ color: string; label: string; impact: string; sample: ReactNode }> = [
+    {
+      color: colors.firstLevelElements,
+      label: "First-level elements",
+      impact: "Trend lines, card data labels, table values",
+      sample: <span style={{ color: colors.firstLevelElements, fontWeight: 650 }}>82K</span>,
+    },
+    {
+      color: colors.secondLevelElements,
+      label: "Second-level elements",
+      impact: "Axis & legend labels, table headers",
+      sample: <span style={{ color: colors.secondLevelElements, fontSize: 10 }}>Region</span>,
+    },
+    {
+      color: colors.thirdLevelElements,
+      label: "Third-level elements",
+      impact: "Gridlines, shape fill, grid colour",
+      sample: <span className="palette-legend__gridline-demo" style={{ borderColor: colors.thirdLevelElements }} />,
+    },
+    {
+      color: colors.fourthLevelElements,
+      label: "Fourth-level elements",
+      impact: "Card & legend category labels (dimmed)",
+      sample: <span style={{ color: colors.fourthLevelElements, fontSize: 10 }}>Applications</span>,
+    },
+    {
+      color: theme.background,
+      label: "Background",
+      impact: "Button fill, tooltip background",
+      sample: <span className="palette-legend__stroke-demo" style={{ backgroundColor: theme.background, borderColor: colors.thirdLevelElements }} />,
+    },
+    {
+      color: colors.secondaryBackground,
+      label: "Secondary background",
+      impact: "Grid outline, disabled fill",
+      sample: <span className="palette-legend__stroke-demo" style={{ backgroundColor: colors.secondaryBackground }} />,
+    },
   ];
 
   return (
@@ -189,6 +248,60 @@ export function PaletteLegend({ theme, colors }: { theme: ResolvedTheme; colors:
           </span>
         </div>
       </div>
+
+      <div className="palette-legend__group palette-legend__group--wide">
+        <h3>Structural colours</h3>
+        <p>
+          Power BI&rsquo;s Fluent text/UI hierarchy — hover a swatch for the full list of what it styles (source:{" "}
+          <a href="https://learn.microsoft.com/en-us/power-bi/create-reports/report-themes-create-custom" target="_blank" rel="noreferrer">
+            Microsoft&rsquo;s theme docs
+          </a>
+          ).
+        </p>
+        <div className="palette-legend__structural">
+          {structural.map((entry) => (
+            <span className="palette-legend__structural-item" key={entry.label} title={entry.impact}>
+              <span className="palette-legend__chip-dot" style={{ backgroundColor: entry.color }} />
+              <span className="palette-legend__structural-sample">{entry.sample}</span>
+              <small>{entry.label}</small>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="palette-legend__group palette-legend__group--wide">
+        <h3>Text classes</h3>
+        <p>
+          The 14 typography defaults Power BI applies across every visual — 4 you set directly (title, header, label, callout), the
+          rest inherit from those unless overridden. Hover a row for what it styles.
+        </p>
+        <div className="palette-legend__text-classes">
+          {TEXT_CLASS_KEYS.map((key) => (
+            <TextClassSample key={key} textKey={key} textClasses={textClasses} />
+          ))}
+        </div>
+      </div>
     </section>
+  );
+}
+
+/** One row of the text-class reference: the class's own resolved styling, applied to its own name. */
+function TextClassSample({ textKey, textClasses }: { textKey: TextClassKey; textClasses: ResolvedTextClasses }) {
+  const fontSize = Math.min(20, Number(textClasses[`${textKey}FontSize`]) || 12);
+  return (
+    <span className="palette-legend__text-class" title={TEXT_CLASS_DESCRIPTIONS[textKey]}>
+      <span
+        className="palette-legend__text-class-sample"
+        style={{
+          color: String(textClasses[`${textKey}Color`]),
+          fontFamily: String(textClasses[`${textKey}FontFace`]) || undefined,
+          fontSize,
+          fontWeight: textClasses[`${textKey}FontWeight`] === "bold" ? 700 : 400,
+        }}
+      >
+        Aa
+      </span>
+      <small>{TEXT_CLASS_LABELS[textKey]}</small>
+    </span>
   );
 }

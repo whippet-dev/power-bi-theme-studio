@@ -601,6 +601,87 @@ button { color: inherit; }
   border-radius: 4px;
 }
 
+.palette-legend p a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Structural colours and text classes have too many entries to fit one
+   215px grid cell — span the full row instead of competing for space with
+   the other, shorter reference groups. */
+.palette-legend__group--wide {
+  grid-column: 1 / -1;
+}
+
+.palette-legend__structural {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.palette-legend__structural-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 92px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+  cursor: default;
+}
+
+.palette-legend__structural-sample {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  font-size: 11px;
+}
+
+.palette-legend__structural-item small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.palette-legend__gridline-demo {
+  display: block;
+  width: 100%;
+  border-top: 2px solid;
+}
+
+.palette-legend__text-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.palette-legend__text-class {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 84px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+  cursor: default;
+}
+
+.palette-legend__text-class-sample {
+  display: block;
+  line-height: 1;
+}
+
+.palette-legend__text-class small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
 /* Hero: rendered at a fixed pre-scale size, then visually enlarged with a
    transform so resolved font sizes (often 8-12px) stay legible. The wrap
    reserves the post-scale footprint so surrounding layout doesn't overlap;
