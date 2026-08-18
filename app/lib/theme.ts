@@ -240,6 +240,53 @@ export function deleteThemeValue(theme: PowerBITheme, path: Array<string | numbe
   return clone as PowerBITheme;
 }
 
+/**
+ * Layers `override` (the user's own theme) on top of `base` (the selected
+ * base theme — see baseThemes.ts), recursively: object keys merge, array
+ * entries merge by index (not concatenated or replaced wholesale), and a
+ * primitive in `override` always wins. This is what lets every resolver's
+ * existing "theme override, else hardcoded fallback" cascade gain a real
+ * middle layer — sourced from genuine Power BI base-theme data instead of
+ * this app's own guesses — without rewriting every individual default.
+ *
+ * Only used to build the *preview's* resolution input; the user's actual
+ * theme state (what gets edited and exported) stays exactly as they wrote
+ * it, never merged. Passing an array through index-based merging can, in
+ * principle, misalign `$id`-tagged per-state entries (actionButton /
+ * bookmarkNavigator / pageNavigator) if a base theme and a user theme
+ * order those states differently — an accepted, low-probability edge
+ * case rather than a full $id-aware merge.
+ */
+export function mergeThemeOverBase(base: PowerBITheme, override: PowerBITheme): PowerBITheme {
+  return deepMergeJson(base as unknown as JsonValue, override as unknown as JsonValue) as unknown as PowerBITheme;
+}
+
+function deepMergeJson(base: JsonValue | undefined, override: JsonValue | undefined): JsonValue {
+  if (override === undefined) return base as JsonValue;
+  if (base === undefined) return override;
+
+  if (Array.isArray(base) && Array.isArray(override)) {
+    const length = Math.max(base.length, override.length);
+    const merged: JsonValue[] = [];
+    for (let i = 0; i < length; i++) {
+      merged[i] = deepMergeJson(base[i], override[i]);
+    }
+    return merged;
+  }
+
+  if (isRecord(base) && isRecord(override)) {
+    const merged: Record<string, JsonValue> = {};
+    for (const key of new Set([...Object.keys(base), ...Object.keys(override)])) {
+      merged[key] = deepMergeJson(base[key] as JsonValue, override[key] as JsonValue);
+    }
+    return merged;
+  }
+
+  // Primitive, or a type mismatch (e.g. one side is an array, the other
+  // an object) -- the override wins outright rather than guessing.
+  return override;
+}
+
 export function cloneStarterTheme(): PowerBITheme {
   return JSON.parse(JSON.stringify(STARTER_THEME)) as PowerBITheme;
 }

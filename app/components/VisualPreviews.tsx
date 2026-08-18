@@ -77,6 +77,8 @@ function hasSmallMultiplesOverride(theme: PowerBITheme, visual: string): boolean
 type VisualGalleryProps = {
   theme: ResolvedTheme;
   rawTheme: PowerBITheme;
+  /** The working theme layered on top of the selected base theme — see mergeThemeOverBase. Used only for the hero's own interaction-state re-resolution; everything else already arrives pre-resolved via the *Style props below. */
+  effectiveTheme: PowerBITheme;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
@@ -874,6 +876,7 @@ function PreviewShell({
 export function VisualGallery({
   theme,
   rawTheme,
+  effectiveTheme,
   tableStyle,
   barChartStyle,
   columnChartStyle,
@@ -918,13 +921,13 @@ export function VisualGallery({
   const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
   const isStatefulHero = selected === "actionButton" || selected === "bookmarkNavigator" || selected === "pageNavigator";
   const effectiveActionButtonStyle =
-    selected === "actionButton" ? resolveActionButtonStyle(rawTheme, theme, previewInteractionState) : actionButtonStyle;
+    selected === "actionButton" ? resolveActionButtonStyle(effectiveTheme, theme, previewInteractionState) : actionButtonStyle;
   const effectiveBookmarkNavigatorStyle =
     selected === "bookmarkNavigator"
-      ? resolveBookmarkNavigatorStyle(rawTheme, theme, previewInteractionState)
+      ? resolveBookmarkNavigatorStyle(effectiveTheme, theme, previewInteractionState)
       : bookmarkNavigatorStyle;
   const effectivePageNavigatorStyle =
-    selected === "pageNavigator" ? resolvePageNavigatorStyle(rawTheme, theme, previewInteractionState) : pageNavigatorStyle;
+    selected === "pageNavigator" ? resolvePageNavigatorStyle(effectiveTheme, theme, previewInteractionState) : pageNavigatorStyle;
   const stateSelectorNode = isStatefulHero ? (
     <span className="preview-state-selector">
       <StateSelector state={previewInteractionState} onSelect={setPreviewInteractionState} />

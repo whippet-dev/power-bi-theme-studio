@@ -156,6 +156,27 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
+/* Picks which real Power BI base theme every default in the preview
+   falls back to when the working theme itself is silent on a value —
+   see baseThemes.ts / mergeThemeOverBase. */
+.base-theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.base-theme-picker select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .status-dot,
 .preview-badge span {
   width: 7px;

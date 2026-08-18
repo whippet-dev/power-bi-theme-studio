@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   cloneStarterTheme,
   deleteThemeValue,
+  mergeThemeOverBase,
   parseThemeJson,
   resolveTheme,
   themeFileName,
@@ -11,6 +12,7 @@ import {
   type JsonValue,
   type PowerBITheme,
 } from "../lib/theme";
+import { BASE_THEMES, DEFAULT_BASE_THEME_ID, getBaseTheme, type BaseThemeId } from "../lib/baseThemes";
 import { resolveBarChartStyle } from "../lib/barChartProperties";
 import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
@@ -97,52 +99,71 @@ export function ThemeStudio() {
   // theme state, so hiding them costs nothing to try and nothing is lost.
   const [showFilterPane, setShowFilterPane] = useState(true);
   const [showPaletteLegend, setShowPaletteLegend] = useState(true);
+  // Which real Power BI base theme underlies every default this app shows
+  // when the working theme itself is silent on a value — see baseThemes.ts.
+  // Defaults to Classic 2026 (Power BI's own current default for new
+  // reports), independent of what the *starter theme* (this app's own
+  // from-scratch example) happens to set.
+  const [baseThemeId, setBaseThemeId] = useState<BaseThemeId>(DEFAULT_BASE_THEME_ID);
   const fileInput = useRef<HTMLInputElement>(null);
-  const resolved = useMemo(() => resolveTheme(theme), [theme]);
-  const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
-  const barChartStyle = useMemo(() => resolveBarChartStyle(theme, resolved), [theme, resolved]);
-  const columnChartStyle = useMemo(() => resolveColumnChartStyle(theme, resolved), [theme, resolved]);
-  const stackedBarChartStyle = useMemo(() => resolveStackedBarChartStyle(theme, resolved), [theme, resolved]);
-  const stackedColumnChartStyle = useMemo(() => resolveStackedColumnChartStyle(theme, resolved), [theme, resolved]);
-  const lineChartStyle = useMemo(() => resolveLineChartStyle(theme, resolved), [theme, resolved]);
-  const cardStyle = useMemo(() => resolveCardStyle(theme, resolved), [theme, resolved]);
-  const slicerStyle = useMemo(() => resolveSlicerStyle(theme, resolved), [theme, resolved]);
-  const matrixStyle = useMemo(() => resolveMatrixStyle(theme, resolved), [theme, resolved]);
-  const pieChartStyle = useMemo(() => resolvePieChartStyle(theme, resolved), [theme, resolved]);
-  const shapeStyle = useMemo(() => resolveShapeStyle(theme, resolved), [theme, resolved]);
-  const actionButtonStyle = useMemo(() => resolveActionButtonStyle(theme, resolved), [theme, resolved]);
-  const bookmarkNavigatorStyle = useMemo(() => resolveBookmarkNavigatorStyle(theme, resolved), [theme, resolved]);
-  const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(theme, resolved), [theme, resolved]);
-  const textboxStyle = useMemo(() => resolveTextboxStyle(theme, resolved), [theme, resolved]);
-  const imageStyle = useMemo(() => resolveImageStyle(theme, resolved), [theme, resolved]);
+  // Every resolver below reads from this, not the raw `theme` -- it's the
+  // working theme layered on top of the selected base theme, so a value
+  // the user never set still resolves to genuine Power BI base-theme data
+  // instead of straight to this app's own hardcoded fallback. `theme`
+  // itself (edited, exported, and used for "is this overridden?" checks)
+  // stays exactly what the user wrote, never merged.
+  const effectiveTheme = useMemo(() => mergeThemeOverBase(getBaseTheme(baseThemeId), theme), [theme, baseThemeId]);
+  const resolved = useMemo(() => resolveTheme(effectiveTheme), [effectiveTheme]);
+  const tableStyle = useMemo(() => resolveTableStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const barChartStyle = useMemo(() => resolveBarChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const columnChartStyle = useMemo(() => resolveColumnChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const stackedBarChartStyle = useMemo(() => resolveStackedBarChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const stackedColumnChartStyle = useMemo(
+    () => resolveStackedColumnChartStyle(effectiveTheme, resolved),
+    [effectiveTheme, resolved],
+  );
+  const lineChartStyle = useMemo(() => resolveLineChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const cardStyle = useMemo(() => resolveCardStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const slicerStyle = useMemo(() => resolveSlicerStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const matrixStyle = useMemo(() => resolveMatrixStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const pieChartStyle = useMemo(() => resolvePieChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const shapeStyle = useMemo(() => resolveShapeStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const actionButtonStyle = useMemo(() => resolveActionButtonStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const bookmarkNavigatorStyle = useMemo(
+    () => resolveBookmarkNavigatorStyle(effectiveTheme, resolved),
+    [effectiveTheme, resolved],
+  );
+  const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const textboxStyle = useMemo(() => resolveTextboxStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const imageStyle = useMemo(() => resolveImageStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({
-      card: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.card, resolved),
-      bar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bar, resolved),
-      column: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.column, resolved),
-      stackedBar: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.stackedBar, resolved),
-      stackedColumn: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.stackedColumn, resolved),
-      line: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.line, resolved),
-      table: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.table, resolved),
-      matrix: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.matrix, resolved),
-      pie: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.pie, resolved),
-      slicer: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.slicer, resolved),
-      shape: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.shape, resolved),
-      actionButton: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.actionButton, resolved),
-      bookmarkNavigator: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.bookmarkNavigator, resolved),
-      pageNavigator: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.pageNavigator, resolved),
-      textbox: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.textbox, resolved),
-      image: resolveChromeStyle(theme, VISUAL_SCHEMA_KEY.image, resolved),
+      card: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.card, resolved),
+      bar: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.bar, resolved),
+      column: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.column, resolved),
+      stackedBar: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.stackedBar, resolved),
+      stackedColumn: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.stackedColumn, resolved),
+      line: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.line, resolved),
+      table: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.table, resolved),
+      matrix: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.matrix, resolved),
+      pie: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.pie, resolved),
+      slicer: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.slicer, resolved),
+      shape: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.shape, resolved),
+      actionButton: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.actionButton, resolved),
+      bookmarkNavigator: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.bookmarkNavigator, resolved),
+      pageNavigator: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.pageNavigator, resolved),
+      textbox: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.textbox, resolved),
+      image: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.image, resolved),
     }),
-    [theme, resolved],
+    [effectiveTheme, resolved],
   );
   // The shared default only (no visual-specific override blended in) — what
   // the "Theme" tab shows and edits, distinct from a single visual's fully
   // resolved chrome.
-  const sharedChromeStyle = useMemo(() => resolveChromeStyle(theme, "*", resolved), [theme, resolved]);
-  const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(theme, resolved), [theme, resolved]);
-  const themeColors = useMemo(() => resolveThemeColors(theme, resolved), [theme, resolved]);
-  const textClasses = useMemo(() => resolveTextClasses(theme, resolved), [theme, resolved]);
+  const sharedChromeStyle = useMemo(() => resolveChromeStyle(effectiveTheme, "*", resolved), [effectiveTheme, resolved]);
+  const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const themeColors = useMemo(() => resolveThemeColors(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const textClasses = useMemo(() => resolveTextClasses(effectiveTheme, resolved), [effectiveTheme, resolved]);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -246,6 +267,20 @@ export function ThemeStudio() {
           <span>{resolved.name}</span>
           <span className="project-bar__file">{fileLabel}</span>
         </div>
+        <label className="base-theme-picker">
+          <span>Base theme</span>
+          <select
+            value={baseThemeId}
+            onChange={(event) => setBaseThemeId(event.target.value as BaseThemeId)}
+            title="Every default this preview falls back to, when your theme doesn't set a value itself, comes from whichever Power BI base theme is selected here."
+          >
+            {BASE_THEMES.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="text-button" type="button" onClick={resetTheme}>Reset starter</button>
       </div>
 
@@ -308,6 +343,7 @@ export function ThemeStudio() {
               <VisualGallery
                 theme={resolved}
                 rawTheme={theme}
+                effectiveTheme={effectiveTheme}
                 tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}
