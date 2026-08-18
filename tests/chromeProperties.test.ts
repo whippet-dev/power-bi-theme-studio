@@ -41,7 +41,10 @@ test("resolveChromeStyle falls back to plain defaults when nothing is set anywhe
 
   assert.equal(chrome.title.show, true);
   assert.equal(chrome.title.fontColor, base.foreground);
-  assert.equal(chrome.background.show, false);
+  // Verified against themes/base/classic2026.json's shared background
+  // group -- a visual's own background box is on by default (usually
+  // invisible only because it matches the canvas colour), not off.
+  assert.equal(chrome.background.show, true);
   assert.equal(chrome.border.show, false);
 });
 

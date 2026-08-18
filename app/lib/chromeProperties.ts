@@ -1284,7 +1284,9 @@ export function resolveChromeStyle(
       bold: resolveChromeValue(theme, activeVisual, p.title.bold, true),
       italic: resolveChromeValue(theme, activeVisual, p.title.italic, false),
       underline: resolveChromeValue(theme, activeVisual, p.title.underline, false),
-      titleWrap: resolveChromeValue(theme, activeVisual, p.title.titleWrap, false),
+      // Verified against themes/base/classic2026.json's shared
+      // visualStyles["*"]["*"].title group.
+      titleWrap: resolveChromeValue(theme, activeVisual, p.title.titleWrap, true),
     },
     subTitle: {
       show: resolveChromeValue(theme, activeVisual, p.subTitle.show, false),
@@ -1300,7 +1302,11 @@ export function resolveChromeStyle(
       titleWrap: resolveChromeValue(theme, activeVisual, p.subTitle.titleWrap, false),
     },
     background: {
-      show: resolveChromeValue(theme, activeVisual, p.background.show, false),
+      // show/transparency verified against themes/base/classic2026.json's
+      // shared background group ({show: true, transparency: 0}) — this
+      // visual chrome background is a distinct group from the page's own
+      // outspace/background (see globalOptionsProperties.ts).
+      show: resolveChromeValue(theme, activeVisual, p.background.show, true),
       color: resolveChromeValue(theme, activeVisual, p.background.color, base.background),
       transparency: resolveChromeValue(theme, activeVisual, p.background.transparency, 0),
     },
@@ -1349,9 +1355,12 @@ export function resolveChromeStyle(
     },
     spacing: {
       customizeSpacing: resolveChromeValue(theme, activeVisual, p.spacing.customizeSpacing, false),
-      spaceAboveDivider: resolveChromeValue(theme, activeVisual, p.spacing.spaceAboveDivider, 0),
-      spaceAbovePlotArea: resolveChromeValue(theme, activeVisual, p.spacing.spaceAbovePlotArea, 0),
-      spaceAboveSubtitle: resolveChromeValue(theme, activeVisual, p.spacing.spaceAboveSubtitle, 0),
+      // spaceAboveDivider/spaceAbovePlotArea/spaceAboveSubtitle verified
+      // against themes/base/classic2026.json's shared spacing group; the
+      // rest of this group isn't set there, so stay inferred/unchanged.
+      spaceAboveDivider: resolveChromeValue(theme, activeVisual, p.spacing.spaceAboveDivider, 4),
+      spaceAbovePlotArea: resolveChromeValue(theme, activeVisual, p.spacing.spaceAbovePlotArea, 16),
+      spaceAboveSubtitle: resolveChromeValue(theme, activeVisual, p.spacing.spaceAboveSubtitle, 2),
       spaceBelowSubTitle: resolveChromeValue(theme, activeVisual, p.spacing.spaceBelowSubTitle, 0),
       spaceBelowTitle: resolveChromeValue(theme, activeVisual, p.spacing.spaceBelowTitle, 0),
       spaceBelowTitleArea: resolveChromeValue(theme, activeVisual, p.spacing.spaceBelowTitleArea, 0),
