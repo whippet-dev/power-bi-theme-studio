@@ -29,7 +29,7 @@ import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import { resolvePageNavigatorStyle, type ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { InteractionState } from "../lib/properties";
-import { areaPath, linePath, markerShape } from "../lib/lineGeometry";
+import { areaPath, linePath, markerShape, type MarkerShape, type Point } from "../lib/lineGeometry";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import { StateSelector } from "./PropertyEditor";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
@@ -124,6 +124,81 @@ function svgDashArray(style: "solid" | "dashed" | "dotted"): string | undefined 
   if (style === "dashed") return "6 4";
   if (style === "dotted") return "1.5 3";
   return undefined;
+}
+
+/**
+ * Chart markers must render as true circles/squares regardless of the
+ * plot's aspect ratio — but the line/area path they sit alongside is drawn
+ * in an SVG whose 100x100 viewBox is stretched non-uniformly
+ * (preserveAspectRatio="none") to fill whatever actual width/height the
+ * plot has. `vector-effect="non-scaling-stroke"` keeps a path's *stroke
+ * width* constant against that stretch, but it does nothing for a shape's
+ * *geometry* — a `<circle r={4}>` drawn inside that same stretched
+ * coordinate space still comes out as a squashed ellipse, exactly the
+ * "stretched markers" bug this fixes. Rendering markers as plain
+ * absolutely-positioned HTML elements sidesteps the whole problem:
+ * `point.x`/`point.y` are already percentages of the plot area (see
+ * linePointCoords), so percentage position still lines up with the data
+ * point, while pixel width/height/border-radius are never touched by any
+ * SVG transform at all.
+ */
+function chartMarker(
+  key: string | number,
+  marker: MarkerShape,
+  point: Point,
+  fill: string,
+  stroke: string,
+  strokeWidth: number,
+  rotation = 0,
+): ReactNode {
+  const base: CSSProperties = {
+    position: "absolute",
+    left: `${point.x}%`,
+    top: `${point.y}%`,
+    backgroundColor: fill,
+    border: strokeWidth > 0 && stroke !== "none" ? `${strokeWidth}px solid ${stroke}` : undefined,
+    pointerEvents: "none",
+  };
+
+  if (marker.kind === "circle") {
+    const size = marker.r * 2;
+    return (
+      <span
+        key={key}
+        aria-hidden="true"
+        style={{ ...base, width: size, height: size, borderRadius: "50%", transform: "translate(-50%, -50%)" }}
+      />
+    );
+  }
+  if (marker.kind === "rect") {
+    return (
+      <span
+        key={key}
+        aria-hidden="true"
+        style={{
+          ...base,
+          width: marker.size,
+          height: marker.size,
+          transform: `translate(-50%, -50%) rotate(${marker.rotate + rotation}deg)`,
+        }}
+      />
+    );
+  }
+  // "polygon" is only ever a triangle — approximated with clip-path inside
+  // a square bounding box the same size as the equivalent circle marker.
+  return (
+    <span
+      key={key}
+      aria-hidden="true"
+      style={{
+        ...base,
+        width: marker.size,
+        height: marker.size,
+        clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
+        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+      }}
+    />
+  );
 }
 
 
@@ -1629,41 +1704,39 @@ export function VisualGallery({
   );
 
   // Anomaly detection highlights outlying points and can shade a
-  // confidence band behind the whole series.
+  // confidence band behind the whole series. The band stays inside the
+  // SVG (an area fill, not a shape that needs to look geometrically
+  // correct), but the marker is rendered the same way as the series'
+  // own markers — outside the SVG, via chartMarker — for the same
+  // squashed-ellipse reason.
   const anomaly = lineChartStyle.anomalyDetection;
   const anomalyMarker = markerShape(String(anomaly.markerShape), anomaly.markerShapeSize || 7);
-  const anomalyNode = anomaly.show && (
-    <>
-      {anomaly.confidenceBandShow && (
-        <polygon
-          points={`0,${linePointCoords[0].y - 9} ${linePointCoords.map((p) => `${p.x},${p.y - 9}`).join(" ")} 100,${
-            linePointCoords[linePointCoords.length - 1].y + 9
-          } ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 9}`).join(" ")}`}
-          fill={hexWithAlpha(anomaly.confidenceBandColor, anomaly.transparency)}
-          stroke="none"
-        />
-      )}
-      {anomaly.markerShow && (
-        <circle
-          cx={linePointCoords[2].x}
-          cy={linePointCoords[2].y}
-          r={anomalyMarker.kind === "circle" ? anomalyMarker.r : (anomaly.markerShapeSize || 7) / 2}
-          fill={hexWithAlpha(anomaly.markerColor, anomaly.markerTransparency)}
-          stroke={
-            anomaly.markerBorderShow
-              ? hexWithAlpha(
-                  anomaly.markerBorderColorMatchFill ? anomaly.markerColor : anomaly.markerBorderColor,
-                  anomaly.markerBorderTransparency,
-                )
-              : "none"
-          }
-          strokeWidth={anomaly.markerBorderWidth}
-          transform={`rotate(${anomaly.markerRotation} ${linePointCoords[2].x} ${linePointCoords[2].y})`}
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
-    </>
+  const anomalyBandNode = anomaly.show && anomaly.confidenceBandShow && (
+    <polygon
+      points={`0,${linePointCoords[0].y - 9} ${linePointCoords.map((p) => `${p.x},${p.y - 9}`).join(" ")} 100,${
+        linePointCoords[linePointCoords.length - 1].y + 9
+      } ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 9}`).join(" ")}`}
+      fill={hexWithAlpha(anomaly.confidenceBandColor, anomaly.transparency)}
+      stroke="none"
+    />
   );
+  const anomalyMarkerNode =
+    anomaly.show &&
+    anomaly.markerShow &&
+    chartMarker(
+      "anomaly",
+      anomalyMarker,
+      linePointCoords[2],
+      hexWithAlpha(anomaly.markerColor, anomaly.markerTransparency),
+      anomaly.markerBorderShow
+        ? hexWithAlpha(
+            anomaly.markerBorderColorMatchFill ? anomaly.markerColor : anomaly.markerBorderColor,
+            anomaly.markerBorderTransparency,
+          )
+        : "none",
+      anomaly.markerBorderWidth,
+      anomaly.markerRotation,
+    );
 
   // A small-multiples layout replaces the single plot with a grid of
   // repeated mini-charts, one per category.
@@ -1691,7 +1764,7 @@ export function VisualGallery({
         {errorLabel}
         {lineConstantLines}
         <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {anomalyNode}
+          {anomalyBandNode}
           {errorShade}
           {lineIsArea && (
             <path
@@ -1718,47 +1791,6 @@ export function VisualGallery({
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {lineShowMarkers &&
-            linePointCoords.map((point, index) => {
-              const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
-              const markerStroke = lineChartStyle.markers.borderShow
-                ? hexWithAlpha(
-                    lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
-                    lineChartStyle.markers.borderTransparency,
-                  )
-                : "none";
-              const rotation = lineChartStyle.markers.rotation;
-              const common = {
-                fill: markerFill,
-                stroke: markerStroke,
-                strokeWidth: lineChartStyle.markers.borderWidth,
-                vectorEffect: "non-scaling-stroke" as const,
-              };
-              if (lineMarker.kind === "circle") {
-                return <circle key={index} cx={point.x} cy={point.y} r={lineMarker.r} {...common} />;
-              }
-              if (lineMarker.kind === "rect") {
-                return (
-                  <rect
-                    key={index}
-                    x={point.x - lineMarker.size / 2}
-                    y={point.y - lineMarker.size / 2}
-                    width={lineMarker.size}
-                    height={lineMarker.size}
-                    transform={`rotate(${lineMarker.rotate + rotation} ${point.x} ${point.y})`}
-                    {...common}
-                  />
-                );
-              }
-              return (
-                <polygon
-                  key={index}
-                  points={lineMarker.points}
-                  transform={`translate(${point.x} ${point.y}) rotate(${rotation})`}
-                  {...common}
-                />
-              );
-            })}
           {lineChartStyle.error.enabled && lineChartStyle.error.barShow && (
             <line
               x1={linePointCoords[3].x}
@@ -1772,6 +1804,26 @@ export function VisualGallery({
           )}
           {forecastNode}
         </svg>
+        {anomalyMarkerNode}
+        {lineShowMarkers &&
+          linePointCoords.map((point, index) => {
+            const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
+            const markerStroke = lineChartStyle.markers.borderShow
+              ? hexWithAlpha(
+                  lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
+                  lineChartStyle.markers.borderTransparency,
+                )
+              : "none";
+            return chartMarker(
+              index,
+              lineMarker,
+              point,
+              markerFill,
+              markerStroke,
+              lineChartStyle.markers.borderWidth,
+              lineChartStyle.markers.rotation,
+            );
+          })}
         {lineChartStyle.trend.show && (
           <span
             className="chart-preview__trend-line"
@@ -1993,26 +2045,30 @@ export function VisualGallery({
         .map((v, i) => `${(i / (values.length - 1)) * 100},${100 - (v / max) * 100}`)
         .join(" ");
       return (
-        <svg className="matrix-preview__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <polyline
-            points={points}
-            fill="none"
-            stroke={spark.dataColor}
-            strokeWidth={spark.strokeWidth}
-            vectorEffect="non-scaling-stroke"
-          />
+        <span className="matrix-preview__spark" style={{ position: "relative" }}>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ width: "100%", height: "100%", display: "block" }}>
+            <polyline
+              points={points}
+              fill="none"
+              stroke={spark.dataColor}
+              strokeWidth={spark.strokeWidth}
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
           {spark.markers > 0 &&
-            values.map((v, i) => (
-              <circle
-                key={i}
-                cx={(i / (values.length - 1)) * 100}
-                cy={100 - (v / max) * 100}
-                r={spark.markerSize / 2}
-                fill={spark.markerColor}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-        </svg>
+            // Same squashed-ellipse reason as the line chart's own markers
+            // (see chartMarker) — rendered outside the stretched SVG.
+            values.map((v, i) =>
+              chartMarker(
+                i,
+                { kind: "circle", r: spark.markerSize / 2 },
+                { x: (i / (values.length - 1)) * 100, y: 100 - (v / max) * 100 },
+                spark.markerColor,
+                "none",
+                0,
+              ),
+            )}
+        </span>
       );
     }
     return (

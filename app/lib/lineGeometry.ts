@@ -64,10 +64,13 @@ export function areaPath(points: Point[], linePathD: string, baseline = 100): st
 }
 
 /**
- * Marker shapes Power BI offers. Returned as an SVG element description so
- * the preview can render the chosen shape rather than always a circle.
+ * Marker shapes Power BI offers. Returned as a plain size/rotation
+ * description (not SVG path data) so the preview can render each as a
+ * CSS shape positioned outside the chart's stretched SVG coordinate space —
+ * see the comment at chartMarker in VisualPreviews.tsx for why a marker's
+ * geometry can't live inside that SVG without distorting into an ellipse.
  */
-export type MarkerShape = { kind: "circle"; r: number } | { kind: "polygon"; points: string } | { kind: "rect"; size: number; rotate: number };
+export type MarkerShape = { kind: "circle"; r: number } | { kind: "polygon"; size: number } | { kind: "rect"; size: number; rotate: number };
 
 export function markerShape(shape: string, size: number): MarkerShape {
   const r = Math.max(1, size) / 2;
@@ -77,10 +80,10 @@ export function markerShape(shape: string, size: number): MarkerShape {
     case "diamond":
       return { kind: "rect", size: r * 1.7, rotate: 45 };
     case "triangle":
-      return { kind: "polygon", points: `0,${-r} ${r},${r} ${-r},${r}` };
+      return { kind: "polygon", size: r * 2 };
     case "x":
     case "cross":
-      // No native SVG x glyph — a rotated square reads as a distinct
+      // No native CSS x glyph — a rotated square reads as a distinct
       // shape, which is what matters for judging marker styling here.
       return { kind: "rect", size: r * 1.5, rotate: 45 };
     case "circle":
