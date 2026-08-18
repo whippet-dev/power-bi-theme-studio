@@ -20,11 +20,14 @@ Reported with explicit denominators, deliberately not collapsed into one figure.
 | Represented / *previewable* | 153 | 264 | **58.0%** |
 | **Gap / *previewable*** | 111 | 264 | **42.0%** |
 | Property→target relationships | **158** | — | — |
-| — exact | 147 | 158 | 93.0% |
-| — approximate | 10 | 158 | 6.3% |
-| — indicative | 1 | 158 | 0.6% |
-| **Misleading relationships** | **5** | 158 | 3.2% |
-| **Misleading targets** | **3** | 20 | 15.0% |
+| — exact | 149 | 158 | 94.3% |
+| — approximate | 9 | 158 | 5.7% |
+| — indicative | 0 | 158 | 0% |
+| **Misleading relationships** | **4** | 158 | 2.5% |
+| Targets carrying `modelFidelity` | **6** | 19 | 31.6% |
+| **Misleading targets** | **3** | 19 | 15.8% |
+
+> **Recount note (rev2.1).** These figures were revised after `PREVIEW_TARGET_DESIGN.md` §3.5 fixed the boundary between relationship fidelity and target model fidelity. Two verdicts moved *from* relationships *to* elements — `plotArea.transparency` and `error.barWidth` — because the defect survives with the property set correctly. Relationship-level `indicative` fell to zero as a result (see §5.3). No classification was changed to make numbers agree; the property-level totals (153/33/111) are unaffected.
 
 > **The 93.0% "exact relationships" figure is the flattering one and must never be headlined.** It is high only because relationships exist solely where a property already renders. The honest headline is the pair: **58% of previewable properties are represented at all**, and **42% have no rendering path**.
 
@@ -37,8 +40,8 @@ Reported with explicit denominators, deliberately not collapsed into one figure.
 | valueAxis | 34 | 26 | 4 | 4 | 29 | 26 | 3 | 0 |
 | legend | 11 | 10 | 1 | 0 | 10 | 9 | 1 | 0 |
 | labels | 58 | 40 | 8 | 10 | 40 | 37 | 3 | 0 |
-| plotArea | 1 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
-| error | 24 | 6 | 2 | **16** | 6 | 5 | 0 | 1 |
+| plotArea | 1 | 1 | 0 | 0 | 1 | 1 | 0 | 0 |
+| error | 24 | 6 | 2 | **16** | 6 | 6 | 0 | 0 |
 | trend | 11 | 5 | 3 | 3 | 5 | 5 | 0 | 0 |
 | referenceLine | 23 | 5 | 1 | **17** | 5 | 5 | 0 | 0 |
 | xAxisReferenceLine | 23 | 0 | 0 | **23** | 0 | 0 | 0 | 0 |
@@ -47,7 +50,7 @@ Reported with explicit denominators, deliberately not collapsed into one figure.
 | smallMultiplesLayout | 17 | 15 | 0 | 2 | 15 | 15 | 0 | 0 |
 | subheader | 10 | 10 | 0 | 0 | 10 | 10 | 0 | 0 |
 | layout | 5 | 1 | 4 | 0 | 1 | 1 | 0 | 0 |
-| **Total** | **297** | **153** | **33** | **111** | **158** | **147** | **10** | **1** |
+| **Total** | **297** | **153** | **33** | **111** | **158** | **149** | **9** | **0** |
 
 **41% of the entire gap is two groups**: `xAxisReferenceLine` and `y1AxisReferenceLine` (46 properties) have **zero** references anywhere in the component tree — verified by direct search, not inferred.
 
@@ -55,26 +58,30 @@ Reported with explicit denominators, deliberately not collapsed into one figure.
 
 ## 2. Targets used
 
-20 targets were needed. Three carry a **target-level** fidelity caveat that is *not* attributable to any single property (see §4).
+19 targets are declared, of which six carry a **target-level** fidelity caveat not attributable to any single property; three of those are misleading. `categoryAxis.gridlines` is deliberately **not** declared — no element emits it, so its 8 properties are `gap` and declaring the target would only create an `unboundTarget`.
 
-| Target | Renderer element | Model fidelity |
+Model fidelity is assigned by the rule in `PREVIEW_TARGET_DESIGN.md` §3.5: **does the defect survive with every property set correctly?** If it vanishes when the user leaves a property alone, it belongs to the relationship, not the element.
+
+| Target | Renderer element | `modelFidelity` |
 |---|---|---|
-| `categoryAxis.tickLabels` | `.bar-row__label` | exact |
-| `categoryAxis.title` | `.chart-preview__axis-title--rotated` | exact |
-| `categoryAxis.gutter` | `.bar-row` grid column 1 | **misleading** (§3.1) |
-| `categoryAxis.gridlines` | *none — no renderer exists* | **absent** |
-| `valueAxis.tickLabels` | `AxisTickLabels` | exact |
-| `valueAxis.title` | `.chart-preview__axis-title--value` | exact |
-| `valueAxis.gridlines` | `Gridlines` | exact *in default state only* |
-| `plot.dataMarks` | `.bar-row__fill` | approximate (scale, §3.2) |
-| `plot.dataLabels` | `DataLabel` | exact |
-| `plot.background` | `.chart-preview` | **misleading** (§3.4) |
-| `plot.referenceLine` | `.chart-preview__reference-line` | **misleading** (§3.5) |
-| `plot.trendLine` | `.chart-preview__trend-line` | **misleading** (§3.6) |
-| `plot.errorBars` | `.bar-row__error` | indicative (§3.7) |
-| `legend.items` / `legend.title` | `ChartLegend` | exact |
-| `zoom.categorySlider` / `zoom.valueSlider` | `ZoomSliders` | indicative (§3.8) |
-| `smallMultiples.grid` / `smallMultiples.title` | `SmallMultiplesGrid` | exact |
+| `categoryAxis.tickLabels` | `.bar-row__label` | — |
+| `categoryAxis.title` | `.chart-preview__axis-title--rotated` | — |
+| `categoryAxis.gutter` | `.bar-row` grid column 1 | — *(correct while `show` is true; the defect is the `show → gutter` relationship, §3.1)* |
+| `valueAxis.tickLabels` | `AxisTickLabels` | — |
+| `valueAxis.title` | `.chart-preview__axis-title--value` | — |
+| `valueAxis.gridlines` | `Gridlines` | — *(misalignment is caused by `categoryAxis.show`, not by this element)* |
+| `plot.dataMarks` | `.bar-row__fill` | — *(bars model bars; the scale defect is the `start`/`end`/`invertAxis` relationships)* |
+| `plot.dataLabels` | `DataLabel` | — |
+| `plot.background` | `.chart-preview` | **approximate / misleading** — the bound element is the *entire visual*, including legend and both axes. Wrong regardless of any property value. |
+| `plot.referenceLine` | `.chart-preview__reference-line` | **approximate / misleading** — pinned at `left:65%`, and not on the gridline scale, so it cannot be read against the axis in any state. |
+| `plot.trendLine` | `.chart-preview__trend-line` | **indicative / misleading** — a fixed `-6deg` diagonal at `top:18%`, sloping against ascending data. |
+| `plot.errorBars` | `.bar-row__error` | **indicative / cosmetic** — a fixed block on the first category, not a ± range. |
+| `legend.items` / `legend.title` | `ChartLegend` | — |
+| `zoom.categorySlider` | `ZoomSliders` | **indicative / cosmetic** — decorative; does not zoom the plot. |
+| `zoom.valueSlider` | `ZoomSliders` | **indicative / cosmetic** — as above. |
+| `smallMultiples.grid` / `smallMultiples.title` | `SmallMultiplesGrid` | — |
+
+**6 of 19 targets carry `modelFidelity`; 3 are misleading.**
 
 ---
 
@@ -118,7 +125,9 @@ Pin the axis to 0–100K and the labels read 100K while the 82 bar still reaches
 
 `VisualPreviews.tsx:1008` applies `opacity: 1 - transparency/100` to `.chart-preview` — the element that contains the legend, both axes and their titles. Power BI's plot-area transparency affects the plot background only.
 
-A user setting this to 50 sees the legend and axis labels fade and will conclude their theme does that. It does not. Wrong-element attribution, so **misleading**, though less damaging than §3.1–3.3 because no data relationship is falsified.
+A user setting this to 50 sees the legend and axis labels fade and will conclude their theme does that. It does not.
+
+**[rev2.1] This is a target-level defect, not a relationship one.** The property faithfully drives the element it is bound to, so `plotArea.transparency → plot.background` is **exact**; the element bound to `plot.background` is simply the wrong one — `.chart-preview` is the entire visual — and that is true regardless of the value. Severity **misleading**, though less damaging than §3.1–3.3 because no data relationship is falsified.
 
 ### 3.5 Constant/reference lines — **MISLEADING + the largest single gap**
 
@@ -144,7 +153,7 @@ Gap: `dashArray`, `dashCap`, `displayName` (3). Non-previewable: `autoScale`, `c
 
 Rendered only on `index === 0`, as a fixed-height block at `left: barPercent(value)` — a marker at the bar's end, not a ± range.
 
-- Represented: `enabled`, `barShow`, `barColor`, `barBorderSize`, `barBorderColor` (exact), `barWidth` (indicative — sets the indicator's height, not a range)
+- Represented: `enabled`, `barShow`, `barColor`, `barBorderSize`, `barBorderColor`, `barWidth` — **all six exact [rev2.1]**. `barWidth` genuinely drives the indicator's height; the fact that the indicator is not a ± range is a property of the *element*, recorded once as `plot.errorBars` `modelFidelity: indicative/cosmetic`, rather than smeared across six relationships.
 - **Gap: 16** — `barMatchSeriesColor`, all 12 `label*`, all 3 `marker*`
 - Non-previewable: `tooltipShow`, `tooltipFormat` (behavioural)
 
@@ -245,7 +254,7 @@ Adopting the design as written would have forced a choice between 111 dishonest 
 
 **(b) Fidelity sometimes belongs to the target, not the relationship.** `error.barColor` → `plot.errorBars` is genuinely exact: the indicator really is that colour. But the indicator is not an error bar. Recording this only per-relationship forces either a lie ("exact") or smearing the caveat across all six error relationships, which loses the information that the colour binding works. The element needs its **own** fidelity, stated once.
 
-The same applies to `plot.trendLine` and both zoom sliders. Three of 20 targets need it.
+The same applies to `plot.trendLine`, `plot.referenceLine`, `plot.background` and both zoom sliders — six of 19 targets.
 
 **(c) A target with bindings but no renderer.** `categoryAxis.gridlines` has 8 properties that *should* bind to it, and no renderer emits it. The design's `unboundTargets` check finds targets with no bindings — the reverse. Tier 3 (emission) catches this, which is a point in the design's favour, but the pilot shows it will fire on day one rather than being a rare regression guard.
 
@@ -255,13 +264,13 @@ The same applies to `plot.trendLine` and both zoom sliders. Three of 20 targets 
 |---|---|
 | **Add `gap`** | §5.2(a). Non-negotiable. |
 | **Add target-level `modelFidelity`** | §5.2(b). |
-| **Add `severity: cosmetic \| misleading`** | 5 misleading vs 5 cosmetic relationships — averaging them would be useless. |
-| Keep `indicative` | Earns its place: `error.barWidth` is neither exact nor merely approximate. Only 1 of 158, but it is the honest label. |
+| **Add `severity: cosmetic \| misleading`** | 4 misleading vs 5 cosmetic relationships — averaging them would be useless. |
+| **`indicative` may belong only at target level** | **[rev2.1]** Once the §3.5 rule is applied properly, relationship-level `indicative` falls to **zero** for this visual, while three targets need it. The hypothesis worth testing on the other pilots: *"presence shown, magnitude not modelled"* is always a statement about an element, never about one property's effect on it. If Table and Action Button agree, `Representation` should drop to `exact | approximate` and `indicative` should live only on `modelFidelity`. |
 | **Do not** add reasons | All 33 non-previewable fitted the existing seven. |
 
 ### 5.4 Is target granularity right?
 
-**Broadly yes.** 20 targets for 297 properties — roughly 8 properties per target, and the largest cluster (16 → `categoryAxis.tickLabels`) is genuinely one thing a user points at.
+**Broadly yes.** 19 targets for 297 properties — roughly 8 properties per target, and the largest cluster (16 → `categoryAxis.tickLabels`) is genuinely one thing a user points at.
 
 Two adjustments the pilot forced:
 

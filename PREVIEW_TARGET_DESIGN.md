@@ -9,6 +9,15 @@
 3. **Target-level `modelFidelity`** added (§3.5) — `error.barColor` really is exact, but the element it colours is not an error bar. Fidelity sometimes belongs to the element, not the relationship.
 4. **Severity** (`cosmetic` / `misleading`) added (§3.3), and coverage reporting reworked to forbid a single headline percentage (§7).
 
+**Revision 2.1** — consistency pass. Fidelity examples updated to the `affects` shape; `NonPreviewable.property`, `Gap.property` and `supersededBy` typed as `PropertyId<V>`; the relationship-vs-target fidelity boundary given a decidable rule (§3.5) and the bar-chart pilot recounted against it.
+
+**Revision 2.2** — validated against two further complete registries: **Table (73 properties, structural/DOM)** and **Action Button (68 properties, stateful)**. Both survived. Two changes:
+
+1. **`requires` added to `TargetRelationship`** (§3.2) — the one genuinely new concept either pilot demanded. Without it a tier-4 test reports false failures on the 18 mutually-exclusive shape parameters.
+2. **`indicative` flagged for removal from `Representation`** (§3.2) — three pilots, zero relationship-level uses, five target-level uses.
+
+Cross-pilot results are summarised in §12.
+
 Addresses `ARCHITECTURE_REVIEW.md` §3.4/§5D (no declarative property → rendered-element mapping) in light of `RENDERER_AUDIT.md` (no computed plot geometry; "referenced in JSX" is not evidence of representation).
 
 Companion to the `ChartLayout` proposal in `RENDERER_AUDIT.md` §3.1. The two are independent and composable: `ChartLayout` answers *where an element goes*; this answers *which properties affect it, and how faithfully*.
@@ -84,7 +93,6 @@ Targets are declared per visual in a closed catalogue:
 export const BAR_CHART_TARGETS = defineTargets("clusteredBarChart", {
   "categoryAxis.tickLabels": { label: "Category axis labels", layoutSlot: "categoryAxis", conditional: true },
   "categoryAxis.title":      { label: "Category axis title",  layoutSlot: "categoryAxis", conditional: true },
-  "categoryAxis.gridlines":  { label: "Category gridlines",   layoutSlot: "plot",         conditional: true },
   "valueAxis.tickLabels":    { label: "Value axis labels",    layoutSlot: "valueAxis",    conditional: true },
   "valueAxis.gridlines":     { label: "Value axis gridlines", layoutSlot: "plot",         conditional: true },
   "valueAxis.title":         { label: "Value axis title",     layoutSlot: "valueAxis",    conditional: true },
@@ -122,7 +130,15 @@ type Representation =
   | "exact"
   /** Renders, but the model is simplified. `note` REQUIRED. */
   | "approximate"
-  /** Presence is shown; magnitude/position is not modelled. `note` REQUIRED. */
+  /**
+   * [rev2.2] CANDIDATE FOR REMOVAL. All three pilots produced **zero**
+   * relationship-level `indicative`, while five targets across them need
+   * it. "Presence shown, magnitude not modelled" appears to be always a
+   * statement about an ELEMENT, never about one property's effect on it —
+   * so this member is a tempting wrong answer for authors who have not
+   * internalised the §3.5 rule. Recommendation: narrow this union to
+   * `exact | approximate` and keep `indicative` only on `modelFidelity`.
+   */
   | "indicative";
 
 type TargetRelationship<V extends VisualSchemaKey = VisualSchemaKey> = {
@@ -130,6 +146,23 @@ type TargetRelationship<V extends VisualSchemaKey = VisualSchemaKey> = {
   representation: Representation;
   severity?: Severity;          // required unless representation is "exact"
   note?: string;                // required unless representation is "exact"
+  /**
+   * [rev2.2] Property values that must hold for this relationship to be
+   * observable at all. NOT a fidelity statement — a precondition.
+   *
+   * Forced by the Action Button pilot: 18 of the 20 shape parameters are
+   * mutually exclusive on `tileShape`, so a tier-4 test that does not set
+   * it first reports 18 false failures. The same shape recurs everywhere
+   * (`labels.*` needs `labels.show`, `error.*` needs `error.enabled`).
+   *
+   * Also lets the coverage report separate "does nothing" from "does
+   * nothing yet", and gives the property editor a basis for annotating a
+   * control that cannot currently take effect.
+   */
+  requires?: ReadonlyArray<{
+    property: PropertyId<V>;
+    equals: JsonValue | ReadonlyArray<JsonValue>;
+  }>;
 };
 
 type PreviewBinding<V extends VisualSchemaKey = VisualSchemaKey> = {
@@ -165,7 +198,7 @@ The common case stays terse — a single-target exact binding is one line — an
 
 ### 3.3 Severity — cosmetic vs misleading **[rev2]**
 
-`approximate` was doing too much work. A legend that collapses eight placements into four is not comparable to an axis that displays a scale the bars ignore. The pilot found **5 misleading and 5 cosmetic** relationships; averaging them would produce a number describing neither.
+`approximate` was doing too much work. A legend that collapses eight placements into four is not comparable to an axis that displays a scale the bars ignore. The pilot found **4 misleading and 5 cosmetic** relationships, plus 3 misleading elements; averaging them would produce a number describing neither.
 
 ```ts
 type Severity =
@@ -202,8 +235,8 @@ Every registered property therefore resolves to exactly one of:
 `gap` is what makes the model honest. It is the difference between "we decided this cannot be shown" and "we have not built this yet", and the pilot showed the second is the larger population by a wide margin.
 
 ```ts
-type Gap = {
-  property: PropertyId;
+type Gap<V extends VisualSchemaKey = VisualSchemaKey> = {
+  property: PropertyId<V>;
   /** Optional pointer to an issue or design note. */
   ref?: string;
   /** Why it has not been done — capacity, blocked on layout, blocked on data. */
@@ -247,7 +280,32 @@ type PreviewTarget<V> = {
 },
 ```
 
-Three of the pilot's 20 targets needed this (`plot.trendLine`, `plot.referenceLine`, both zoom sliders). A coverage report that ignored it would call the trend line 100% exact.
+#### The deciding rule **[rev2.1]**
+
+The first pass applied this loosely and double-counted defects at both levels. The rule is:
+
+> **Relationship fidelity** answers: *does this PROPERTY drive this target correctly?*
+> **Target model fidelity** answers: *does this ELEMENT model Power BI's equivalent element, with every property set correctly and none of them varying?*
+
+Two tests make it decidable:
+
+1. **Would the defect vanish if the user left this property alone?** If yes, it is a *relationship* problem. `categoryAxis.show` breaks the gutter only when toggled off; with it on, the gutter is a perfectly good model. So `categoryAxis.gutter` carries **no** `modelFidelity` — the defect belongs to the `show → gutter` relationship.
+2. **Would the defect survive with every property at its correct value?** If yes, it is a *target* problem. The trend line is a fixed `-6deg` diagonal no matter what any property says.
+
+Applying this corrected three earlier misclassifications:
+
+| Element | Was | Now | Why |
+|---|---|---|---|
+| `plot.dataMarks` | target approximate | **no `modelFidelity`** | Bars model bars correctly. The scale defect belongs to the `start`/`end`/`invertAxis` relationships. |
+| `categoryAxis.gutter` | target misleading | **no `modelFidelity`** | Correct whenever `show` is true — a relationship defect. |
+| `plot.background` | target misleading + relationship misleading | **target misleading only** | The element bound to `plot.background` is `.chart-preview`, the whole visual. That is wrong regardless of the transparency value, so the relationship `plotArea.transparency → plot.background` is **exact** and the element carries the verdict. |
+| `plot.errorBars` | relationship indicative (`barWidth`) | **target indicative only** | `barWidth` genuinely drives the indicator's size; the indicator simply is not an error range. |
+
+The last two are the rule earning its keep: both defects moved *from* the relationship *to* the element, which is where a reader looking at "why is this wrong?" would expect to find them.
+
+**Six of the pilot's 19 targets carry `modelFidelity`** — `plot.background` and `plot.referenceLine` (approximate/misleading), `plot.trendLine` (indicative/misleading), `plot.errorBars`, `zoom.categorySlider` and `zoom.valueSlider` (indicative/cosmetic) — **of which three are misleading**. A coverage report ignoring this level would call the trend line 100% exact.
+
+**A target with no renderer is not a `modelFidelity` case.** `categoryAxis.gridlines` has no emitting element at all; its eight properties are `gap`, and the target should not be declared until something renders it. Declaring it early would make it an `unboundTarget`, which is a different signal.
 
 ### 3.6 Typed property ids **[rev2]**
 
@@ -300,14 +358,16 @@ type NonPreviewableReason =
   /** Schema duplicate of another property that is bound. */
   | "schema-duplicate";
 
-type NonPreviewable = {
-  property: string;
+type NonPreviewable<V extends VisualSchemaKey = VisualSchemaKey> = {
+  property: PropertyId<V>;                   // [rev2] typed, see §3.6
   reason: NonPreviewableReason;
   /** Required for "schema-duplicate": which property supersedes it. */
-  supersededBy?: string;
+  supersededBy?: PropertyId<V>;              // [rev2]
   note?: string;
 };
 ```
+
+**[rev2] All three classification outcomes take `PropertyId<V>`, not `string`.** Typing only `PreviewBinding.property` would leave the larger populations unchecked — the bar-chart pilot produced 33 non-previewable and 111 gap declarations against 153 bindings, so two-thirds of all property references would have been untyped. `supersededBy` is typed for the same reason: a `schema-duplicate` pointing at a renamed property is exactly the silent rot this is meant to prevent.
 
 These seven reasons are not invented — they are the buckets already catalogued during the earlier render audit, now given a machine-readable form instead of living in prose.
 
@@ -348,12 +408,14 @@ app/lib/preview/
 Six registry entries all style the same semantic thing:
 
 ```ts
-{ property: "bar.categoryAxis.labelColor",  targets: ["categoryAxis.tickLabels"], representation: "exact" },
-{ property: "bar.categoryAxis.fontFamily",  targets: ["categoryAxis.tickLabels"], representation: "exact" },
-{ property: "bar.categoryAxis.fontSize",    targets: ["categoryAxis.tickLabels"], representation: "exact" },
-{ property: "bar.categoryAxis.bold",        targets: ["categoryAxis.tickLabels"], representation: "exact" },
-{ property: "bar.categoryAxis.italic",      targets: ["categoryAxis.tickLabels"], representation: "exact" },
-{ property: "bar.categoryAxis.underline",   targets: ["categoryAxis.tickLabels"], representation: "exact" },
+const at = (target: BarTargetId) => [{ target, representation: "exact" as const }];
+
+{ property: "bar.categoryAxis.labelColor",  affects: at("categoryAxis.tickLabels") },
+{ property: "bar.categoryAxis.fontFamily",  affects: at("categoryAxis.tickLabels") },
+{ property: "bar.categoryAxis.fontSize",    affects: at("categoryAxis.tickLabels") },
+{ property: "bar.categoryAxis.bold",        affects: at("categoryAxis.tickLabels") },
+{ property: "bar.categoryAxis.italic",      affects: at("categoryAxis.tickLabels") },
+{ property: "bar.categoryAxis.underline",   affects: at("categoryAxis.tickLabels") },
 ```
 
 The editor can now answer "what else affects this element?" — six properties, one hover highlight.
@@ -458,10 +520,16 @@ export const TABLE_TARGETS = defineTargets("tableEx", {
 Note the absent `layoutSlot` — it is optional precisely so non-cartesian visuals need no layout engine. The highlight overlay falls back to DOM measurement for these (§8.2).
 
 ```ts
-{ property: "table.columnHeaders.backColor",  targets: ["table.columnHeaders"], representation: "exact" },
-{ property: "table.columnHeaders.fontColor",  targets: ["table.columnHeaders"], representation: "exact" },
-{ property: "table.columnHeaders.alignment",  targets: ["table.columnHeaders"], representation: "exact" },
-{ property: "table.columnHeaders.outline",    targets: ["table.columnHeaders", "table.outline"], representation: "exact" },
+{ property: "table.columnHeaders.backColor", affects: [{ target: "table.columnHeaders", representation: "exact" }] },
+{ property: "table.columnHeaders.fontColor", affects: [{ target: "table.columnHeaders", representation: "exact" }] },
+{ property: "table.columnHeaders.alignment", affects: [{ target: "table.columnHeaders", representation: "exact" }] },
+{
+  property: "table.columnHeaders.outline",
+  affects: [
+    { target: "table.columnHeaders", representation: "exact" },
+    { target: "table.outline",       representation: "exact" },
+  ],
+},
 
 { property: "table.columnWidth.autoSizeColumnWidth", reason: "layout-engine" },
 { property: "table.values.urlIcon",                  reason: "data-shape" },
@@ -488,15 +556,31 @@ export const ACTION_BUTTON_TARGETS = defineTargets("actionButton", {
 ```ts
 const ALL_STATES = ["default", "hover", "selected", "disabled"] as const;
 
-{ property: "actionButton.fill.fillColor",    targets: ["button.fill"], representation: "exact", states: ALL_STATES },
-{ property: "actionButton.fill.show",         targets: ["button.fill"], representation: "exact", states: ALL_STATES },
-{ property: "actionButton.fill.transparency", targets: ["button.fill"], representation: "exact", states: ALL_STATES },
+const fill = [{ target: "button.fill" as const, representation: "exact" as const }];
+
+{ property: "actionButton.fill.fillColor",    affects: fill, states: ALL_STATES },
+{ property: "actionButton.fill.show",         affects: fill, states: ALL_STATES },
+{ property: "actionButton.fill.transparency", affects: fill, states: ALL_STATES },
 
 // One property, two targets — placement moves the icon and reflows the text.
-{ property: "actionButton.icon.placement", targets: ["button.icon", "button.text"], representation: "exact", states: ALL_STATES },
+{
+  property: "actionButton.icon.placement",
+  affects: [
+    { target: "button.icon", representation: "exact" },
+    { target: "button.text", representation: "exact" },
+  ],
+  states: ALL_STATES,
+},
 
-{ property: "actionButton.outline.weight", targets: ["button.outline"], representation: "approximate",
-  note: "Drawn as an inset ring so the button's box size does not change with weight." },
+{
+  property: "actionButton.outline.weight",
+  affects: [
+    { target: "button.outline", representation: "approximate", severity: "cosmetic",
+      note: "Drawn as an inset ring (box-shadow) so the button's box size does not "
+          + "change with weight." },
+  ],
+  states: ALL_STATES,
+},
 ```
 
 **The separation that matters here.** The binding says `actionButton.fill.fillColor` — a single property id. It does not say "array entry 1", does not mention `$id`, and does not know that Fluent 2 writes five entries where a custom theme writes one. All of that lives in layer 1 (`forStateId`, per-layer `$id` matching). If a future Power BI release changes how states are encoded in JSON, **this file does not change.**
@@ -556,7 +640,7 @@ type CoverageReport = {
 Three rules for anyone consuming it:
 
 1. **Never publish a figure without its denominator.** `represented / previewable` and `represented / total` differ by 6.5 points on the bar chart alone.
-2. **Report `misleading` separately and first.** It is the only count that maps to user harm; 5 misleading relationships matter more than 111 gaps.
+2. **Report `misleading` separately and first.** It is the only count that maps to user harm; 4 misleading relationships and 3 misleading elements matter more than 111 gaps.
 3. **`gap` is a backlog, not a failure.** It should trend down and be visible; it must not fail the build, or teams will convert gaps into false `non-previewable` declarations to get green.
 
 ### 7.2 Four tiers of test, increasing in strength
@@ -576,18 +660,25 @@ Branded `PreviewTargetId` types mean a binding referencing a non-existent target
 Render each visual with a theme that enables every `conditional` target; collect `document.querySelectorAll("[data-preview-target]")`; assert catalogue ⊆ emitted. **This is what proves an element exists** — the thing grep cannot do.
 
 **Tier 4 — Behavioural binding (DOM, the real answer).**
-For each binding declared `exact`: render twice with two themes differing *only* in that property; assert the target element's computed style or measured geometry differs.
+Render twice with two themes differing *only* in one property; assert the target element changes. **[rev2]** The unit is the *relationship*, not the binding — a binding may be exact for one target and approximate for another, and only the exact ones carry the strong claim.
 
 ```ts
 // sketch
-for (const b of map.bindings.filter(b => b.representation === "exact")) {
+for (const b of map.bindings) {
   const [a, z] = twoThemesDifferingOnlyIn(b.property);
-  for (const target of b.targets) {
-    assert.notDeepEqual(snapshot(render(a), target), snapshot(render(z), target),
-      `${b.property} is declared exact for ${target} but changing it renders identically`);
+  for (const rel of b.affects) {
+    // Every fidelity level promises SOME visible response; only "exact"
+    // promises it is the correct one, which this tier cannot check.
+    assert.notDeepEqual(
+      snapshot(render(a), rel.target, b.states?.[0]),
+      snapshot(render(z), rel.target, b.states?.[0]),
+      `${b.property} → ${rel.target} is declared ${rel.representation} but changing it renders identically`,
+    );
   }
 }
 ```
+
+Running it over *every* relationship rather than just the exact ones is deliberate: an `approximate` or `indicative` relationship that produces no response at all is misfiled — it is a `gap` wearing a binding's clothes, and this is the only tier that can tell the difference.
 
 Tier 4 is the direct, mechanised answer to *"a property being referenced somewhere in JSX is not evidence that it is accurately represented."* A binding that lies fails. It is also the most expensive tier — it needs a DOM environment and N renders — so I would gate it behind a separate script rather than the default `npm test`, at least initially. Tiers 1–3 should run always.
 
@@ -658,7 +749,7 @@ The two designs meet at exactly one point: `PreviewTarget.layoutSlot` names a `C
 
 - **Highlighting** without DOM measurement (§8.2).
 - **A regression test for the audit's headline defect.** With `categoryAxis.show = false`, assert (a) target `categoryAxis.tickLabels` is absent, (b) `layout.categoryAxis` is null, (c) `layout.plot.width` grew by exactly the former gutter, and (d) `valueAxis.gridlines` still spans `layout.plot`. Today all four are wrong; the mapping layer gives the test a vocabulary for stating them.
-- **Neither design blocks the other.** Bindings can be written now against the current renderer, with the known gaps recorded as `approximate`. When `ChartLayout` lands, bindings get promoted. If `ChartLayout` never lands, the mapping is still useful.
+- **Neither design blocks the other.** Bindings can be written now against the current renderer. **[rev2]** A property that *should* render but has no renderer is a `gap`, never an `approximate` binding — `approximate` requires an actual, if simplified, visual response. When `ChartLayout` lands, the affected relationships get promoted from `approximate` to `exact` and the notes deleted; gaps become bindings only when something renders them. If `ChartLayout` never lands, the mapping is still useful.
 
 ---
 
@@ -681,9 +772,9 @@ Ordered so that each step is independently valuable and reviewable.
 
 ## 10. Open questions for review
 
-1. **Target granularity.** `plot.dataMarks` treats all bars as one target. Should there be per-series targets once stacked charts model real series? I lean no — targets should name what a *property* can address, and theme properties are per-series-collection, not per-bar. **The pilot supports this**: 20 targets covered 297 properties with no case that felt too coarse, and the only additions it forced were `categoryAxis.gutter` and `plot.background` — both *coarser* structural distinctions, not finer ones.
+1. **Target granularity.** `plot.dataMarks` treats all bars as one target. Should there be per-series targets once stacked charts model real series? I lean no — targets should name what a *property* can address, and theme properties are per-series-collection, not per-bar. **The pilot supports this**: 19 targets covered 297 properties with no case that felt too coarse, and the only additions it forced were `categoryAxis.gutter` and `plot.background` — both *coarser* structural distinctions, not finer ones.
 2. **Chrome targets.** Title/subtitle/background/border are shared across all 16 visuals. One shared catalogue (`chrome.title`) reused per visual, or a per-visual copy? I lean shared, with bindings living in a `chrome.preview.ts` that every visual's map spreads in — mirroring how `chromeProperties.ts` already works.
-3. ~~**Should `representation` carry a severity?**~~ **Resolved by the pilot — yes.** Adopted as §3.3. The bar chart splits 5 misleading / 5 cosmetic; without the distinction the two would average into a number describing neither, and the "fix first" queue could not be derived.
+3. ~~**Should `representation` carry a severity?**~~ **Resolved by the pilot — yes.** Adopted as §3.3. The bar chart splits 4 misleading / 5 cosmetic relationships plus 3 misleading elements; without the distinction the two would average into a number describing neither, and the "fix first" queue could not be derived.
 4. **Tier 4 in CI.** It needs a DOM. Worth the dependency, or a manually-run script? Given the repo currently has no browser-test dependency at all, I lean toward a separate script until the pilot proves its value.
 5. **Enforcement of "renderer cannot see the theme".** Types make it awkward but a determined import still compiles. An ESLint rule banning `PowerBITheme` imports inside `app/components/` would make it structural. Cheap, and worth doing at step 3.
 6. **[rev2] Should `gap` require `blockedBy`?** Making it mandatory forces a judgement at declaration time and makes the backlog sortable; making it optional keeps bulk declaration cheap, which matters when the first commit declares 111 of them. I lean optional at first, mandatory once a visual's gaps drop below ~20.
@@ -697,3 +788,57 @@ Ordered so that each step is independently valuable and reviewable.
 - It does **not** implement `ChartLayout`. It composes with it, and degrades gracefully without it.
 - It does **not** add visuals, style presets, registry consolidation, or UI changes.
 - It does **not** claim to measure fidelity. It measures *whether a property is represented at all*, and records *how faithfully* as a human-asserted, human-reviewable claim. Tier 4 stops that claim being silently false; only a person with Power BI open can stop it being wrong.
+
+---
+
+## 12. Cross-pilot validation **[rev2.2]**
+
+Three complete registries, chosen to span the families the app actually contains.
+
+| | Clustered Bar | Table | Action Button |
+|---|---:|---:|---:|
+| Family | cartesian / geometric | structural / DOM | stateful |
+| Properties | 297 | 73 | 68 |
+| Represented | 153 | 37 | 67 |
+| Non-previewable | 33 | 8 | 0 |
+| **Gap** | **111** | **28** | **1** |
+| Unclassified | 0 | 0 | 0 |
+| Represented / previewable | **58.0%** | **56.9%** | **98.5%** |
+| Relationships | 158 | 39 | 68 |
+| — exact | 149 | 39 | 61 |
+| — approximate | 9 | 0 | 7 |
+| — indicative | **0** | **0** | **0** |
+| Misleading relationships | 4 | 0 | 4 |
+| Targets | 19 | 7 | 7 |
+| Targets with `modelFidelity` | 6 | 3 | 0 |
+| Misleading targets | 3 | 1 | 0 |
+| Needs `layoutSlot` | yes | **no** | **no** |
+
+### 12.1 The architecture survives all three
+
+No pilot required a new classification outcome, a new severity, a new non-previewable reason, or a different notion of what a target is. The model expressed:
+
+- one property → many targets, at **different** fidelities (bar chart `valueAxis.start`; also `grid.rowPadding` → three Table targets, `icon.placement` → two button targets)
+- many properties → one target (16 → `categoryAxis.tickLabels`)
+- element-level defects distinct from property-level ones (§3.5)
+- ragged real-world state coverage (§12.4)
+- an entire visual with no geometry at all
+
+### 12.2 Each family stressed a different part
+
+- **Bar chart** forced `gap` and per-relationship fidelity. Its 111 gaps proved the original bound-or-non-previewable dichotomy unworkable.
+- **Table** proved the model works with **no `ChartLayout`**, and is the strongest argument for §7.1's ban on a single headline figure: it reports **100% exact relationships** while 43% of its previewable properties render nothing and its vertical gridlines draw a structurally different thing.
+- **Action Button** forced `requires`, and confirmed that state handling needs nothing beyond `stateful` targets plus `states` on bindings — no per-state duplication, no mention of `$id`.
+
+### 12.3 The Table de-risks the migration order
+
+All seven Table targets omit `layoutSlot`, and nothing else in the model touched layout. The nine structural visuals (Table, Matrix, Slicer, Card, Textbox, Image, and the canvas objects) can therefore be mapped **before `ChartLayout` exists**, contrary to the implication in §9. Only the six cartesian charts need to wait.
+
+### 12.4 One limit worth recording
+
+`states` on a binding declares which states the **tool** can drive — not which states a given theme populates. Fluent 2 omits `disabled` for `outline` and `hover` for `text` and `icon`; those resolve through the untagged entry to a coded fallback. Encoding a specific theme's coverage in the mapping would be a category error, but it means **tier-4 tests must construct themes that set each state**, or they will report false failures.
+
+### 12.5 Two residual observations, both out of scope here
+
+- `actionButton.shape` is tagged `$id: "default"` by Fluent 2 but is absent from `STATEFUL_GROUPS`, so it resolves positionally at index 0 — correct by coincidence today. A **resolution** concern of exactly the class `fe481de` fixed elsewhere.
+- Highlight overlays for structural visuals must be positioned inside the hero's scaled coordinate space; CSS-border targets (gridlines, outlines) can only highlight the element carrying the border, since a border has no box of its own.
