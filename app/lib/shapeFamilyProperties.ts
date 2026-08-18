@@ -649,7 +649,14 @@ export function resolveShapeFamilyCore(
   for (const [key, definition] of Object.entries(core.shape)) {
     const fallback: string | number =
       SHAPE_PARAM_DEFAULTS[key] ?? (definition.valueType === "enum" ? (definition.options?.[0]?.value ?? "") : 0);
-    shape[key] = resolvePropertyValue(theme, definition, fallback);
+    // `shape` is NOT a state group — geometry doesn't change on hover — so
+    // this deliberately asks for "default" rather than `state`. But Fluent 2
+    // still writes `shape: [{ $id: "default", ... }]`, so the entry has to be
+    // located by its `$id` (or by being untagged) rather than at index 0:
+    // nothing guarantees the default entry is listed first, and reading
+    // position would hand back another state's geometry. Same reasoning as
+    // STATEFUL_GROUPS, minus the per-state part.
+    shape[key] = resolvePropertyValue(theme, forStateId(definition, "default"), fallback);
   }
 
   return {

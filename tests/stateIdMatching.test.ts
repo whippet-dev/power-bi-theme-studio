@@ -197,3 +197,77 @@ test("filterCard: a single untagged entry still applies to both states", () => {
   assert.equal(global.pageFilterCards.backgroundColor, "#EEEEEE");
   assert.equal(global.pageFilterCardsApplied.backgroundColor, "#EEEEEE");
 });
+
+// --- Non-stateful groups that a real base theme still tags with `$id` ---
+
+/**
+ * `shape` is not an interaction-state group — a button's geometry does not
+ * change on hover — so it is deliberately absent from STATEFUL_GROUPS and
+ * resolves to "the group's own entry" for every state.
+ *
+ * But Fluent 2 still writes it as `shape: [{ $id: "default", ... }]`, for
+ * actionButton, bookmarkNavigator and pageNavigator alike. Reading index 0
+ * literally therefore happens to be correct only because the default entry
+ * is listed first. Nothing in the format guarantees that, and it is the
+ * same positional assumption the $id work removed elsewhere.
+ *
+ * The rule these pin: an entry is located by what it *is*, never by where
+ * it sits — whether or not the group varies by state.
+ */
+
+const buttonShape = (entries: Array<Record<string, JsonValue>>): PowerBITheme => ({
+  visualStyles: { actionButton: { "*": { shape: entries } } },
+});
+const roundEdgeOf = (custom: PowerBITheme, base?: PowerBITheme, state: "default" | "hover" = "default") =>
+  resolveActionButtonStyle(themeLayers(custom, base), RESOLVED, state).shape.roundEdge;
+
+test("REAL FIXTURE: Fluent 2 tags actionButton.shape with $id despite it not being a state group", () => {
+  const shape = (BASE_FLUENT_2.visualStyles as never as Record<string, Record<string, Record<string, Array<Record<string, unknown>>>>>)
+    .actionButton["*"].shape;
+  assert.equal(shape[0].$id, "default", "fixture guard: the tag this test exists because of");
+  assert.equal(
+    resolveActionButtonStyle(themeLayers({ visualStyles: {} }, BASE_FLUENT_2), RESOLVED, "default").shape.roundEdge,
+    shape[0].roundEdge,
+    "the shipped value must reach the resolved style",
+  );
+});
+
+test("a tagged `default` shape entry resolves wherever it sits in the array", () => {
+  const atZero = buttonShape([{ $id: "default", roundEdge: 11 }]);
+  const atOne = buttonShape([{ $id: "hover", roundEdge: 99 }, { $id: "default", roundEdge: 11 }]);
+
+  assert.equal(roundEdgeOf({ visualStyles: {} }, atZero), 11, "baseline: default entry first");
+  assert.equal(
+    roundEdgeOf({ visualStyles: {} }, atOne),
+    11,
+    "reordering the array must not change the answer — index 0 is another state's entry",
+  );
+});
+
+test("an untagged shape entry stands in for the group even when it is not first", () => {
+  const untaggedFirst = buttonShape([{ roundEdge: 22 }]);
+  const untaggedSecond = buttonShape([{ $id: "hover", roundEdge: 99 }, { roundEdge: 22 }]);
+
+  assert.equal(roundEdgeOf({ visualStyles: {} }, untaggedFirst), 22);
+  assert.equal(roundEdgeOf({ visualStyles: {} }, untaggedSecond), 22, "untagged entry is found by being untagged, not by position");
+});
+
+test("a custom shape layer is matched by $id, not by index, against a differently-ordered base", () => {
+  const base = buttonShape([{ $id: "default", roundEdge: 77 }]);
+  const custom = buttonShape([{ $id: "hover", roundEdge: 99 }, { $id: "default", roundEdge: 11 }]);
+
+  assert.equal(roundEdgeOf(custom, base), 11, "custom's own default entry wins, wherever it sits");
+});
+
+test("a custom layer declaring only `default` resolves without a base", () => {
+  assert.equal(roundEdgeOf(buttonShape([{ $id: "default", roundEdge: 11 }]), undefined), 11);
+});
+
+test("shape stays constant across interaction states — it is not a state group", () => {
+  // The whole point of shape being outside STATEFUL_GROUPS: asking for
+  // "hover" must still yield the group's own entry, not fall through to a
+  // coded default because no `$id: "hover"` exists.
+  const base = buttonShape([{ $id: "default", roundEdge: 11 }]);
+  assert.equal(roundEdgeOf({ visualStyles: {} }, base, "default"), 11);
+  assert.equal(roundEdgeOf({ visualStyles: {} }, base, "hover"), 11, "geometry does not change on hover");
+});

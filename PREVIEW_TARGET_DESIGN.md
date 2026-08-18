@@ -14,7 +14,9 @@
 **Revision 2.2** — validated against two further complete registries: **Table (73 properties, structural/DOM)** and **Action Button (68 properties, stateful)**. Both survived. Two changes:
 
 1. **`requires` added to `TargetRelationship`** (§3.2) — the one genuinely new concept either pilot demanded. Without it a tier-4 test reports false failures on the 18 mutually-exclusive shape parameters.
-2. **`indicative` flagged for removal from `Representation`** (§3.2) — three pilots, zero relationship-level uses, five target-level uses.
+2. **`indicative` removed from `Representation`** (§3.2) — three pilots, zero relationship-level uses, five target-level uses. It survives only on `PreviewTarget.modelFidelity`.
+
+**Revision 2.3** — `Representation` narrowed to `exact | approximate`. `indicative` now exists only on `PreviewTarget.modelFidelity`, and the two examples that had been miscoded with it (`error.barWidth`, `plotArea.transparency`) are corrected to exact relationships whose *element* carries the caveat.
 
 Cross-pilot results are summarised in §12.
 
@@ -125,21 +127,26 @@ bar.valueAxis.start → plot.dataMarks         MISLEADING  (barPercent ignores i
 One `representation` would have to be `approximate`, which understates the tick-label binding and dangerously understates the data-mark one. So fidelity attaches per relationship:
 
 ```ts
+/**
+ * How faithfully one PROPERTY drives one TARGET. Two members only.
+ *
+ * [rev2.3] `indicative` was removed here. All three pilots — 297, 73 and
+ * 68 properties — produced **zero** relationship-level uses of it, while
+ * five targets across them needed it. "Presence is shown, magnitude is not
+ * modelled" turns out to be always a statement about an ELEMENT, never
+ * about one property's effect on it: `error.barWidth` really does drive
+ * the indicator's height; the indicator simply is not an error range.
+ *
+ * Keeping it here offered a tempting wrong answer to authors who had not
+ * internalised §3.5, and every use of it would have been a
+ * misclassification. It survives on `PreviewTarget.modelFidelity`, which
+ * is where all five real cases belong.
+ */
 type Representation =
   /** Changing the property produces the visually correct result. */
   | "exact"
-  /** Renders, but the model is simplified. `note` REQUIRED. */
-  | "approximate"
-  /**
-   * [rev2.2] CANDIDATE FOR REMOVAL. All three pilots produced **zero**
-   * relationship-level `indicative`, while five targets across them need
-   * it. "Presence shown, magnitude not modelled" appears to be always a
-   * statement about an ELEMENT, never about one property's effect on it —
-   * so this member is a tempting wrong answer for authors who have not
-   * internalised the §3.5 rule. Recommendation: narrow this union to
-   * `exact | approximate` and keep `indicative` only on `modelFidelity`.
-   */
-  | "indicative";
+  /** Renders, but the model is simplified. `note` and `severity` REQUIRED. */
+  | "approximate";
 
 type TargetRelationship<V extends VisualSchemaKey = VisualSchemaKey> = {
   target: PreviewTargetId<V>;
@@ -464,20 +471,30 @@ The second is a case grep would never surface as a single fact. The first is the
           + "axis reads right-to-left while the data does not." },
   ],
 },
+// [rev2.3] Both of the next two are EXACT relationships whose *element* is
+// imperfect. Before the §3.5 rule they were miscoded as indicative and
+// approximate respectively — the two cases that proved fidelity needs two
+// levels, and that `indicative` never belongs on a relationship.
 {
   property: "bar.error.barWidth",
-  affects: [
-    { target: "plot.errorBars", representation: "indicative", severity: "cosmetic",
-      note: "Sets the indicator's height. Not a ± range." },
-  ],
+  affects: [{ target: "plot.errorBars", representation: "exact" }],
+  // plot.errorBars carries modelFidelity: indicative / cosmetic —
+  // barWidth really does drive the indicator's height; the indicator is
+  // simply not a ± range.
 },
 {
   property: "bar.plotArea.transparency",
+  affects: [{ target: "plot.background", representation: "exact" }],
+  // plot.background carries modelFidelity: approximate / misleading — the
+  // bound element is `.chart-preview`, the whole visual. Wrong regardless
+  // of the value, so the verdict belongs to the element.
+},
+{
+  property: "bar.categoryAxis.innerPadding",
   affects: [
-    { target: "plot.background", representation: "approximate", severity: "misleading",
-      note: "Applied as opacity to .chart-preview, which contains the legend and both "
-          + "axes. Power BI fades only the plot background, so a user concludes their "
-          + "theme does something it does not." },
+    { target: "plot.dataMarks", representation: "approximate", severity: "cosmetic",
+      note: "Applied as a flex `gap: N%`, which resolves against the plot's height "
+          + "rather than the category slot." },
   ],
 },
 ```
@@ -626,7 +643,6 @@ type CoverageReport = {
     total: number;
     exact: number;
     approximate: { cosmetic: number; misleading: number };
-    indicative: { cosmetic: number; misleading: number };
   };
 
   /** Targets whose ELEMENT is itself approximate or indicative (§3.5). */
@@ -678,7 +694,7 @@ for (const b of map.bindings) {
 }
 ```
 
-Running it over *every* relationship rather than just the exact ones is deliberate: an `approximate` or `indicative` relationship that produces no response at all is misfiled — it is a `gap` wearing a binding's clothes, and this is the only tier that can tell the difference.
+Running it over *every* relationship rather than just the exact ones is deliberate: an `approximate` relationship that produces no response at all is misfiled — it is a `gap` wearing a binding's clothes, and this is the only tier that can tell the difference.
 
 Tier 4 is the direct, mechanised answer to *"a property being referenced somewhere in JSX is not evidence that it is accurately represented."* A binding that lies fails. It is also the most expensive tier — it needs a DOM environment and N renders — so I would gate it behind a separate script rather than the default `npm test`, at least initially. Tiers 1–3 should run always.
 
@@ -741,7 +757,7 @@ For targets with a `layoutSlot`, the overlay rect comes from `ChartLayout` direc
 
 The reverse direction comes free and is worth noting as future affordance: clicking a preview element reads its `data-preview-target`, and the panel filters to the bindings for that target — "what controls this bar?" That is a substantially better discovery model than scrolling 297 properties, and it requires no new data beyond what this design already defines.
 
-Representation quality should surface in the UI too: an `approximate` or `indicative` binding is exactly the case where the existing `PROPERTY_EFFECTS` before/after affordance earns its place, and `note` is the text to show.
+Representation quality should surface in the UI too: an `approximate` relationship, or a target carrying `modelFidelity`, is exactly the case where the existing `PROPERTY_EFFECTS` before/after affordance earns its place, and `note` is the text to show.
 
 ### 8.3 Compatibility with `ChartLayout`
 
@@ -807,7 +823,6 @@ Three complete registries, chosen to span the families the app actually contains
 | Relationships | 158 | 39 | 68 |
 | — exact | 149 | 39 | 61 |
 | — approximate | 9 | 0 | 7 |
-| — indicative | **0** | **0** | **0** |
 | Misleading relationships | 4 | 0 | 4 |
 | Targets | 19 | 7 | 7 |
 | Targets with `modelFidelity` | 6 | 3 | 0 |
