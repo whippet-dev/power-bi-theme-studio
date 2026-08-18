@@ -2,6 +2,13 @@
 
 **Date:** 2026-08-18 · **Status:** design only, **no code written** · **For:** independent review
 
+**Revision 2** — validated against the complete 297-property `clusteredBarChart` registry. See `BAR_CHART_PREVIEW_COVERAGE_PILOT.md` for the full trace. Four changes were made *because of* that pilot, each marked **[rev2]** below:
+
+1. Fidelity moved from the binding to the **individual property→target relationship** (§3.2) — `valueAxis.start` is exact for tick labels and misleading for data marks.
+2. A **`gap`** category added (§3.4) — the pilot found **111 properties (42% of previewable)** that should render and do not. The original design had no home for these and would have forced either 111 dishonest `non-previewable` declarations or a permanently failing test.
+3. **Target-level `modelFidelity`** added (§3.5) — `error.barColor` really is exact, but the element it colours is not an error bar. Fidelity sometimes belongs to the element, not the relationship.
+4. **Severity** (`cosmetic` / `misleading`) added (§3.3), and coverage reporting reworked to forbid a single headline percentage (§7).
+
 Addresses `ARCHITECTURE_REVIEW.md` §3.4/§5D (no declarative property → rendered-element mapping) in light of `RENDERER_AUDIT.md` (no computed plot geometry; "referenced in JSX" is not evidence of representation).
 
 Companion to the `ChartLayout` proposal in `RENDERER_AUDIT.md` §3.1. The two are independent and composable: `ChartLayout` answers *where an element goes*; this answers *which properties affect it, and how faithfully*.
@@ -98,25 +105,38 @@ export const BAR_CHART_TARGETS = defineTargets("clusteredBarChart", {
 
 `defineTargets` returns a typed record, so `BAR_CHART_TARGETS["plot.dataMarks"]` is checked at compile time and a typo is a build error — **not** something a regex has to catch.
 
-### 3.2 Bindings — property → target
+### 3.2 Bindings — fidelity lives on the *relationship* **[rev2]**
+
+The first draft put one `representation` on the whole binding. The pilot broke that immediately:
+
+```
+bar.valueAxis.start → valueAxis.tickLabels   EXACT       (axisTicks honours it)
+bar.valueAxis.start → plot.dataMarks         MISLEADING  (barPercent ignores it)
+```
+
+One `representation` would have to be `approximate`, which understates the tick-label binding and dangerously understates the data-mark one. So fidelity attaches per relationship:
 
 ```ts
 type Representation =
   /** Changing the property produces the visually correct result. */
   | "exact"
-  /** Renders, but the model is simplified. `note` is REQUIRED. */
+  /** Renders, but the model is simplified. `note` REQUIRED. */
   | "approximate"
   /** Presence is shown; magnitude/position is not modelled. `note` REQUIRED. */
   | "indicative";
 
-type PreviewBinding<V extends VisualSchemaKey = VisualSchemaKey> = {
-  /** PropertyDefinition.id — never a JSON path. */
-  property: string;
-  /** One property may affect several targets. */
-  targets: ReadonlyArray<PreviewTargetId<V>>;
+type TargetRelationship<V extends VisualSchemaKey = VisualSchemaKey> = {
+  target: PreviewTargetId<V>;
   representation: Representation;
-  /** Required unless representation is "exact". Explains the gap. */
-  note?: string;
+  severity?: Severity;          // required unless representation is "exact"
+  note?: string;                // required unless representation is "exact"
+};
+
+type PreviewBinding<V extends VisualSchemaKey = VisualSchemaKey> = {
+  /** PropertyDefinition.id — never a JSON path. Typed; see §3.6. */
+  property: PropertyId<V>;
+  /** One property may affect several targets, each with its own fidelity. */
+  affects: ReadonlyArray<TargetRelationship<V>>;
   /**
    * Which interaction states this binding applies to. Omitted means the
    * property is not state-varying. The mapping layer states *that* the
@@ -126,9 +146,142 @@ type PreviewBinding<V extends VisualSchemaKey = VisualSchemaKey> = {
 };
 ```
 
-### 3.3 Non-previewable declarations
+Worked, from the pilot:
 
-Equally first-class. A property with no binding is a **gap**; a property with an explicit declaration is a **decision**.
+```ts
+{
+  property: "bar.valueAxis.start",
+  affects: [
+    { target: "valueAxis.tickLabels", representation: "exact" },
+    { target: "plot.dataMarks", representation: "approximate", severity: "misleading",
+      note: "axisTicks honours the pinned range; barPercent scales against the sample "
+          + "maximum. The chart displays a scale its own data does not obey. Resolved "
+          + "by routing bar geometry through ChartLayout.scale.value." },
+  ],
+},
+```
+
+The common case stays terse — a single-target exact binding is one line — and the cost is paid only where the truth is genuinely split.
+
+### 3.3 Severity — cosmetic vs misleading **[rev2]**
+
+`approximate` was doing too much work. A legend that collapses eight placements into four is not comparable to an axis that displays a scale the bars ignore. The pilot found **5 misleading and 5 cosmetic** relationships; averaging them would produce a number describing neither.
+
+```ts
+type Severity =
+  /**
+   * The preview under-models detail, but a conclusion a user draws from it
+   * remains correct. Example: legend.position collapsing TopLeft and
+   * TopCenter — the legend really is at the top.
+   */
+  | "cosmetic"
+  /**
+   * A user could draw a FALSE conclusion about what their theme does.
+   * Example: valueAxis.start changing the labels but not the bars.
+   */
+  | "misleading";
+```
+
+The deciding question is deliberately about the *user's conclusion*, not about implementation effort: **"could someone ship a wrong theme because of this?"** Wrong-element attribution counts — the pilot classified `plotArea.transparency` as misleading because it fades the legend and axes, so a user concludes their theme does something it does not.
+
+Misleading relationships are the queue for renderer work; cosmetic ones are a backlog.
+
+### 3.4 The four classification outcomes **[rev2]**
+
+The first draft had two: *bound* or *non-previewable*, with anything else a test failure. The pilot showed that is unworkable — **111 of 264 previewable bar-chart properties (42%) are neither**. `xAxisReferenceLine.value` is not non-previewable; it is entirely renderable and simply is not rendered. Declaring those 111 as `non-previewable` would be a lie encoded in the repository; leaving them `unclassified` would mean a permanently red test that everyone learns to ignore.
+
+Every registered property therefore resolves to exactly one of:
+
+| Outcome | Meaning | Test |
+|---|---|---|
+| **represented** | has ≥1 `TargetRelationship` | counted by fidelity |
+| **non-previewable** | declared, with a reason — a *decision* | counted by reason |
+| **gap** | should render, does not — an acknowledged *absence* | tracked; must trend down |
+| **unclassified** | nobody has looked at it | **build failure** |
+
+`gap` is what makes the model honest. It is the difference between "we decided this cannot be shown" and "we have not built this yet", and the pilot showed the second is the larger population by a wide margin.
+
+```ts
+type Gap = {
+  property: PropertyId;
+  /** Optional pointer to an issue or design note. */
+  ref?: string;
+  /** Why it has not been done — capacity, blocked on layout, blocked on data. */
+  blockedBy?: "renderer" | "layout" | "sample-data" | "unscheduled";
+  note?: string;
+};
+```
+
+### 3.5 Target-level model fidelity **[rev2]**
+
+The pilot found a case relationship-fidelity cannot express. `error.barColor → plot.errorBars` is genuinely **exact** — the indicator really is the colour you chose. But the indicator is a fixed-height block on the first category, not a ± range. Recording that only per-relationship forces a choice between claiming `exact` (a lie about the element) and marking all six error relationships `approximate` (losing the fact that the colour binding works).
+
+The element gets its own verdict, stated once:
+
+```ts
+type PreviewTarget<V> = {
+  // …id, label, layoutSlot, conditional, stateful as before…
+  /**
+   * How faithfully this ELEMENT models Power BI's equivalent, independent
+   * of any property that drives it. Omitted means it models it correctly.
+   */
+  modelFidelity?: {
+    level: "approximate" | "indicative";
+    severity: Severity;
+    note: string;
+  };
+};
+```
+
+```ts
+"plot.trendLine": {
+  label: "Trend line",
+  layoutSlot: "plot",
+  conditional: true,
+  modelFidelity: {
+    level: "indicative", severity: "misleading",
+    note: "A fixed -6deg diagonal at top:18% (globals.css:1588), unrelated to the "
+        + "plotted values, and sloping against ascending data. Its colour, width and "
+        + "style bindings are exact; the element is a fiction.",
+  },
+},
+```
+
+Three of the pilot's 20 targets needed this (`plot.trendLine`, `plot.referenceLine`, both zoom sliders). A coverage report that ignored it would call the trend line 100% exact.
+
+### 3.6 Typed property ids **[rev2]**
+
+`PreviewBinding.property` was a bare `string`, so a typo — or a rename in a registry — would compile and silently produce an orphan binding. Targets were typed; properties should be too, without duplicating metadata.
+
+The obstacle is that `PropertyDefinition.id` is declared `string`, so `typeof BAR_CHART_PROPERTIES` widens every id. **Recommended fix: make the factories generic in their id**, a type-only change with no runtime effect and no call-site edits:
+
+```ts
+// before: id: string
+// after:
+export function colorProp<Id extends string>(
+  visual: VisualSchemaKey, id: Id, label: string, /* … */
+): PropertyDefinition<"color"> & { id: Id };
+```
+
+The literal is then preserved through the registry, and ids are derivable by a recursive walk:
+
+```ts
+type PropertyId<R> =
+  R extends { id: infer I extends string } ? I
+  : R extends object ? { [K in keyof R]: PropertyId<R[K]> }[keyof R]
+  : never;
+
+type BarChartPropertyId = PropertyId<typeof BAR_CHART_PROPERTIES>;
+// → "bar.dataPoint.fill" | "bar.categoryAxis.show" | … (297 members)
+```
+
+A typo now fails the build, and deleting a property breaks every binding that referenced it — exactly the coupling wanted.
+
+**Alternative considered and rejected:** deriving ids as template-literal types from the registry's *structure* (`` `bar.${G}.${F}` ``). It needs no factory change, but it trusts that the hand-written `id` string always matches its structural position. The registries were partly generated, so that is not a safe assumption. If the generic-factory route is rejected as too invasive, the fallback is a runtime test asserting `id === derivedKey` for every property — worth adding regardless, since it would catch copy-paste id errors that exist today.
+
+### 3.7 Non-previewable declarations
+
+A property with a declaration is a **decision**; a property with neither declaration nor binding is `gap` or `unclassified` (§3.4).
 
 ```ts
 type NonPreviewableReason =
@@ -158,7 +311,9 @@ type NonPreviewable = {
 
 These seven reasons are not invented — they are the buckets already catalogued during the earlier render audit, now given a machine-readable form instead of living in prose.
 
-### 3.4 The per-visual mapping module
+These seven reasons survived the pilot unchanged: all 33 non-previewable bar-chart properties fitted them, and none needed an eighth.
+
+### 3.8 The per-visual mapping module
 
 ```ts
 type PreviewMap<V extends VisualSchemaKey> = {
@@ -166,6 +321,7 @@ type PreviewMap<V extends VisualSchemaKey> = {
   targets: Record<string, PreviewTarget<V>>;
   bindings: ReadonlyArray<PreviewBinding<V>>;
   nonPreviewable: ReadonlyArray<NonPreviewable>;
+  gaps: ReadonlyArray<Gap>;           // [rev2]
 };
 ```
 
@@ -205,24 +361,32 @@ The editor can now answer "what else affects this element?" — six properties, 
 ### 4.2 One property → many targets
 
 ```ts
-// `show` governs both the labels AND whether the axis reserves a gutter.
-// This is exactly the coupling RENDERER_AUDIT §2 found broken: the labels
-// disappeared but the gutter constant did not follow.
+// `show` governs both the labels AND whether the axis reserves a gutter —
+// and the two have DIFFERENT fidelity, which is why §3.2 moved
+// representation onto the relationship.
 {
   property: "bar.categoryAxis.show",
-  targets: ["categoryAxis.tickLabels", "categoryAxis.gutter"],
-  representation: "exact",
+  affects: [
+    { target: "categoryAxis.tickLabels", representation: "exact" },
+    { target: "categoryAxis.gutter", representation: "approximate", severity: "misleading",
+      note: "The label is omitted from the DOM but .bar-row still declares three grid "
+          + "columns, so the track auto-flows into the 68px label column while "
+          + "BAR_VALUE_AXIS_INSET stays fixed. Measured: bars and gridlines stop "
+          + "overlapping entirely. RENDERER_AUDIT §2.2." },
+  ],
 },
 
 // The bar colour is also the legend swatch colour.
 {
   property: "bar.dataPoint.fill",
-  targets: ["plot.dataMarks", "legend.items"],
-  representation: "exact",
+  affects: [
+    { target: "plot.dataMarks", representation: "exact" },
+    { target: "legend.items", representation: "exact" },
+  ],
 },
 ```
 
-The second is a case grep would never surface as a single fact.
+The second is a case grep would never surface as a single fact. The first is the case that forced **[rev2]**: a single `representation` would have had to be `approximate`, hiding that the label styling is perfectly correct while the layout coupling is broken.
 
 ### 4.3 Encoding a known defect as data, not folklore
 
@@ -230,26 +394,33 @@ The second is a case grep would never surface as a single fact.
 
 ```ts
 {
-  property: "bar.valueAxis.start",
-  targets: ["valueAxis.tickLabels", "plot.dataMarks"],
-  representation: "approximate",
-  note: "Tick labels honour the pinned range; bar lengths still scale to the "
-      + "sample maximum. RENDERER_AUDIT §4.1 finding 4. Becomes exact once "
-      + "bars are positioned through ChartLayout.scale.value.",
-},
-{
-  property: "bar.categoryAxis.invertAxis",
-  targets: ["categoryAxis.tickLabels", "plot.dataMarks"],
-  representation: "approximate",
-  note: "Reverses tick label order only; bar order is unchanged.",
+  property: "bar.valueAxis.invertAxis",
+  affects: [
+    { target: "valueAxis.tickLabels", representation: "exact" },
+    { target: "plot.dataMarks", representation: "approximate", severity: "misleading",
+      note: "axisTicks reverses the tick array; bars still grow left-to-right, so the "
+          + "axis reads right-to-left while the data does not." },
+  ],
 },
 {
   property: "bar.error.barWidth",
-  targets: ["plot.errorBars"],
-  representation: "indicative",
-  note: "A fixed-size indicator is drawn on the first category regardless of value.",
+  affects: [
+    { target: "plot.errorBars", representation: "indicative", severity: "cosmetic",
+      note: "Sets the indicator's height. Not a ± range." },
+  ],
+},
+{
+  property: "bar.plotArea.transparency",
+  affects: [
+    { target: "plot.background", representation: "approximate", severity: "misleading",
+      note: "Applied as opacity to .chart-preview, which contains the legend and both "
+          + "axes. Power BI fades only the plot background, so a user concludes their "
+          + "theme does something it does not." },
+  ],
 },
 ```
+
+Note that `bar.categoryAxis.invertAxis` is **not** a binding at all — the pilot found it is never read, so it is a `gap`, not an approximation. That distinction is only expressible because of §3.4.
 
 The value here is that the gap stops being tribal knowledge. It appears in the coverage report, it is reviewable in a diff, and when `ChartLayout` lands, flipping `approximate` → `exact` is a deliberate edit that a reviewer will question if the note is not also removed.
 
@@ -342,39 +513,61 @@ so the editor can highlight "the fill, in the state currently previewed" without
 
 ## 7. Coverage measurement
 
-### 7.1 The report
+### 7.1 The report — no single headline figure **[rev2]**
 
-Pure function over data — no DOM, no rendering, no theme:
+The first draft proposed one number, `exact / (total − nonPreviewable)`. The pilot shows why that is unsafe. For the bar chart, three defensible "coverage" figures are:
+
+| Figure | Value |
+|---|---|
+| exact relationships / all relationships | **93.0%** |
+| represented properties / previewable properties | **58.0%** |
+| exact relationships / previewable properties | **55.7%** |
+
+The 93% is arithmetically true and deeply misleading: relationships only exist where a property already renders, so the metric silently excludes the 111 properties that render nothing. **Any design that permits one summary number will have that number quoted.** So the report exposes counts with explicit denominators and no aggregate:
 
 ```ts
 type CoverageReport = {
   visual: VisualSchemaKey;
-  total: number;
-  exact: number;
-  approximate: number;
-  indicative: number;
-  nonPreviewable: Record<NonPreviewableReason, number>;
-  /** THE failure list: registered but neither bound nor declared. */
-  unclassified: string[];
-  /** Targets in the catalogue that no property binds to — dead targets. */
+
+  properties: {
+    total: number;
+    represented: number;
+    nonPreviewable: Record<NonPreviewableReason, number>;
+    gap: Record<NonNullable<Gap["blockedBy"]>, number>;
+    /** THE build failure: nobody has looked at these. */
+    unclassified: string[];
+  };
+
+  relationships: {
+    total: number;
+    exact: number;
+    approximate: { cosmetic: number; misleading: number };
+    indicative: { cosmetic: number; misleading: number };
+  };
+
+  /** Targets whose ELEMENT is itself approximate or indicative (§3.5). */
+  targetFidelity: { exact: number; approximate: number; indicative: number; misleading: string[] };
+
+  /** Targets nothing binds to — dead catalogue entries. */
   unboundTargets: string[];
 };
-
-function computeCoverage(
-  registry: Record<string, PropertyDefinition>,
-  map: PreviewMap<VisualSchemaKey>,
-): CoverageReport;
 ```
 
-Reported honestly, "preview coverage" becomes `exact / (total − nonPreviewable)` — a figure that cannot be inflated by a stray JSX reference, because a stray reference creates no binding.
+Three rules for anyone consuming it:
+
+1. **Never publish a figure without its denominator.** `represented / previewable` and `represented / total` differ by 6.5 points on the bar chart alone.
+2. **Report `misleading` separately and first.** It is the only count that maps to user harm; 5 misleading relationships matter more than 111 gaps.
+3. **`gap` is a backlog, not a failure.** It should trend down and be visible; it must not fail the build, or teams will convert gaps into false `non-previewable` declarations to get green.
 
 ### 7.2 Four tiers of test, increasing in strength
 
 **Tier 1 — Completeness (pure, cheap, runs today's style of test).**
 ```
-assert(report.unclassified.length === 0)
+assert(report.properties.unclassified.length === 0)
 ```
-Every registered property is either bound or explicitly declared non-previewable. This is a set operation over data. **No grep, no JSX inspection.** Adding a property to a registry without classifying it fails the build.
+Every registered property is bound, declared non-previewable, **or declared a gap**. This is a set operation over data. **No grep, no JSX inspection.** Adding a property to a registry without classifying it fails the build.
+
+Note the `gap` outcome is what makes this tier adoptable at all: without it, standing up the bar chart would produce 111 immediate failures with no honest way to clear them.
 
 **Tier 2 — Referential integrity (compile time).**
 Branded `PreviewTargetId` types mean a binding referencing a non-existent target does not compile. `report.unboundTargets` catches the reverse: a target nothing binds to, which is either a missing binding or a target that should be deleted.
@@ -480,17 +673,21 @@ Ordered so that each step is independently valuable and reviewable.
 5. **Roll out to the remaining 13 visuals.** Mechanical, and reviewable in batches per visual.
 6. **Then** enable the editor hover highlight — deliberately last, so the data is trustworthy before it is surfaced to users.
 
-A reasonable checkpoint at step 4: publish the first honest coverage number. My expectation is that it will be **materially lower** than any figure previously quoted, because previous counts came from grep and counted references rather than representations. That drop is the point, not a regression.
+**Revised expectation [rev2]:** the pilot has already produced that number for one visual — **58% of previewable properties represented, 42% gap**. Expect the other 15 visuals to land in the same range, and expect the whole-app figure to be far below any previously quoted. That drop is the measurement working, not a regression.
+
+**One sequencing change [rev2].** This plan implied mapping should precede renderer work. The pilot undercuts that in one specific case: **57 of the bar chart's 111 gaps are constant lines** (`referenceLine` partial, plus `xAxisReferenceLine` and `y1AxisReferenceLine` entirely unrendered). One renderer feature would move that visual from 58% to ~79%. Writing those 57 gap declarations is still worth doing first — it is how the number becomes visible — but the mapping layer should not be presented as blocking constant-line work.
 
 ---
 
 ## 10. Open questions for review
 
-1. **Target granularity.** `plot.dataMarks` treats all bars as one target. Should there be per-series targets once stacked charts model real series? I lean no — targets should name what a *property* can address, and theme properties are per-series-collection, not per-bar.
+1. **Target granularity.** `plot.dataMarks` treats all bars as one target. Should there be per-series targets once stacked charts model real series? I lean no — targets should name what a *property* can address, and theme properties are per-series-collection, not per-bar. **The pilot supports this**: 20 targets covered 297 properties with no case that felt too coarse, and the only additions it forced were `categoryAxis.gutter` and `plot.background` — both *coarser* structural distinctions, not finer ones.
 2. **Chrome targets.** Title/subtitle/background/border are shared across all 16 visuals. One shared catalogue (`chrome.title`) reused per visual, or a per-visual copy? I lean shared, with bindings living in a `chrome.preview.ts` that every visual's map spreads in — mirroring how `chromeProperties.ts` already works.
-3. **Should `representation` carry a severity?** `approximate` covers both "cosmetically simplified" and "displays a scale it does not obey". Those are not equally serious. A `severity: "cosmetic" | "misleading"` field would let the coverage report rank what to fix. I think yes, but it adds a field to every non-exact binding.
+3. ~~**Should `representation` carry a severity?**~~ **Resolved by the pilot — yes.** Adopted as §3.3. The bar chart splits 5 misleading / 5 cosmetic; without the distinction the two would average into a number describing neither, and the "fix first" queue could not be derived.
 4. **Tier 4 in CI.** It needs a DOM. Worth the dependency, or a manually-run script? Given the repo currently has no browser-test dependency at all, I lean toward a separate script until the pilot proves its value.
 5. **Enforcement of "renderer cannot see the theme".** Types make it awkward but a determined import still compiles. An ESLint rule banning `PowerBITheme` imports inside `app/components/` would make it structural. Cheap, and worth doing at step 3.
+6. **[rev2] Should `gap` require `blockedBy`?** Making it mandatory forces a judgement at declaration time and makes the backlog sortable; making it optional keeps bulk declaration cheap, which matters when the first commit declares 111 of them. I lean optional at first, mandatory once a visual's gaps drop below ~20.
+7. **[rev2] Are generic id factories too invasive?** §3.6 needs `properties.ts` factory signatures to become generic in `Id`. It is type-only with no call-site changes, but it touches the file the resolver work just stabilised. The fallback (runtime id-matches-structure test) is weaker but zero-risk.
 
 ---
 
