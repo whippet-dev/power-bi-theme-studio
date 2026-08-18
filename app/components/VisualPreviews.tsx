@@ -1,7 +1,7 @@
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
-import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
+import { resolveActionButtonStyle, type ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
-import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
+import { resolveBookmarkNavigatorStyle, type ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { hexWithAlpha } from "../lib/colorUtils";
 import {
@@ -26,10 +26,12 @@ import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
-import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
+import { resolvePageNavigatorStyle, type ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
+import type { InteractionState } from "../lib/properties";
 import { areaPath, linePath, markerShape } from "../lib/lineGeometry";
 import { shapeGeometry } from "../lib/shapeGeometry";
+import { StateSelector } from "./PropertyEditor";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -107,6 +109,8 @@ type PreviewShellProps = {
   chrome: ResolvedChromeStyle;
   onSelect: (visual: VisualKind) => void;
   children: ReactNode;
+  /** Extra controls shown below the hero tile only (e.g. the interaction-state selector for buttons/navigators). */
+  extraControls?: ReactNode;
 };
 
 function mapLineStyle(value: string | number): "solid" | "dashed" | "dotted" {
@@ -424,6 +428,7 @@ function PreviewShell({
   chrome,
   onSelect,
   children,
+  extraControls,
 }: PreviewShellProps) {
   // The data tooltip preview used to float below the tile permanently,
   // which read as a stray, unlabelled box rather than something that
@@ -775,6 +780,7 @@ function PreviewShell({
       <span className="visual-hero-scale-wrap">
         <span className="visual-hero-scale">{tile}</span>
       </span>
+      {extraControls}
       {tooltip.show && (
         <button
           type="button"
@@ -825,6 +831,30 @@ export function VisualGallery({
   // preview lets you expand it rather than showing a permanently
   // collapsed control whose colours you can't judge.
   const [slicerDropdownOpen, setSlicerDropdownOpen] = useState(false);
+
+  // Action button, Bookmark navigator, and Page navigator style differently
+  // per interaction state ($id: default/hover/selected/disabled — see
+  // STATEFUL_GROUPS in properties.ts). The property panel already lets
+  // each state be edited blind; this lets the hero preview actually show
+  // what each one looks like, re-resolving from the raw theme with the
+  // chosen state rather than always rendering "default". Only the hero
+  // visual responds — thumbnails always show the default state, since
+  // there's no selector attached to them.
+  const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
+  const isStatefulHero = selected === "actionButton" || selected === "bookmarkNavigator" || selected === "pageNavigator";
+  const effectiveActionButtonStyle =
+    selected === "actionButton" ? resolveActionButtonStyle(rawTheme, theme, previewInteractionState) : actionButtonStyle;
+  const effectiveBookmarkNavigatorStyle =
+    selected === "bookmarkNavigator"
+      ? resolveBookmarkNavigatorStyle(rawTheme, theme, previewInteractionState)
+      : bookmarkNavigatorStyle;
+  const effectivePageNavigatorStyle =
+    selected === "pageNavigator" ? resolvePageNavigatorStyle(rawTheme, theme, previewInteractionState) : pageNavigatorStyle;
+  const stateSelectorNode = isStatefulHero ? (
+    <span className="preview-state-selector">
+      <StateSelector state={previewInteractionState} onSelect={setPreviewInteractionState} />
+    </span>
+  ) : undefined;
 
   // Shared sample data, so every cartesian chart plots the same figures
   // and axis ticks line up with the bars they describe.
@@ -2555,9 +2585,9 @@ export function VisualGallery({
 
   const shapeContent = shapeTile(shapeStyle, "shape");
 
-  const actionIcon = actionButtonStyle.icon;
+  const actionIcon = effectiveActionButtonStyle.icon;
   const actionButtonContent = shapeTile(
-    actionButtonStyle,
+    effectiveActionButtonStyle,
     "actionButton",
     actionIcon.show && (
       <span
@@ -2628,17 +2658,18 @@ export function VisualGallery({
   };
 
   const bookmarkNavigatorContent = navigatorButtons(
-    bookmarkNavigatorStyle,
-    bookmarkNavigatorStyle.accentBar,
-    bookmarkNavigatorStyle.layout,
+    effectiveBookmarkNavigatorStyle,
+    effectiveBookmarkNavigatorStyle.accentBar,
+    effectiveBookmarkNavigatorStyle.layout,
     ["Overview", "Detail", "Trends"],
   );
 
-  const pageNavigatorContent = navigatorButtons(pageNavigatorStyle, pageNavigatorStyle.accentBar, pageNavigatorStyle.layout, [
-    "Page 1",
-    "Page 2",
-    "Page 3",
-  ]);
+  const pageNavigatorContent = navigatorButtons(
+    effectivePageNavigatorStyle,
+    effectivePageNavigatorStyle.accentBar,
+    effectivePageNavigatorStyle.layout,
+    ["Page 1", "Page 2", "Page 3"],
+  );
 
   const textboxContent = (
     <span
@@ -2774,6 +2805,7 @@ export function VisualGallery({
           theme={theme}
           chrome={hero.chrome}
           onSelect={onSelect}
+          extraControls={stateSelectorNode}
         >
           {hero.content}
         </PreviewShell>

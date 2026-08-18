@@ -516,7 +516,7 @@ function PropertyRow({
  * array entry rather than a separate property — without this, only one
  * state is reachable and the other three are invisible.
  */
-function StateSelector({
+export function StateSelector({
   state,
   onSelect,
 }: {

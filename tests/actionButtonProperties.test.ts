@@ -39,6 +39,35 @@ test("resolveActionButtonStyle prefers a visualStyles.actionButton override over
   assert.equal(style.icon.shapeType, "back");
 });
 
+// Powers the preview's own state selector (VisualPreviews.tsx) — without a
+// `state` argument passed through resolveShapeFamilyCore, the hero preview
+// could only ever show "default", no matter which state the user picked.
+test("resolveActionButtonStyle's state argument reads that state's own entry, not the default", () => {
+  const themeWithStates: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: {
+      actionButton: {
+        "*": {
+          fill: [
+            { fillColor: { solid: { color: "#111111" } } },
+            { $id: "hover", fillColor: { solid: { color: "#222222" } } },
+          ],
+          icon: [{ shapeType: "blank" }, { $id: "hover", shapeType: "help" }],
+        },
+      },
+    },
+  };
+  const base = resolveTheme(themeWithStates);
+
+  assert.equal(resolveActionButtonStyle(themeWithStates, base).fill.fillColor, "#111111");
+  assert.equal(resolveActionButtonStyle(themeWithStates, base, "hover").fill.fillColor, "#222222");
+  // A state with no entry of its own falls back to the default, exactly
+  // like the property panel's own read behaviour.
+  assert.equal(resolveActionButtonStyle(themeWithStates, base, "selected").fill.fillColor, "#111111");
+  // Icon is also a stateful group for this visual specifically.
+  assert.equal(resolveActionButtonStyle(themeWithStates, base, "hover").icon.shapeType, "help");
+});
+
 test("propertyThemePath writes an action button icon-colour round-trip through updateThemeValue and resolveActionButtonStyle", () => {
   const path = propertyThemePath(ACTION_BUTTON_PROPERTIES.icon.lineColor);
   const updated = updateThemeValue(STARTER_THEME, path, "#00FF00");

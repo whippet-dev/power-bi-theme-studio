@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { forState, groupSupportsStates, stateEntryIndex } from "../app/lib/properties";
 import { ACTION_BUTTON_PROPERTIES, propertyThemePath } from "../app/lib/actionButtonProperties";
-import { readThemeValueAtPath, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
+import { resolveBookmarkNavigatorStyle } from "../app/lib/bookmarkNavigatorProperties";
+import { resolvePageNavigatorStyle } from "../app/lib/pageNavigatorProperties";
+import { readThemeValueAtPath, resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 const BARE: PowerBITheme = { name: "Sample theme", visualStyles: {} };
 
@@ -68,6 +70,30 @@ test("writing a non-default state appends an entry instead of overwriting the de
     readThemeValueAtPath(theme, propertyThemePath(forState(ACTION_BUTTON_PROPERTIES.fill.fillColor, 1))),
     "#AABBCC",
   );
+});
+
+test("bookmark and page navigator resolvers pick up accentBar's own per-state entry", () => {
+  const themed: PowerBITheme = {
+    ...BARE,
+    visualStyles: {
+      bookmarkNavigator: {
+        "*": {
+          accentBar: [{ color: { solid: { color: "#111111" } } }, { $id: "hover", color: { solid: { color: "#222222" } } }],
+        },
+      },
+      pageNavigator: {
+        "*": {
+          accentBar: [{ color: { solid: { color: "#333333" } } }, { $id: "hover", color: { solid: { color: "#444444" } } }],
+        },
+      },
+    },
+  };
+  const base = resolveTheme(themed);
+
+  assert.equal(resolveBookmarkNavigatorStyle(themed, base).accentBar.color, "#111111");
+  assert.equal(resolveBookmarkNavigatorStyle(themed, base, "hover").accentBar.color, "#222222");
+  assert.equal(resolvePageNavigatorStyle(themed, base).accentBar.color, "#333333");
+  assert.equal(resolvePageNavigatorStyle(themed, base, "hover").accentBar.color, "#444444");
 });
 
 test("forState retargets the array index without disturbing the rest of the path", () => {

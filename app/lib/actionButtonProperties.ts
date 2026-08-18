@@ -1,4 +1,15 @@
-import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolvePropertyValue } from "./properties";
+import {
+  boolProp,
+  colorProp,
+  enumProp,
+  forState,
+  groupSupportsStates,
+  numberProp,
+  propertyThemePath,
+  resolvePropertyValue,
+  stateEntryIndex,
+} from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
 import type { PowerBITheme, ResolvedTheme } from "./theme";
 
@@ -183,24 +194,38 @@ export type ResolvedActionButtonStyle = ResolvedShapeFamilyCore & {
   };
 };
 
-export function resolveActionButtonStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedActionButtonStyle {
+/**
+ * `state` previews how the button looks in each interaction state — see
+ * resolveShapeFamilyCore's doc comment. Icon is also a stateful group here
+ * (STATEFUL_GROUPS.actionButton includes it), unlike the other shape-family
+ * visuals.
+ */
+export function resolveActionButtonStyle(
+  theme: PowerBITheme,
+  base: ResolvedTheme,
+  state: InteractionState = "default",
+): ResolvedActionButtonStyle {
   const p = ACTION_BUTTON_PROPERTIES;
+  const iconStateful = groupSupportsStates("actionButton", "icon");
+  const iconIndex = iconStateful ? stateEntryIndex(theme, "actionButton", "icon", state) : 0;
+  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyDefinition<T> =>
+    iconStateful ? forState(definition, iconIndex) : definition;
   return {
-    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily),
+    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
     icon: {
-      show: resolvePropertyValue(theme, p.icon.show, true),
-      shapeType: resolvePropertyValue(theme, p.icon.shapeType, "blank"),
-      placement: resolvePropertyValue(theme, p.icon.placement, "left"),
-      iconSize: resolvePropertyValue(theme, p.icon.iconSize, 20),
-      lineColor: resolvePropertyValue(theme, p.icon.lineColor, base.foreground),
-      lineWeight: resolvePropertyValue(theme, p.icon.lineWeight, 2),
-      lineTransparency: resolvePropertyValue(theme, p.icon.lineTransparency, 0),
-      horizontalAlignment: resolvePropertyValue(theme, p.icon.horizontalAlignment, "center"),
-      verticalAlignment: resolvePropertyValue(theme, p.icon.verticalAlignment, "middle"),
-      topMargin: resolvePropertyValue(theme, p.icon.topMargin, 0),
-      bottomMargin: resolvePropertyValue(theme, p.icon.bottomMargin, 0),
-      leftMargin: resolvePropertyValue(theme, p.icon.leftMargin, 0),
-      rightMargin: resolvePropertyValue(theme, p.icon.rightMargin, 0),
+      show: resolvePropertyValue(theme, at(p.icon.show), true),
+      shapeType: resolvePropertyValue(theme, at(p.icon.shapeType), "blank"),
+      placement: resolvePropertyValue(theme, at(p.icon.placement), "left"),
+      iconSize: resolvePropertyValue(theme, at(p.icon.iconSize), 20),
+      lineColor: resolvePropertyValue(theme, at(p.icon.lineColor), base.foreground),
+      lineWeight: resolvePropertyValue(theme, at(p.icon.lineWeight), 2),
+      lineTransparency: resolvePropertyValue(theme, at(p.icon.lineTransparency), 0),
+      horizontalAlignment: resolvePropertyValue(theme, at(p.icon.horizontalAlignment), "center"),
+      verticalAlignment: resolvePropertyValue(theme, at(p.icon.verticalAlignment), "middle"),
+      topMargin: resolvePropertyValue(theme, at(p.icon.topMargin), 0),
+      bottomMargin: resolvePropertyValue(theme, at(p.icon.bottomMargin), 0),
+      leftMargin: resolvePropertyValue(theme, at(p.icon.leftMargin), 0),
+      rightMargin: resolvePropertyValue(theme, at(p.icon.rightMargin), 0),
     },
   };
 }

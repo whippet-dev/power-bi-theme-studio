@@ -1,4 +1,16 @@
-import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
+import {
+  boolProp,
+  colorProp,
+  enumProp,
+  forState,
+  groupSupportsStates,
+  numberProp,
+  propertyThemePath,
+  resolvePropertyValue,
+  stateEntryIndex,
+  textProp,
+} from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
 import type { PowerBITheme, ResolvedTheme } from "./theme";
 
@@ -137,16 +149,25 @@ export type ResolvedBookmarkNavigatorStyle = ResolvedShapeFamilyCore & {
   layout: { orientation: string | number; columnCount: number; rowCount: number; cellPadding: number };
 };
 
-export function resolveBookmarkNavigatorStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedBookmarkNavigatorStyle {
+/** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
+export function resolveBookmarkNavigatorStyle(
+  theme: PowerBITheme,
+  base: ResolvedTheme,
+  state: InteractionState = "default",
+): ResolvedBookmarkNavigatorStyle {
   const p = BOOKMARK_NAVIGATOR_PROPERTIES;
+  const accentBarStateful = groupSupportsStates("bookmarkNavigator", "accentBar");
+  const accentBarIndex = accentBarStateful ? stateEntryIndex(theme, "bookmarkNavigator", "accentBar", state) : 0;
+  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyDefinition<T> =>
+    accentBarStateful ? forState(definition, accentBarIndex) : definition;
   return {
-    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily),
+    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
     accentBar: {
-      show: resolvePropertyValue(theme, p.accentBar.show, false),
-      color: resolvePropertyValue(theme, p.accentBar.color, base.tableAccent),
-      position: resolvePropertyValue(theme, p.accentBar.position, "Left"),
-      width: resolvePropertyValue(theme, p.accentBar.width, 4),
-      transparency: resolvePropertyValue(theme, p.accentBar.transparency, 0),
+      show: resolvePropertyValue(theme, at(p.accentBar.show), false),
+      color: resolvePropertyValue(theme, at(p.accentBar.color), base.tableAccent),
+      position: resolvePropertyValue(theme, at(p.accentBar.position), "Left"),
+      width: resolvePropertyValue(theme, at(p.accentBar.width), 4),
+      transparency: resolvePropertyValue(theme, at(p.accentBar.transparency), 0),
     },
     bookmarks: {
       allowDeselectionBookmark: resolvePropertyValue(theme, p.bookmarks.allowDeselectionBookmark, false),

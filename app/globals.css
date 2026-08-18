@@ -1164,6 +1164,25 @@ button { color: inherit; }
   max-width: 100%;
 }
 
+/* Lets the hero preview itself show what a button/navigator looks like in
+   each interaction state, not just the property panel's blind editor.
+   Reuses .state-selector's markup but resets its panel-oriented styling
+   (full-width, bottom border/margin meant to separate it from the group
+   content below it) to a compact standalone control matching the tooltip
+   trigger button beside it. */
+.preview-state-selector {
+  display: inline-block;
+  width: 260px;
+  max-width: 100%;
+  margin: 10px 0 0 24px;
+}
+
+.preview-state-selector .state-selector {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 /* Reveals the data-tooltip preview on demand rather than always — the
    box used to float below the tile permanently with nothing explaining
    what it was. */

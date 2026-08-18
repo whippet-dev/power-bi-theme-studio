@@ -1,5 +1,15 @@
-import { boolProp, colorProp, enumProp, numberProp, resolvePropertyValue, textProp } from "./properties";
-import type { VisualSchemaKey } from "./properties";
+import {
+  boolProp,
+  colorProp,
+  enumProp,
+  forState,
+  groupSupportsStates,
+  numberProp,
+  resolvePropertyValue,
+  stateEntryIndex,
+  textProp,
+} from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType, VisualSchemaKey } from "./properties";
 import type { PowerBITheme } from "./theme";
 
 /**
@@ -615,13 +625,28 @@ const SHAPE_PARAM_DEFAULTS: Record<string, string | number> = {
   tabRoundCornerBottom: 0,
 };
 
-/** Shared resolver for the core groups — every shape-family visual calls this the same way, then resolves its own extra groups on top. */
+/**
+ * Shared resolver for the core groups — every shape-family visual calls
+ * this the same way, then resolves its own extra groups on top.
+ *
+ * `state` lets the preview show what a button or navigator actually looks
+ * like in each interaction state (Power BI keys fill/outline/shadow/glow/
+ * text by `$id` per state — see STATEFUL_GROUPS in properties.ts). Only
+ * Action button, Bookmark navigator, and Page navigator support this;
+ * Shape doesn't, and `groupSupportsStates` returning false for it means
+ * `at()` is a no-op there — passing a non-"default" state has no effect.
+ */
 export function resolveShapeFamilyCore(
   theme: PowerBITheme,
   core: ShapeFamilyCore,
   baseForeground: string,
   baseFontFamily: string,
+  state: InteractionState = "default",
 ): ResolvedShapeFamilyCore {
+  const visual = core.fill.fillColor.visual;
+  const at = <T extends PropertyValueType>(group: string, definition: PropertyDefinition<T>): PropertyDefinition<T> =>
+    groupSupportsStates(visual, group) ? forState(definition, stateEntryIndex(theme, visual, group, state)) : definition;
+
   const shape: Record<string, string | number> = {};
   for (const [key, definition] of Object.entries(core.shape)) {
     const fallback: string | number =
@@ -631,30 +656,30 @@ export function resolveShapeFamilyCore(
 
   return {
     fill: {
-      show: resolvePropertyValue(theme, core.fill.show, true),
-      fillColor: resolvePropertyValue(theme, core.fill.fillColor, "#005EA5"),
-      transparency: resolvePropertyValue(theme, core.fill.transparency, 0),
+      show: resolvePropertyValue(theme, at("fill", core.fill.show), true),
+      fillColor: resolvePropertyValue(theme, at("fill", core.fill.fillColor), "#005EA5"),
+      transparency: resolvePropertyValue(theme, at("fill", core.fill.transparency), 0),
     },
     outline: {
-      show: resolvePropertyValue(theme, core.outline.show, false),
-      lineColor: resolvePropertyValue(theme, core.outline.lineColor, "#E3E3E3"),
-      weight: resolvePropertyValue(theme, core.outline.weight, 1),
-      transparency: resolvePropertyValue(theme, core.outline.transparency, 0),
+      show: resolvePropertyValue(theme, at("outline", core.outline.show), false),
+      lineColor: resolvePropertyValue(theme, at("outline", core.outline.lineColor), "#E3E3E3"),
+      weight: resolvePropertyValue(theme, at("outline", core.outline.weight), 1),
+      transparency: resolvePropertyValue(theme, at("outline", core.outline.transparency), 0),
     },
     shadow: {
-      show: resolvePropertyValue(theme, core.shadow.show, false),
-      shadowPositionPreset: resolvePropertyValue(theme, core.shadow.shadowPositionPreset, "bottomRight"),
-      angle: resolvePropertyValue(theme, core.shadow.angle, 45),
-      color: resolvePropertyValue(theme, core.shadow.color, "#000000"),
-      transparency: resolvePropertyValue(theme, core.shadow.transparency, 60),
-      shadowDistance: resolvePropertyValue(theme, core.shadow.shadowDistance, 2),
-      shadowBlur: resolvePropertyValue(theme, core.shadow.shadowBlur, 5),
+      show: resolvePropertyValue(theme, at("shadow", core.shadow.show), false),
+      shadowPositionPreset: resolvePropertyValue(theme, at("shadow", core.shadow.shadowPositionPreset), "bottomRight"),
+      angle: resolvePropertyValue(theme, at("shadow", core.shadow.angle), 45),
+      color: resolvePropertyValue(theme, at("shadow", core.shadow.color), "#000000"),
+      transparency: resolvePropertyValue(theme, at("shadow", core.shadow.transparency), 60),
+      shadowDistance: resolvePropertyValue(theme, at("shadow", core.shadow.shadowDistance), 2),
+      shadowBlur: resolvePropertyValue(theme, at("shadow", core.shadow.shadowBlur), 5),
     },
     glow: {
-      show: resolvePropertyValue(theme, core.glow.show, false),
-      color: resolvePropertyValue(theme, core.glow.color, "#FFFFFF"),
-      transparency: resolvePropertyValue(theme, core.glow.transparency, 60),
-      shadowBlur: resolvePropertyValue(theme, core.glow.shadowBlur, 5),
+      show: resolvePropertyValue(theme, at("glow", core.glow.show), false),
+      color: resolvePropertyValue(theme, at("glow", core.glow.color), "#FFFFFF"),
+      transparency: resolvePropertyValue(theme, at("glow", core.glow.transparency), 60),
+      shadowBlur: resolvePropertyValue(theme, at("glow", core.glow.shadowBlur), 5),
     },
     rotation: {
       angle: resolvePropertyValue(theme, core.rotation.angle, 0),
@@ -663,20 +688,20 @@ export function resolveShapeFamilyCore(
     },
     shape,
     text: {
-      show: resolvePropertyValue(theme, core.text.show, true),
-      text: resolvePropertyValue(theme, core.text.text, ""),
-      fontColor: resolvePropertyValue(theme, core.text.fontColor, baseForeground),
-      fontFamily: resolvePropertyValue(theme, core.text.fontFamily, baseFontFamily),
-      fontSize: resolvePropertyValue(theme, core.text.fontSize, 10),
-      bold: resolvePropertyValue(theme, core.text.bold, false),
-      italic: resolvePropertyValue(theme, core.text.italic, false),
-      underline: resolvePropertyValue(theme, core.text.underline, false),
-      horizontalAlignment: resolvePropertyValue(theme, core.text.horizontalAlignment, "center"),
-      verticalAlignment: resolvePropertyValue(theme, core.text.verticalAlignment, "middle"),
-      topMargin: resolvePropertyValue(theme, core.text.topMargin, 0),
-      bottomMargin: resolvePropertyValue(theme, core.text.bottomMargin, 0),
-      leftMargin: resolvePropertyValue(theme, core.text.leftMargin, 0),
-      rightMargin: resolvePropertyValue(theme, core.text.rightMargin, 0),
+      show: resolvePropertyValue(theme, at("text", core.text.show), true),
+      text: resolvePropertyValue(theme, at("text", core.text.text), ""),
+      fontColor: resolvePropertyValue(theme, at("text", core.text.fontColor), baseForeground),
+      fontFamily: resolvePropertyValue(theme, at("text", core.text.fontFamily), baseFontFamily),
+      fontSize: resolvePropertyValue(theme, at("text", core.text.fontSize), 10),
+      bold: resolvePropertyValue(theme, at("text", core.text.bold), false),
+      italic: resolvePropertyValue(theme, at("text", core.text.italic), false),
+      underline: resolvePropertyValue(theme, at("text", core.text.underline), false),
+      horizontalAlignment: resolvePropertyValue(theme, at("text", core.text.horizontalAlignment), "center"),
+      verticalAlignment: resolvePropertyValue(theme, at("text", core.text.verticalAlignment), "middle"),
+      topMargin: resolvePropertyValue(theme, at("text", core.text.topMargin), 0),
+      bottomMargin: resolvePropertyValue(theme, at("text", core.text.bottomMargin), 0),
+      leftMargin: resolvePropertyValue(theme, at("text", core.text.leftMargin), 0),
+      rightMargin: resolvePropertyValue(theme, at("text", core.text.rightMargin), 0),
     },
   };
 }
