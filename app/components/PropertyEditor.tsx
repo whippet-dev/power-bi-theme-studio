@@ -29,6 +29,7 @@ import { PAGE_NAVIGATOR_PROPERTIES, propertyThemePath as pageNavigatorPropertyTh
 import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { PIE_CHART_PROPERTIES, propertyThemePath as pieChartPropertyThemePath } from "../lib/pieChartProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
+import { forState, groupSupportsStates, INTERACTION_STATES, stateEntryIndex, type InteractionState } from "../lib/properties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
 import { propertyThemePath as shapePropertyThemePath, SHAPE_PROPERTIES } from "../lib/shapeProperties";
@@ -43,7 +44,7 @@ import { propertyThemePath as tablePropertyThemePath, TABLE_PROPERTIES } from ".
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import { propertyThemePath as textboxPropertyThemePath, TEXTBOX_PROPERTIES } from "../lib/textboxProperties";
 import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
-import { hasThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
+import { hasThemeValueAtPath, readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
 import type { VisualKind } from "./VisualPreviews";
 
 type ThemePath = Array<string | number>;
@@ -510,6 +511,39 @@ function PropertyRow({
 }
 
 /**
+ * Lets a button or navigator's formatting be edited per interaction
+ * state. Power BI keys those groups by `$id`, so "hover" is a separate
+ * array entry rather than a separate property — without this, only one
+ * state is reachable and the other three are invisible.
+ */
+function StateSelector({
+  state,
+  onSelect,
+}: {
+  state: InteractionState;
+  onSelect: (state: InteractionState) => void;
+}) {
+  return (
+    <div className="state-selector" role="group" aria-label="Interaction state">
+      <span className="state-selector__label">State</span>
+      <div className="state-selector__options">
+        {INTERACTION_STATES.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`state-selector__option${option === state ? " is-active" : ""}`}
+            aria-pressed={option === state}
+            onClick={() => onSelect(option)}
+          >
+            {option === "default" ? "Default" : option[0].toUpperCase() + option.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * A before/after demo for settings the main preview can't show — format
  * strings, blank handling, resize behaviour, log scales. Each state the
  * property can take is drawn with a sample of the affected element, and
@@ -561,6 +595,9 @@ function RegistryGroupBody({
   groupValues,
   pathPrefix,
   getThemePath,
+  readThemePath,
+  stateId,
+  stateIdPath,
   onChange,
   onReset,
 }: {
@@ -569,6 +606,15 @@ function RegistryGroupBody({
   groupValues: Record<string, PropertyValue>;
   pathPrefix: string;
   getThemePath: (definition: PropertyDefinition) => ThemePath;
+  /**
+   * Where to *read* from, when that differs from where a write lands —
+   * an interaction state with no entry yet reads the default but writes
+   * a new one. Defaults to `getThemePath`.
+   */
+  readThemePath?: (definition: PropertyDefinition) => ThemePath;
+  /** The `$id` a newly-created state entry needs, if any. */
+  stateId?: string;
+  stateIdPath?: ThemePath;
   onChange: (path: ThemePath, value: PropertyValue) => void;
   onReset: (path: ThemePath) => void;
 }) {
@@ -580,16 +626,25 @@ function RegistryGroupBody({
   }
 
   const renderRow = ([key, definition]: [string, PropertyDefinition<PropertyValueType>]) => {
-    const path = getThemePath(definition);
+    const writePath = getThemePath(definition);
+    const readPath = (readThemePath ?? getThemePath)(definition);
+    // A state's own value if it has one, otherwise what it inherits from
+    // the default entry — which is what Power BI shows for that state.
+    const stateValue = readThemeValueAtPath(theme, readPath) as PropertyValue | undefined;
     return (
       <PropertyRow
         key={definition.id}
         definition={definition}
         pathPrefix={pathPrefix}
-        value={groupValues[key]}
-        hasOverride={hasThemeValueAtPath(theme, path)}
-        onChange={(next) => onChange(path, next)}
-        onReset={() => onReset(path)}
+        value={stateValue ?? groupValues[key]}
+        hasOverride={hasThemeValueAtPath(theme, writePath)}
+        onChange={(next) => {
+          // A new state entry needs its $id, or Power BI can't tell which
+          // state it describes and treats it as another default.
+          if (stateId && stateIdPath && !hasThemeValueAtPath(theme, stateIdPath)) onChange(stateIdPath, stateId);
+          onChange(writePath, next);
+        }}
+        onReset={() => onReset(writePath)}
       />
     );
   };
@@ -705,6 +760,10 @@ export function PropertyEditor({
 }: PropertyEditorProps) {
   const [tab, setTab] = useState<Tab>("visual");
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  // Which interaction state is being edited, for the visuals whose groups
+  // are keyed by `$id` (buttons and navigators). Not theme data — it
+  // selects which array entry the controls read and write.
+  const [interactionState, setInteractionState] = useState<InteractionState>("default");
 
   // A group open in one tab/visual rarely makes sense after switching to
   // another, so return to the list view whenever the context changes.
@@ -1024,46 +1083,91 @@ export function PropertyEditor({
 
     if (id.startsWith(ACTION_BUTTON_ID_PREFIX)) {
       const key = id.slice(ACTION_BUTTON_ID_PREFIX.length) as keyof typeof ACTION_BUTTON_PROPERTIES;
+      const stateful = groupSupportsStates("actionButton", key);
+      // Read the entry for the selected state; writing a state that has
+      // no entry yet appends one rather than overwriting the default.
+      const readIndex = stateEntryIndex(theme, "actionButton", key, interactionState);
+      const writeIndex = stateEntryIndex(theme, "actionButton", key, interactionState, true);
       return (
-        <RegistryGroupBody
-          theme={theme}
-          group={ACTION_BUTTON_PROPERTIES[key]}
-          groupValues={actionButtonStyle[key]}
-          pathPrefix="visualStyles.actionButton.*"
-          getThemePath={actionButtonPropertyThemePath}
-          onChange={onChange}
-          onReset={onReset}
-        />
+        <>
+          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          <RegistryGroupBody
+            theme={theme}
+            group={ACTION_BUTTON_PROPERTIES[key]}
+            groupValues={actionButtonStyle[key]}
+            pathPrefix="visualStyles.actionButton.*"
+            getThemePath={(definition) =>
+              stateful ? actionButtonPropertyThemePath(forState(definition, writeIndex)) : actionButtonPropertyThemePath(definition)
+            }
+            readThemePath={(definition) =>
+              stateful ? actionButtonPropertyThemePath(forState(definition, readIndex)) : actionButtonPropertyThemePath(definition)
+            }
+            stateId={stateful && interactionState !== "default" ? interactionState : undefined}
+            stateIdPath={stateful ? ["visualStyles", "actionButton", "*", key, writeIndex, "$id"] : undefined}
+            onChange={onChange}
+            onReset={onReset}
+          />
+        </>
       );
     }
 
     if (id.startsWith(BOOKMARK_NAVIGATOR_ID_PREFIX)) {
       const key = id.slice(BOOKMARK_NAVIGATOR_ID_PREFIX.length) as keyof typeof BOOKMARK_NAVIGATOR_PROPERTIES;
+      const stateful = groupSupportsStates("bookmarkNavigator", key);
+      // Read the entry for the selected state; writing a state that has
+      // no entry yet appends one rather than overwriting the default.
+      const readIndex = stateEntryIndex(theme, "bookmarkNavigator", key, interactionState);
+      const writeIndex = stateEntryIndex(theme, "bookmarkNavigator", key, interactionState, true);
       return (
-        <RegistryGroupBody
-          theme={theme}
-          group={BOOKMARK_NAVIGATOR_PROPERTIES[key]}
-          groupValues={bookmarkNavigatorStyle[key]}
-          pathPrefix="visualStyles.bookmarkNavigator.*"
-          getThemePath={bookmarkNavigatorPropertyThemePath}
-          onChange={onChange}
-          onReset={onReset}
-        />
+        <>
+          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          <RegistryGroupBody
+            theme={theme}
+            group={BOOKMARK_NAVIGATOR_PROPERTIES[key]}
+            groupValues={bookmarkNavigatorStyle[key]}
+            pathPrefix="visualStyles.bookmarkNavigator.*"
+            getThemePath={(definition) =>
+              stateful ? bookmarkNavigatorPropertyThemePath(forState(definition, writeIndex)) : bookmarkNavigatorPropertyThemePath(definition)
+            }
+            readThemePath={(definition) =>
+              stateful ? bookmarkNavigatorPropertyThemePath(forState(definition, readIndex)) : bookmarkNavigatorPropertyThemePath(definition)
+            }
+            stateId={stateful && interactionState !== "default" ? interactionState : undefined}
+            stateIdPath={stateful ? ["visualStyles", "bookmarkNavigator", "*", key, writeIndex, "$id"] : undefined}
+            onChange={onChange}
+            onReset={onReset}
+          />
+        </>
       );
     }
 
     if (id.startsWith(PAGE_NAVIGATOR_ID_PREFIX)) {
       const key = id.slice(PAGE_NAVIGATOR_ID_PREFIX.length) as keyof typeof PAGE_NAVIGATOR_PROPERTIES;
+      const stateful = groupSupportsStates("pageNavigator", key);
+      // Read the entry for the selected state; writing a state that has
+      // no entry yet appends one rather than overwriting the default.
+      const readIndex = stateEntryIndex(theme, "pageNavigator", key, interactionState);
+      const writeIndex = stateEntryIndex(theme, "pageNavigator", key, interactionState, true);
       return (
-        <RegistryGroupBody
-          theme={theme}
-          group={PAGE_NAVIGATOR_PROPERTIES[key]}
-          groupValues={pageNavigatorStyle[key]}
-          pathPrefix="visualStyles.pageNavigator.*"
-          getThemePath={pageNavigatorPropertyThemePath}
-          onChange={onChange}
-          onReset={onReset}
-        />
+        <>
+          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          <RegistryGroupBody
+            theme={theme}
+            group={PAGE_NAVIGATOR_PROPERTIES[key]}
+            groupValues={pageNavigatorStyle[key]}
+            pathPrefix="visualStyles.pageNavigator.*"
+            getThemePath={(definition) =>
+              stateful ? pageNavigatorPropertyThemePath(forState(definition, writeIndex)) : pageNavigatorPropertyThemePath(definition)
+            }
+            readThemePath={(definition) =>
+              stateful ? pageNavigatorPropertyThemePath(forState(definition, readIndex)) : pageNavigatorPropertyThemePath(definition)
+            }
+            stateId={stateful && interactionState !== "default" ? interactionState : undefined}
+            stateIdPath={stateful ? ["visualStyles", "pageNavigator", "*", key, writeIndex, "$id"] : undefined}
+            onChange={onChange}
+            onReset={onReset}
+          />
+        </>
       );
     }
 

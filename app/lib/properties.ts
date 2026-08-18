@@ -183,6 +183,79 @@ export function chromeThemePath(
   return propertyThemePath({ visual: activeVisual, path: definition.path, valueType: definition.valueType });
 }
 
+/**
+ * Power BI styles a button or navigator differently per interaction state
+ * by writing *several* entries into a group's array, each tagged with an
+ * `$id`:
+ *
+ *   visualStyles.actionButton["*"].fill = [
+ *     { $id: "default",  fillColor: ... },
+ *     { $id: "hover",    fillColor: ... },
+ *   ]
+ *
+ * Everywhere else in this app a group has exactly one entry and the
+ * registries hardcode index 0. That stays true — this is an opt-in path
+ * used only by the visuals whose schema actually carries `$id`.
+ */
+export const INTERACTION_STATES = ["default", "hover", "selected", "disabled"] as const;
+export type InteractionState = (typeof INTERACTION_STATES)[number];
+
+/** Groups that support per-state styling, by visual. */
+export const STATEFUL_GROUPS: Partial<Record<VisualSchemaKey, readonly string[]>> = {
+  actionButton: ["fill", "glow", "outline", "shadow", "text", "icon"],
+  bookmarkNavigator: ["fill", "glow", "outline", "shadow", "text", "accentBar"],
+  pageNavigator: ["fill", "glow", "outline", "shadow", "text", "accentBar"],
+};
+
+export function groupSupportsStates(visual: VisualSchemaKey, group: string): boolean {
+  return STATEFUL_GROUPS[visual]?.includes(group) ?? false;
+}
+
+/**
+ * Which array index holds `state` for this group.
+ *
+ * An entry with no `$id` at all is the default state — that's how a theme
+ * that never thought about states is written, and it has to keep working.
+ * When `create` is set, a state with no entry yet gets the next free
+ * index so it can be written to.
+ */
+export function stateEntryIndex(
+  theme: PowerBITheme,
+  visual: VisualSchemaKey,
+  group: string,
+  state: InteractionState,
+  create = false,
+): number {
+  const visualStyles = theme.visualStyles;
+  const entries = isRecord(visualStyles) ? readAtPath(visualStyles[visual], ["*", group]) : undefined;
+
+  if (Array.isArray(entries)) {
+    const tagged = entries.findIndex((entry) => isRecord(entry) && entry.$id === state);
+    if (tagged !== -1) return tagged;
+
+    if (state === "default") {
+      const untagged = entries.findIndex((entry) => isRecord(entry) && entry.$id === undefined);
+      if (untagged !== -1) return untagged;
+    }
+    return create ? entries.length : 0;
+  }
+
+  // Nothing written yet: the default state is index 0, and any other
+  // state starts a second entry alongside it.
+  return state === "default" ? 0 : create ? 1 : 0;
+}
+
+/** A property definition retargeted at a particular state's array entry. */
+export function forState<T extends PropertyValueType>(
+  definition: PropertyDefinition<T>,
+  index: number,
+): PropertyDefinition<T> {
+  const path = [...definition.path];
+  // The index is always the second segment: ["fill", 0, "fillColor"].
+  path[1] = index;
+  return { ...definition, path };
+}
+
 // Shared factories for building PropertyDefinition entries, used by every
 // per-visual registry (app/lib/tableProperties.ts, app/lib/barChartProperties.ts, ...).
 

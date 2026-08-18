@@ -770,6 +770,54 @@ button { color: inherit; }
 }
 
 /* A three-part data label (title / value / detail). */
+/* Picks which interaction state a button/navigator's formatting applies
+   to. Power BI keys those groups by $id, so each state is a separate
+   array entry rather than a separate property. */
+.state-selector {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.state-selector__label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.state-selector__options {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: #f2eef6;
+}
+
+.state-selector__option {
+  flex: 1;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 6px;
+  background: transparent;
+  color: #6d627b;
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.state-selector__option.is-active {
+  background: #fff;
+  color: var(--brand);
+  box-shadow: 0 1px 2px rgba(20, 10, 30, 0.12);
+}
+
 /* Before/after demo for settings the preview can't show. Lives inside
    the ⓘ panel, so it adds no height to the property row itself. */
 .effect-demo {

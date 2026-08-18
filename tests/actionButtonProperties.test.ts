@@ -48,7 +48,7 @@ test("propertyThemePath writes an action button icon-colour round-trip through u
   assert.equal(style.icon.lineColor, "#00FF00");
 });
 
-test("icon.$id (interaction-state discriminator) and icon.image (complex nested object) are intentionally excluded", () => {
+test("icon.$id is not a user-editable property — the state selector manages it — and icon.image (complex nested object) is excluded", () => {
   assert.equal("$id" in ACTION_BUTTON_PROPERTIES.icon, false);
   assert.equal("image" in ACTION_BUTTON_PROPERTIES.icon, false);
 });

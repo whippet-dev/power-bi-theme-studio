@@ -54,7 +54,7 @@ test("propertyThemePath writes an accent bar colour round-trip through updateThe
   assert.equal(style.accentBar.color, "#00FF00");
 });
 
-test("accentBar.$id (interaction-state discriminator) and bookmarks.bookmarkGroup/selectedBookmark (report content, not style) are intentionally excluded", () => {
+test("accentBar.$id is not a user-editable property — the state selector manages it — and bookmarkGroup/selectedBookmark (report content) are excluded", () => {
   assert.equal("$id" in BOOKMARK_NAVIGATOR_PROPERTIES.accentBar, false);
   assert.equal("bookmarkGroup" in BOOKMARK_NAVIGATOR_PROPERTIES.bookmarks, false);
   assert.equal("selectedBookmark" in BOOKMARK_NAVIGATOR_PROPERTIES.bookmarks, false);

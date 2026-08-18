@@ -146,6 +146,28 @@ export function updateThemeValue(
   return clone as PowerBITheme;
 }
 
+/**
+ * The raw value at `path`, or undefined. Used where a control needs the
+ * value from a *specific* array entry rather than the resolved default —
+ * per-interaction-state formatting, where "hover" and "default" live in
+ * different entries of the same group.
+ */
+export function readThemeValueAtPath(theme: PowerBITheme, path: Array<string | number>): JsonValue | undefined {
+  let cursor: unknown = theme;
+
+  for (const part of path) {
+    if (Array.isArray(cursor)) {
+      cursor = typeof part === "number" ? cursor[part] : undefined;
+    } else if (isRecord(cursor)) {
+      cursor = cursor[part];
+    } else {
+      return undefined;
+    }
+  }
+
+  return cursor as JsonValue | undefined;
+}
+
 /** Whether the theme has an explicit value at `path` — used to tell an active override apart from a resolved fallback. */
 export function hasThemeValueAtPath(theme: PowerBITheme, path: Array<string | number>): boolean {
   let cursor: unknown = theme;
