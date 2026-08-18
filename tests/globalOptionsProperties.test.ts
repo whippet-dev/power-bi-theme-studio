@@ -97,12 +97,54 @@ test("propertyThemePath writes a page background colour round-trip through updat
   assert.equal(global.pageBackground.color, "#00FF00");
 });
 
-test("instance/identity fields are intentionally excluded: filterCard.$id (Available/Applied discriminator), pageInformationName/pageInformationAltName (per-page identity, not a theme-wide default), and every group's 'image' field (complex nested object)", () => {
+test("instance/identity fields are intentionally excluded as *editable* properties: filterCard.$id, pageInformationName/pageInformationAltName (per-page identity, not a theme-wide default), and every group's 'image' field (complex nested object)", () => {
+  // $id itself still isn't a stylable value a user picks — but unlike the
+  // others here, what it discriminates (filterCard's Applied/Available
+  // states) *is* now read distinctly by resolveGlobalOptionsStyle, via
+  // filterCardEntryIndex — see the tests below. An earlier version of
+  // this comment treated $id as "just excluded" the same as the others,
+  // which undersold that the two states it tags render differently in
+  // real Power BI (confirmed against a screenshot) and needed their own
+  // resolution path, not just a skipped property definition.
   assert.equal("$id" in GLOBAL_OPTIONS_PROPERTIES.pageFilterCards, false);
   assert.equal("pageInformationName" in GLOBAL_OPTIONS_PROPERTIES.pageInformation, false);
   assert.equal("pageInformationAltName" in GLOBAL_OPTIONS_PROPERTIES.pageInformation, false);
   assert.equal("image" in GLOBAL_OPTIONS_PROPERTIES.pageBackground, false);
   assert.equal("image" in GLOBAL_OPTIONS_PROPERTIES.pageWallpaper, false);
+});
+
+test("pageFilterCards resolves the 'Available' $id entry and pageFilterCardsApplied resolves 'Applied', independently", () => {
+  const themeWithBothStates: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: {
+      page: {
+        "*": {
+          filterCard: [
+            { $id: "Applied", backgroundColor: { solid: { color: "#F3F2F1" } } },
+            { $id: "Available", backgroundColor: { solid: { color: "#FFFFFF" } } },
+          ],
+        },
+      },
+    },
+  };
+
+  const global = resolveGlobalOptionsStyle(themeWithBothStates, resolveTheme(themeWithBothStates));
+  assert.equal(global.pageFilterCards.backgroundColor, "#FFFFFF", "pageFilterCards reads the Available entry, regardless of array order");
+  assert.equal(global.pageFilterCardsApplied.backgroundColor, "#F3F2F1", "pageFilterCardsApplied reads the Applied entry");
+});
+
+test("a theme with only one untagged filterCard entry applies it to both Available and Applied, rather than losing the override", () => {
+  // Themes written before Applied/Available existed (or that just don't
+  // bother splitting them) still need to work -- same "untagged = default"
+  // reasoning as the button/navigator interaction states.
+  const legacyTheme: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: { page: { "*": { filterCard: [{ backgroundColor: { solid: { color: "#EEEEEE" } } }] } } },
+  };
+
+  const global = resolveGlobalOptionsStyle(legacyTheme, resolveTheme(legacyTheme));
+  assert.equal(global.pageFilterCards.backgroundColor, "#EEEEEE");
+  assert.equal(global.pageFilterCardsApplied.backgroundColor, "#EEEEEE");
 });
 
 test("every resolved GLOBAL_OPTIONS_PROPERTIES path is unique (no accidental JSON collisions)", () => {

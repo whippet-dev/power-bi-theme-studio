@@ -32,9 +32,13 @@ import {
  */
 export function FilterPanePreview({ globalOptions, theme }: { globalOptions: ResolvedGlobalOptionsStyle; theme: ResolvedTheme }) {
   const pane = globalOptions.pageFilterPane;
-  const card = globalOptions.pageFilterCards;
+  // "Available" (no selection, e.g. "is (All)") vs "Applied" (a selection
+  // is active) are genuinely different states in the real schema — see
+  // filterCardEntryIndex in globalOptionsProperties.ts.
+  const availableCard = globalOptions.pageFilterCards;
+  const appliedCard = globalOptions.pageFilterCardsApplied;
   const state = globalOptions.reportFilterPaneState;
-  const fieldNameColor = theme.palette[0] ?? card.foregroundColor;
+  const fieldNameColor = theme.palette[0] ?? availableCard.foregroundColor;
 
   if (!state.visible) {
     return (
@@ -61,16 +65,16 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
     );
   }
 
-  const cardStyle: CSSProperties = {
+  const cardStyleFor = (card: ResolvedGlobalOptionsStyle["pageFilterCards"]): CSSProperties => ({
     backgroundColor: hexWithAlpha(card.backgroundColor, card.transparency),
     border: card.border ? `1px solid ${card.borderColor}` : "1px solid transparent",
     color: card.foregroundColor,
     fontFamily: card.fontFamily || undefined,
     fontSize: card.textSize,
-  };
+  });
 
-  const filterCard = (name: string, body: ReactNode, key: string) => (
-    <span className="filter-card" style={cardStyle} key={key}>
+  const filterCard = (name: string, card: ResolvedGlobalOptionsStyle["pageFilterCards"], body: ReactNode, key: string) => (
+    <span className="filter-card" style={cardStyleFor(card)} key={key}>
       <span className="filter-card__header">
         <span className="filter-card__name" style={{ color: fieldNameColor }}>
           {name}
@@ -106,7 +110,14 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
         </span>
       </span>
 
-      <span className="filter-pane__search" style={{ backgroundColor: pane.inputBoxColor, fontSize: pane.searchTextSize }}>
+      <span
+        className="filter-pane__search"
+        style={{
+          backgroundColor: pane.inputBoxColor,
+          fontSize: pane.searchTextSize,
+          border: `1px solid ${hexWithAlpha(pane.foregroundColor, 55)}`,
+        }}
+      >
         <span aria-hidden="true" className="filter-pane__search-icon">
           ⚲
         </span>
@@ -120,40 +131,54 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
         </span>
       </span>
 
+      {/* No selection made ("is (All)") — the "Available" filter-card state. */}
       {filterCard(
         "Region",
-        <span className="filter-card__value" style={{ backgroundColor: card.inputBoxColor }}>
+        availableCard,
+        <span className="filter-card__value" style={{ backgroundColor: availableCard.inputBoxColor }}>
           is (All)
         </span>,
         "region",
       )}
 
+      {/* A selection is active — the "Applied" filter-card state, styled
+          distinctly from Region above (confirmed against a real Power BI
+          screenshot: an applied filter's card reads as a visibly
+          different, slightly tinted surface). Real Power BI's own "Apply
+          filter" control lives inside the card that needs it, not as one
+          page-level button below every card — it only appears for filter
+          types that don't auto-apply on each click (e.g. this one, once a
+          checkbox is ticked), which this preview approximates by always
+          showing it here rather than modelling every filter type's exact
+          apply-trigger rules. */}
       {filterCard(
         "Status",
-        <span className="filter-card__options">
-          {["Approved", "In review"].map((label, index) => (
-            <span className="filter-card__option" key={label}>
-              <span
-                className="filter-card__check"
-                style={
-                  index === 0
-                    ? { backgroundColor: pane.checkboxAndApplyColor, borderColor: pane.checkboxAndApplyColor }
-                    : { borderColor: card.foregroundColor }
-                }
-                aria-hidden="true"
-              >
-                {index === 0 ? "✓" : ""}
+        appliedCard,
+        <>
+          <span className="filter-card__options">
+            {["Approved", "In review"].map((label, index) => (
+              <span className="filter-card__option" key={label}>
+                <span
+                  className="filter-card__check"
+                  style={
+                    index === 0
+                      ? { backgroundColor: pane.checkboxAndApplyColor, borderColor: pane.checkboxAndApplyColor }
+                      : { borderColor: appliedCard.foregroundColor }
+                  }
+                  aria-hidden="true"
+                >
+                  {index === 0 ? "✓" : ""}
+                </span>
+                {label}
               </span>
-              {label}
-            </span>
-          ))}
-        </span>,
+            ))}
+          </span>
+          <span className="filter-card__apply" style={{ color: pane.checkboxAndApplyColor }}>
+            Apply filter
+          </span>
+        </>,
         "status",
       )}
-
-      <span className="filter-pane__apply" style={{ backgroundColor: pane.checkboxAndApplyColor }}>
-        Apply
-      </span>
 
       <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
         <span>Filters on all pages</span>

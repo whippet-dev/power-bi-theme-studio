@@ -487,7 +487,9 @@ button { color: inherit; }
   gap: 6px;
   padding: 6px 8px;
   border-radius: 3px;
-  opacity: 0.85;
+  /* No opacity fade here on purpose — real Power BI's search box often
+     resolves to the same colour as the pane behind it, distinguished only
+     by its own border (added inline), not by fading the whole box. */
 }
 
 .filter-pane__search-icon {
@@ -567,13 +569,10 @@ button { color: inherit; }
   line-height: 1;
 }
 
-.filter-pane__apply {
-  align-self: flex-start;
-  margin-top: 4px;
-  padding: 5px 12px;
-  border-radius: 3px;
-  color: #fff;
+.filter-card__apply {
+  align-self: flex-end;
   font-weight: 650;
+  cursor: pointer;
 }
 
 /* Theme-level colour tokens have no single visual that shows them, so

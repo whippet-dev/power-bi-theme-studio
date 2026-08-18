@@ -1,6 +1,6 @@
-import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
+import { boolProp, colorProp, enumProp, forState, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
 import type { PropertyDefinition, PropertyValueType } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import { readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "./theme";
 
 /**
  * Report- and page-level settings — genuinely global, not tied to any
@@ -391,6 +391,17 @@ export type ResolvedGlobalOptionsStyle = {
     textSize: number;
     transparency: number;
   };
+  /** The $id: "Applied" state of the same filterCard group — see filterCardEntryIndex. */
+  pageFilterCardsApplied: {
+    backgroundColor: string;
+    border: boolean;
+    borderColor: string;
+    fontFamily: string;
+    foregroundColor: string;
+    inputBoxColor: string;
+    textSize: number;
+    transparency: number;
+  };
   pageWallpaper: { color: string; transparency: number };
   pageFilterPane: {
     backgroundColor: string;
@@ -426,6 +437,32 @@ function resolveGlobalValue<T extends PropertyValueType>(
   return resolveChromeValue<T>(theme, definition.visual, definition, fallback);
 }
 
+/**
+ * A filter card renders differently depending on whether that filter
+ * currently has a selection applied or not (compare "Region: is (All)" vs
+ * "Status: Approved checked" in a real Power BI filter pane — confirmed
+ * against a real screenshot). The schema keys this by `$id: "Applied"` /
+ * `$id: "Available"` on filterCard's array entries, verified against the
+ * real Classic 2026 base theme export (themes/base/classic2026.json sets
+ * both explicitly). An earlier pass here excluded `$id` as "an instance
+ * discriminator, not a stylable value" — true for Matrix's subTotals.$id,
+ * wrong here: this is the exact same per-state pattern as actionButton's
+ * hover/selected states (see STATEFUL_GROUPS in properties.ts), just
+ * keyed by filter state instead of interaction state.
+ */
+function filterCardEntryIndex(theme: PowerBITheme, id: "Applied" | "Available"): number {
+  const entries = readThemeValueAtPath(theme, ["visualStyles", "page", "*", "filterCard"]);
+  if (!Array.isArray(entries)) return 0;
+  const isTaggedRecord = (value: unknown, tag: string): boolean =>
+    typeof value === "object" && value !== null && !Array.isArray(value) && (value as Record<string, unknown>).$id === tag;
+  const tagged = entries.findIndex((entry) => isTaggedRecord(entry, id));
+  if (tagged !== -1) return tagged;
+  const untagged = entries.findIndex(
+    (entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry) && (entry as Record<string, unknown>).$id === undefined,
+  );
+  return untagged !== -1 ? untagged : 0;
+}
+
 /** Resolves report/page-level global options, checking the specific bucket then the shared one. */
 export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedGlobalOptionsStyle {
   const p = GLOBAL_OPTIONS_PROPERTIES;
@@ -447,16 +484,43 @@ export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedThe
     pageAlignment: {
       verticalAlignment: resolveGlobalValue(theme, p.pageAlignment.verticalAlignment, "Top"),
     },
-    pageFilterCards: {
-      backgroundColor: resolveGlobalValue(theme, p.pageFilterCards.backgroundColor, base.background),
-      border: resolveGlobalValue(theme, p.pageFilterCards.border, false),
-      borderColor: resolveGlobalValue(theme, p.pageFilterCards.borderColor, "#E3E3E3"),
-      fontFamily: resolveGlobalValue(theme, p.pageFilterCards.fontFamily, base.fontFamily),
-      foregroundColor: resolveGlobalValue(theme, p.pageFilterCards.foregroundColor, base.foreground),
-      inputBoxColor: resolveGlobalValue(theme, p.pageFilterCards.inputBoxColor, base.background),
-      textSize: resolveGlobalValue(theme, p.pageFilterCards.textSize, 10),
-      transparency: resolveGlobalValue(theme, p.pageFilterCards.transparency, 0),
-    },
+    // "Available" (no selection made, e.g. "is (All)") and "Applied" (a
+    // selection is active) are genuinely different $id-tagged states in
+    // the real schema -- see filterCardEntryIndex.
+    pageFilterCards: (() => {
+      const index = filterCardEntryIndex(theme, "Available");
+      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>) => forState(def, index);
+      return {
+        backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), base.background),
+        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), false),
+        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#E3E3E3"),
+        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), base.fontFamily),
+        foregroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.foregroundColor), base.foreground),
+        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), base.background),
+        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 10),
+        transparency: resolveGlobalValue(theme, at(p.pageFilterCards.transparency), 0),
+      };
+    })(),
+    pageFilterCardsApplied: (() => {
+      const index = filterCardEntryIndex(theme, "Applied");
+      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>) => forState(def, index);
+      return {
+        // Classic 2026's real filterCard entries set foregroundColor
+        // identically for both states and don't set backgroundColor at
+        // all -- there's no verified hex for "Applied"'s real background
+        // tint, so this falls back to the theme's own backgroundLight
+        // token (a genuine "secondary surface" colour, not an arbitrary
+        // guess) rather than inventing one.
+        backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), "#F3F2F1"),
+        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), false),
+        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#E3E3E3"),
+        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), base.fontFamily),
+        foregroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.foregroundColor), base.foreground),
+        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), base.background),
+        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 10),
+        transparency: resolveGlobalValue(theme, at(p.pageFilterCards.transparency), 0),
+      };
+    })(),
     pageWallpaper: {
       color: resolveGlobalValue(theme, p.pageWallpaper.color, "#FFFFFF"),
       transparency: resolveGlobalValue(theme, p.pageWallpaper.transparency, 100),
