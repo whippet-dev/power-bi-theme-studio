@@ -28,6 +28,7 @@ export type ResolvedTheme = {
   titleSize: number;
   calloutSize: number;
   calloutColor: string;
+  categoryLabelColor: string;
 };
 
 export const STARTER_THEME: PowerBITheme = {
@@ -110,6 +111,7 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
   const title = readTextClass(theme, "title");
   const callout = readTextClass(theme, "callout");
   const label = readTextClass(theme, "label");
+  const largeLightLabel = readTextClass(theme, "largeLightLabel");
 
   return {
     name: typeof theme.name === "string" && theme.name.trim() ? theme.name : "Untitled theme",
@@ -127,6 +129,13 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
     // (Create custom report themes docs' text-class table), not a guess.
     calloutSize: readSize(callout.fontSize, 45),
     calloutColor: readColor(callout.color, "#252423"),
+    // Microsoft's docs list "Card category labels" under the largeLightLabel
+    // text class specifically, not a structural colour token — confirmed
+    // against a private real-world theme, which sets largeLightLabel.color to
+    // exactly the #605E5C they report seeing on Card, while leaving
+    // fourthLevelElements (this app's previous source for this field)
+    // unset entirely.
+    categoryLabelColor: readColor(largeLightLabel.color, "#605E5C"),
   };
 }
 

@@ -40,10 +40,10 @@ test("resolveCardStyle falls back to sensible defaults when there is no override
 
 // Regression: verified against a real Power BI report (a private real-world
 // theme, Card (old), no per-visual overrides) — category label colour
-// comes from theme.fourthLevelElements (a Fluent text-hierarchy token, not
-// a data colour), and the big value's colour comes from
-// textClasses.callout.color, not the first data colour either.
-test("category label colour falls back to fourthLevelElements, and the value falls back to textClasses.callout.color — not a data colour", () => {
+// comes from textClasses.largeLightLabel.color (a text-class token, not a
+// structural colour or a data colour), and the big value's colour comes
+// from textClasses.callout.color, not the first data colour either.
+test("category label colour falls back to textClasses.largeLightLabel.color, and the value falls back to textClasses.callout.color — not a data colour", () => {
   const theme: PowerBITheme = {
     ...STARTER_THEME,
     textClasses: { callout: { color: "#252423" } },
@@ -55,16 +55,20 @@ test("category label colour falls back to fourthLevelElements, and the value fal
   assert.equal(card.labels.color, "#252423");
 });
 
-// Microsoft's own docs list "Card category label color" under
-// fourthLevelElements specifically — a theme that sets thirdLevelElements
-// (the field this originally, wrongly, read) must not affect the card,
-// while one that sets fourthLevelElements must.
-test("category label colour reads fourthLevelElements specifically, not thirdLevelElements", () => {
-  const wrongField: PowerBITheme = { ...STARTER_THEME, thirdLevelElements: "#FF00FF" };
+// Microsoft's own docs list "Card category labels" under the
+// largeLightLabel text class specifically — a theme that sets
+// fourthLevelElements (a structural colour token, and the field this
+// originally, wrongly, read) must not affect the card, while one that sets
+// textClasses.largeLightLabel.color must.
+test("category label colour reads textClasses.largeLightLabel.color specifically, not fourthLevelElements", () => {
+  const wrongField: PowerBITheme = { ...STARTER_THEME, fourthLevelElements: "#FF00FF" };
   const wrongCard = resolveCardStyle(wrongField, resolveTheme(wrongField));
-  assert.equal(wrongCard.categoryLabels.color, "#605E5C", "thirdLevelElements must not affect the card");
+  assert.equal(wrongCard.categoryLabels.color, "#605E5C", "fourthLevelElements must not affect the card");
 
-  const rightField: PowerBITheme = { ...STARTER_THEME, fourthLevelElements: "#00FF00" };
+  const rightField: PowerBITheme = {
+    ...STARTER_THEME,
+    textClasses: { ...STARTER_THEME.textClasses, largeLightLabel: { color: "#00FF00" } },
+  };
   const rightCard = resolveCardStyle(rightField, resolveTheme(rightField));
   assert.equal(rightCard.categoryLabels.color, "#00FF00");
 });

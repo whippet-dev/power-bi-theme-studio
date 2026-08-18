@@ -93,20 +93,18 @@ export type ResolvedCardStyle = {
  */
 export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedCardStyle {
   const p = CARD_PROPERTIES;
-  // Card's category label isn't styled from the data palette or the plain
-  // foreground colour — verified against a real report (private theme, Card
-  // (old), no overrides) and now against Microsoft's own docs, which list
-  // "Card category label color" under fourthLevelElements specifically
-  // (not thirdLevelElements, the field this originally read — a genuine
-  // name mismatch, caught after finding the docs, not a coincidence: the
-  // private theme leaves fourthLevelElements unset too, and #605E5C is that
-  // field's real default per the same documentation).
-  const categoryLabelColor = typeof theme.fourthLevelElements === "string" ? theme.fourthLevelElements : "#605E5C";
   return {
     categoryLabels: {
       show: resolvePropertyValue(theme, p.categoryLabels.show, true),
       bold: resolvePropertyValue(theme, p.categoryLabels.bold, false),
-      color: resolvePropertyValue(theme, p.categoryLabels.color, categoryLabelColor),
+      // Card's category label isn't styled from a structural colour token —
+      // it's the "largeLightLabel" text class, which Microsoft's docs list
+      // as covering "Card category labels" specifically. Verified against
+      // a private real-world theme: it sets largeLightLabel.color explicitly
+      // to the #605E5C they report seeing on Card, while leaving the
+      // structural fourthLevelElements token (this app's previous, wrong
+      // source for this field) unset entirely.
+      color: resolvePropertyValue(theme, p.categoryLabels.color, base.categoryLabelColor),
       fontFamily: resolvePropertyValue(theme, p.categoryLabels.fontFamily, ""),
       fontSize: resolvePropertyValue(theme, p.categoryLabels.fontSize, 6),
       italic: resolvePropertyValue(theme, p.categoryLabels.italic, false),
