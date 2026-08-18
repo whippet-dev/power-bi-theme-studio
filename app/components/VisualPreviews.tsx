@@ -670,6 +670,9 @@ function PreviewShell({
             {...headingAria(chrome.subTitle.heading)}
             style={{
               textAlign: chrome.subTitle.alignment as CSSProperties["textAlign"],
+              // The schema gives subTitle no background field of its own —
+              // verified against a real report — it inherits the title's.
+              backgroundColor: chrome.title.background,
               color: chrome.subTitle.fontColor,
               fontFamily: chrome.subTitle.fontFamily,
               fontSize: chrome.subTitle.fontSize,

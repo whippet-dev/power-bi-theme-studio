@@ -1126,7 +1126,9 @@ button { color: inherit; }
 
 .preview-subtitle {
   display: block;
-  margin-top: 2px;
+  /* No default gap: the subtitle shares the title's background (see its
+     inline style), so it should read as one continuous band unless the
+     theme's own "space above subtitle" spacing sets a real gap. */
   line-height: 1.3;
 }
 
