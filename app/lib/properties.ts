@@ -84,7 +84,10 @@ function isRecord(value: unknown): value is Record<string, JsonValue> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+// Power BI writes an 8-digit #RRGGBBAA when a colour has its own alpha
+// (e.g. a "transparent" background) rather than relying solely on a
+// separate `transparency` field — CSS supports that hex form natively.
+const HEX_COLOR = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 
 function readAtPath(root: JsonValue | undefined, path: Array<string | number>): JsonValue | undefined {
   let cursor: JsonValue | undefined = root;

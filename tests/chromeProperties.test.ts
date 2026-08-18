@@ -152,3 +152,23 @@ test("chromeThemePath('*', ...) writes to the shared bucket; a specific visual k
   // Writing the shared bucket affects a visual that never had its own override.
   assert.equal(slicerChrome.title.fontColor, "#ABCDEF");
 });
+
+// Regression: a real theme (a private real-world theme) set the Card visual's
+// title background to a transparent white — Power BI writes an 8-digit
+// #RRGGBBAA when a colour carries its own alpha. The hex validator only
+// matched exactly 6 digits, so this value was silently treated as unset
+// and fell through to the shared bucket's opaque grey instead — the title
+// bar rendered solid grey here while Power BI itself shows no fill at all.
+test("an 8-digit #RRGGBBAA colour (alpha baked into the hex, not the separate transparency field) is read, not silently discarded", () => {
+  const theme: PowerBITheme = {
+    ...STARTER_THEME,
+    visualStyles: {
+      "*": { "*": { title: [{ background: { solid: { color: "#E6E6E6" } } }] } },
+      card: { "*": { title: [{ background: { solid: { color: "#FFFFFF00" } } }] } },
+    },
+  };
+  const base = resolveTheme(theme);
+  const chrome = resolveChromeStyle(theme, "card", base);
+
+  assert.equal(chrome.title.background, "#FFFFFF00");
+});

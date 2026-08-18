@@ -718,16 +718,26 @@ function PreviewShell({
             )}
           </span>
         )}
-        {tooltipNode}
       </span>
     </div>
   );
 
   if (variant !== "hero") return tile;
 
+  // Real Power BI draws a hover tooltip floating over/beside the visual,
+  // not squeezed into its own box — and here it can't be squeezed in
+  // anyway: the hero tile is rendered at a fixed pre-scale size, so
+  // appending the tooltip inside it (as this used to do) pushed the
+  // content past the reserved height and got clipped by the scale
+  // wrap's overflow:hidden, right at the tile's rounded corner. Rendering
+  // it as a sibling below the (still-clipped) scaled tile avoids both
+  // problems at once.
   return (
-    <span className="visual-hero-scale-wrap">
-      <span className="visual-hero-scale">{tile}</span>
+    <span className="visual-hero-wrap">
+      <span className="visual-hero-scale-wrap">
+        <span className="visual-hero-scale">{tile}</span>
+      </span>
+      {tooltipNode}
     </span>
   );
 }

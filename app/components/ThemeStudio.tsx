@@ -93,6 +93,10 @@ export function ThemeStudio() {
   });
   const [fileLabel, setFileLabel] = useState("Starter theme");
   const [message, setMessage] = useState<string | null>(null);
+  // Both start visible; these are display-only preview toggles, not
+  // theme state, so hiding them costs nothing to try and nothing is lost.
+  const [showFilterPane, setShowFilterPane] = useState(true);
+  const [showPaletteLegend, setShowPaletteLegend] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const tableStyle = useMemo(() => resolveTableStyle(theme, resolved), [theme, resolved]);
@@ -265,9 +269,19 @@ export function ThemeStudio() {
               <h1 id="gallery-title">Visual gallery</h1>
               <p>Pick visuals on the left, then tune their settings on the right. The selected visual previews large.</p>
             </div>
-            <span className="preview-badge">
-              <span /> {visibleVisuals.length} on canvas
-            </span>
+            <div className="canvas-panel__toggles">
+              <label className="canvas-toggle">
+                <input type="checkbox" checked={showFilterPane} onChange={(event) => setShowFilterPane(event.target.checked)} />
+                Filter pane
+              </label>
+              <label className="canvas-toggle">
+                <input type="checkbox" checked={showPaletteLegend} onChange={(event) => setShowPaletteLegend(event.target.checked)} />
+                Colour reference
+              </label>
+              <span className="preview-badge">
+                <span /> {visibleVisuals.length} on canvas
+              </span>
+            </div>
           </div>
 
           {/* The report surface: wallpaper (the area around the page),
@@ -315,10 +329,10 @@ export function ThemeStudio() {
                 onSelect={setSelectedVisual}
               />
             </div>
-            <FilterPanePreview globalOptions={globalOptionsStyle} />
+            {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} />}
           </div>
 
-          <PaletteLegend theme={resolved} colors={themeColors} />
+          {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} />}
         </section>
 
         <PropertyEditor

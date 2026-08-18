@@ -344,6 +344,30 @@ button { color: inherit; }
   font-weight: 650;
 }
 
+/* Persistent, always-visible show/hide switches for the two canvas
+   sections that aren't a "visual" of their own (filter pane, colour
+   reference) — sits next to the on-canvas count rather than buried in
+   a settings panel, so it's there whenever those sections are. */
+.canvas-panel__toggles {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.canvas-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  user-select: none;
+}
+
+.canvas-toggle input { accent-color: var(--brand); }
+
 .visual-canvas {
   display: flex;
   flex-direction: column;
@@ -1031,12 +1055,22 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
+/* Positions the sample tooltip as a floating callout under the hero
+   tile rather than inside it — see the comment at its call site. */
+.visual-hero-wrap {
+  position: relative;
+  display: block;
+  width: 630px;
+  max-width: 100%;
+}
+
 .preview-tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 24px;
   display: inline-flex;
   flex-direction: column;
   gap: 3px;
-  align-self: flex-start;
-  margin-top: 10px;
   padding: 7px 9px;
   border-radius: 4px;
   box-shadow: 0 2px 6px rgba(20, 10, 30, 0.24);
@@ -1867,7 +1901,11 @@ button { color: inherit; }
 .number-control {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: 1fr 34px;
+  /* minmax(0, ...) lets the slider track shrink below its intrinsic
+     min-content width — plain `1fr` doesn't, so the track was
+     overflowing this container by ~35px and pushing the value box
+     into the reset button that follows it in the row. */
+  grid-template-columns: minmax(0, 1fr) 34px;
   align-items: center;
   gap: 8px;
   width: 140px;
