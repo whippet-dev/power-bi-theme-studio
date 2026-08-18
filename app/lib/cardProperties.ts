@@ -95,12 +95,13 @@ export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): Reso
   const p = CARD_PROPERTIES;
   // Card's category label isn't styled from the data palette or the plain
   // foreground colour — verified against a real report (private theme, Card
-  // (old), no overrides): it inherits `theme.thirdLevelElements`, the same
-  // Fluent text-hierarchy token this app already defaults to "#605E5C" for
-  // the Theme tab's own colour list (themeGlobalsProperties.ts) — that
-  // theme doesn't set it, and the rendered colour matched the app's
-  // existing default exactly.
-  const categoryLabelColor = typeof theme.thirdLevelElements === "string" ? theme.thirdLevelElements : "#605E5C";
+  // (old), no overrides) and now against Microsoft's own docs, which list
+  // "Card category label color" under fourthLevelElements specifically
+  // (not thirdLevelElements, the field this originally read — a genuine
+  // name mismatch, caught after finding the docs, not a coincidence: the
+  // private theme leaves fourthLevelElements unset too, and #605E5C is that
+  // field's real default per the same documentation).
+  const categoryLabelColor = typeof theme.fourthLevelElements === "string" ? theme.fourthLevelElements : "#605E5C";
   return {
     categoryLabels: {
       show: resolvePropertyValue(theme, p.categoryLabels.show, true),
@@ -119,9 +120,9 @@ export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): Reso
       color: resolvePropertyValue(theme, p.labels.color, base.calloutColor),
       fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
       // Card's big value is typically much larger than other visuals' text —
-      // 28 matches the existing textClasses.callout default it visually sits
-      // alongside (this per-visual override wins over that global default).
-      fontSize: resolvePropertyValue(theme, p.labels.fontSize, 28),
+      // 45 matches textClasses.callout's own Microsoft-documented default
+      // (this per-visual override wins over that global default when set).
+      fontSize: resolvePropertyValue(theme, p.labels.fontSize, base.calloutSize),
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelDisplayUnits: resolvePropertyValue(theme, p.labels.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.labels.labelPrecision, 0),

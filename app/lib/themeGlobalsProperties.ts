@@ -98,10 +98,14 @@ export const THEME_COLOR_PROPERTIES = {
     ["null"],
   ),
 
+  // Descriptions below quote Microsoft's own "What it formats" table for
+  // the theme's structural colours (Create custom report themes docs) —
+  // these are the only 4 of the 32 tokens on this page with real,
+  // published documentation rather than an inferred guess.
   firstLevelElements: colorRoot(
     "globals.color.firstLevelElements",
     "First-level elements",
-    "The highest-emphasis text colour — headings and primary content.",
+    'Also called "foreground". Label background (outside data points), trend line colour, textbox default colour, table/matrix values and totals font colour, data bars axis colour, card data labels, gauge callout value, KPI goal and text colour, slicer item/header/dropdown/numeric-input colour, scatter chart ratio line, line chart forecast line, map leader line, filter pane and card text, modern tooltip text and icons.',
     ["firstLevelElements"],
     undefined,
     "Text hierarchy",
@@ -109,7 +113,7 @@ export const THEME_COLOR_PROPERTIES = {
   secondLevelElements: colorRoot(
     "globals.color.secondLevelElements",
     "Second-level elements",
-    "The second-highest-emphasis text colour.",
+    'Also called "foregroundNeutralSecondary". Light secondary text classes, legend/axis label colour, table/matrix header font colour, gauge target and its leader line, KPI trend axis, slicer slider/item font/outline colour, line chart hover colour, multi-row card title, ribbon chart stroke, shape map border, button text/icon/outline colour.',
     ["secondLevelElements"],
     undefined,
     "Text hierarchy",
@@ -117,7 +121,7 @@ export const THEME_COLOR_PROPERTIES = {
   thirdLevelElements: colorRoot(
     "globals.color.thirdLevelElements",
     "Third-level elements",
-    "A lower-emphasis text colour, for secondary content.",
+    'Also called "backgroundLight". Axis gridline colour, table/matrix grid colour, slicer header background in focus mode, multi-row card outline, shape fill colour, gauge arc background, applied filter card background, disabled button fill/outline when the button\'s own background is white.',
     ["thirdLevelElements"],
     undefined,
     "Text hierarchy",
@@ -125,7 +129,7 @@ export const THEME_COLOR_PROPERTIES = {
   fourthLevelElements: colorRoot(
     "globals.color.fourthLevelElements",
     "Fourth-level elements",
-    "The lowest-emphasis text colour, for the least prominent content.",
+    'Also called "foregroundNeutralTertiary". Dimmed legend entries, Card and multi-row card category label colour, multi-row card bar colour, funnel chart conversion-rate stroke, disabled button text/icon colour.',
     ["fourthLevelElements"],
     undefined,
     "Text hierarchy",
@@ -231,7 +235,7 @@ export const THEME_COLOR_PROPERTIES = {
   secondaryBackground: colorRoot(
     "globals.color.secondaryBackground",
     "Secondary background",
-    "An alternate background colour, for panels or cards distinct from the main canvas.",
+    'Also called "backgroundNeutral". Table/matrix grid outline colour, shape map default colour, ribbon chart fill when "match series" is off, disabled button fill/outline when the button\'s own background isn\'t white, modern tooltip separator line and hover colour.',
     ["secondaryBackground"],
     undefined,
     "Background",
@@ -319,75 +323,123 @@ type TextClassKey =
   | "smallLightLabel"
   | "smallDataLabel";
 
-const TEXT_CLASS_META: Record<TextClassKey, { label: string; description: string; fontSize: number; bold: boolean }> = {
-  title: { label: "Title", description: "The default text style for visual titles.", fontSize: 12, bold: true },
+// Descriptions, default sizes, and default colours below are quoted or
+// derived from Microsoft's own "Set formatted text defaults" table (Create
+// custom report themes docs), not inferred — the only two classes without
+// published documentation (dataTitle, smallDataLabel, both schema-only)
+// keep this app's own best-guess text, flagged as such below. Four
+// primary classes (title/header/label/callout) can be set directly; the
+// rest are secondary classes that inherit the primary's colour/font/size
+// except for the one property Microsoft's table lists as their own
+// override — reflected here by each secondary's `color`/`fontSize` either
+// matching its primary or diverging exactly where documented.
+const TEXT_CLASS_META: Record<
+  TextClassKey,
+  { label: string; description: string; fontSize: number; bold: boolean; color: string }
+> = {
+  title: {
+    label: "Title",
+    description: "Category axis title, value axis title, multi-row card title, slicer header (the slicer header itself defaults to the first data colour, not this class's colour).",
+    fontSize: 12,
+    bold: false,
+    color: "#252423",
+  },
   header: {
     label: "Header",
-    description: "The default text style for headers, such as table and matrix column headers.",
+    description: "Key influencers headers (Segoe UI Semibold — approximated here as bold).",
     fontSize: 12,
     bold: true,
+    color: "#252423",
   },
   label: {
     label: "Label",
-    description: "The default text style for general labels — axis labels, legend text, and similar.",
+    description: "Table and matrix column headers, matrix row headers, table and matrix grid, table and matrix values.",
     fontSize: 10,
     bold: false,
+    color: "#252423",
   },
   callout: {
     label: "Callout",
-    description: "The default text style for callout values, such as a Card visual's big number.",
-    fontSize: 28,
+    description: "Card data labels, KPI indicators.",
+    fontSize: 45,
     bold: false,
+    color: "#252423",
   },
   largeTitle: {
     label: "Large title",
-    description: "The default text style for large, prominent titles.",
-    fontSize: 20,
-    bold: true,
+    description: "Secondary class of Title. Visual title.",
+    fontSize: 14,
+    bold: false,
+    color: "#252423",
   },
+  // Not in Microsoft's published text-class table — schema-only field,
+  // this app's own inferred description.
   dataTitle: {
     label: "Data title",
-    description: "The default text style for data-driven titles that change with the data.",
+    description: "Not documented by Microsoft — inferred as a data-driven title that changes with the data.",
     fontSize: 12,
     bold: false,
+    color: "#252423",
   },
   boldLabel: {
     label: "Bold label",
-    description: "The default text style for emphasised labels.",
+    description: "Secondary class of Label (Segoe UI Bold). Matrix subtotals, matrix grand totals, table totals.",
     fontSize: 10,
     bold: true,
+    color: "#252423",
   },
-  largeLabel: { label: "Large label", description: "The default text style for larger labels.", fontSize: 14, bold: false },
+  largeLabel: {
+    label: "Large label",
+    description: "Secondary class of Label. Multi-row card data labels.",
+    fontSize: 12,
+    bold: false,
+    color: "#252423",
+  },
   largeLightLabel: {
     label: "Large light label",
-    description: "The default text style for larger, lighter-weight labels.",
-    fontSize: 14,
+    description: "Secondary class of Label. Card category labels, gauge labels, multi-row card category labels.",
+    fontSize: 12,
     bold: false,
+    color: "#605E5C",
   },
   lightLabel: {
     label: "Light label",
-    description: "The default text style for lighter-weight labels.",
+    description:
+      "Secondary class of Label. Legend text, button text, category axis labels, funnel chart data/conversion-rate labels, gauge target, scatter chart category label, slicer items.",
     fontSize: 10,
     bold: false,
+    color: "#605E5C",
   },
   semiboldLabel: {
     label: "Semibold label",
-    description: "The default text style for semibold-weight labels.",
+    description: "Secondary class of Label (Segoe UI Semibold). Key influencers profile text.",
     fontSize: 10,
     bold: true,
+    color: "#252423",
   },
-  smallLabel: { label: "Small label", description: "The default text style for small labels.", fontSize: 8, bold: false },
+  smallLabel: {
+    label: "Small label",
+    description:
+      "Secondary class of Label. Reference line labels, slicer date-range labels, slicer numeric input text, slicer search box, key influencers influencer text.",
+    fontSize: 9,
+    bold: false,
+    color: "#252423",
+  },
   smallLightLabel: {
     label: "Small light label",
-    description: "The default text style for small, lighter-weight labels.",
-    fontSize: 8,
+    description: "Secondary class of Label. Data labels, value axis labels.",
+    fontSize: 9,
     bold: false,
+    color: "#605E5C",
   },
+  // Not in Microsoft's published text-class table — schema-only field,
+  // this app's own inferred description.
   smallDataLabel: {
     label: "Small data label",
-    description: "The default text style for small data labels.",
-    fontSize: 8,
+    description: "Not documented by Microsoft — inferred as a small data label style.",
+    fontSize: 9,
     bold: false,
+    color: "#252423",
   },
 };
 
@@ -459,25 +511,34 @@ export function resolveThemeColors(theme: PowerBITheme, base: ResolvedTheme): Re
     center: read("center", "#FFEB84"),
     maximum: read("maximum", "#63BE7B"),
     nullValue: read("null", "#A6A6A6"),
-    firstLevelElements: read("firstLevelElements", "#201F1E"),
-    secondLevelElements: read("secondLevelElements", "#323130"),
-    thirdLevelElements: read("thirdLevelElements", "#605E5C"),
-    fourthLevelElements: read("fourthLevelElements", "#A19F9D"),
+    // firstLevelElements..fourthLevelElements below are corrected against
+    // Microsoft's own docs (Create custom report themes): each is paired
+    // with an "also called" Fluent name that must resolve to the same
+    // default, and fourthLevelElements' #605E5C is independently confirmed
+    // — it's what a real Power BI report renders for Card's category label
+    // when a theme (verified against the user's own) leaves it unset.
+    firstLevelElements: read("firstLevelElements", "#252423"),
+    secondLevelElements: read("secondLevelElements", "#605E5C"),
+    thirdLevelElements: read("thirdLevelElements", "#F3F2F1"),
+    fourthLevelElements: read("fourthLevelElements", "#605E5C"),
     accent: read("accent", base.tableAccent),
     foregroundLight: read("foregroundLight", "#605E5C"),
     foregroundDark: read("foregroundDark", "#201F1E"),
     foregroundNeutralLight: read("foregroundNeutralLight", "#A19F9D"),
     foregroundNeutralDark: read("foregroundNeutralDark", "#484644"),
+    // "Also called" secondLevelElements per Microsoft's docs — kept equal.
     foregroundNeutralSecondary: read("foregroundNeutralSecondary", "#605E5C"),
     foregroundNeutralSecondaryAlt: read("foregroundNeutralSecondaryAlt", "#69797E"),
     foregroundNeutralSecondaryAlt2: read("foregroundNeutralSecondaryAlt2", "#69797E"),
-    foregroundNeutralTertiary: read("foregroundNeutralTertiary", "#A19F9D"),
+    // "Also called" fourthLevelElements per Microsoft's docs — kept equal.
+    foregroundNeutralTertiary: read("foregroundNeutralTertiary", "#605E5C"),
     foregroundNeutralTertiaryAlt: read("foregroundNeutralTertiaryAlt", "#C8C6C4"),
     foregroundSelected: read("foregroundSelected", base.tableAccent),
     foregroundButton: read("foregroundButton", "#FFFFFF"),
-    secondaryBackground: read("secondaryBackground", "#F3F2F1"),
+    // "Also called" backgroundNeutral per Microsoft's docs — kept equal.
+    secondaryBackground: read("secondaryBackground", "#C8C6C4"),
     backgroundLight: read("backgroundLight", "#FAF9F8"),
-    backgroundNeutral: read("backgroundNeutral", "#F3F2F1"),
+    backgroundNeutral: read("backgroundNeutral", "#C8C6C4"),
     backgroundDark: read("backgroundDark", "#201F1E"),
     hyperlink: read("hyperlink", "#106EBE"),
     visitedHyperlink: read("visitedHyperlink", "#551A8B"),
@@ -496,7 +557,11 @@ export function resolveTextClasses(theme: PowerBITheme, base: ResolvedTheme): Re
     result[`${key}FontFace`] = typeof stored.fontFace === "string" ? stored.fontFace : base.fontFamily;
     result[`${key}FontSize`] = typeof stored.fontSize === "number" ? stored.fontSize : meta.fontSize;
     result[`${key}FontWeight`] = typeof stored.fontWeight === "string" ? stored.fontWeight : meta.bold ? "bold" : "normal";
-    result[`${key}Color`] = typeof stored.color === "string" ? stored.color : base.foreground;
+    // Microsoft's docs state text classes' own default colour directly
+    // (#252423, or #605E5C for the "light" secondary classes) rather than
+    // deriving it from the theme's plain foreground token — verified
+    // against the "Set formatted text defaults" table.
+    result[`${key}Color`] = typeof stored.color === "string" ? stored.color : meta.color;
   }
   return result;
 }

@@ -123,7 +123,9 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
         ? label.fontFace
         : "Segoe UI",
     titleSize: readSize(title.fontSize, 12),
-    calloutSize: readSize(callout.fontSize, 28),
+    // 45pt is Microsoft's documented default for the "callout" text class
+    // (Create custom report themes docs' text-class table), not a guess.
+    calloutSize: readSize(callout.fontSize, 45),
     calloutColor: readColor(callout.color, "#252423"),
   };
 }

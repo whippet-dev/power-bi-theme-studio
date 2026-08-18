@@ -29,11 +29,25 @@ test("resolveThemeColors falls back to app-chosen defaults when nothing is set, 
   assert.equal(overrideColors.good, "#00FF00");
 });
 
-test("resolveTextClasses falls back to per-class defaults, and 'callout' keeps the same 28px default already used by Card's calloutSize", () => {
+// Defaults below are Microsoft's own documented values (Create custom
+// report themes docs' "Set formatted text defaults" table), not guesses —
+// callout's 45pt is also what Card's own calloutSize reads by default.
+test("resolveTextClasses falls back to Microsoft's documented per-class defaults", () => {
   const base = resolveTheme(STARTER_THEME);
   const classes = resolveTextClasses(STARTER_THEME, base);
-  assert.equal(classes.calloutFontSize, 28);
-  assert.equal(classes.titleFontWeight, "bold");
+  assert.equal(classes.calloutFontSize, 45);
+  assert.equal(classes.calloutColor, "#252423");
+  assert.equal(base.calloutSize, 45);
+  // Title (DIN, unstyled) isn't documented as bold; header (Segoe UI
+  // Semibold) is approximated as bold since this app has no weight dial.
+  assert.equal(classes.titleFontWeight, "normal");
+  assert.equal(classes.headerFontWeight, "bold");
+  // The three "light" secondary classes default to #605E5C, not the
+  // theme's own plain foreground colour.
+  assert.equal(classes.lightLabelColor, "#605E5C");
+  assert.equal(classes.largeLightLabelColor, "#605E5C");
+  assert.equal(classes.smallLightLabelColor, "#605E5C");
+  assert.equal(classes.labelColor, "#252423");
 });
 
 test("themeGlobalThemePath returns the raw root path with no visualStyles prefix, and round-trips through updateThemeValue", () => {
