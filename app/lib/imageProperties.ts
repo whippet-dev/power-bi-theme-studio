@@ -1,5 +1,6 @@
+import type { ThemeSource } from "./properties";
 import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Image — a canvas image object, `visual-image` in the schema. Excludes
@@ -328,7 +329,7 @@ export type ResolvedImageStyle = {
   imageScaling: { imageScalingType: string | number };
 };
 
-export function resolveImageStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedImageStyle {
+export function resolveImageStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedImageStyle {
   const p = IMAGE_PROPERTIES;
   return {
     image: {

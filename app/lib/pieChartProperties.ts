@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -7,7 +8,7 @@ import {
   resolvePropertyValue,
   textProp,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Pie chart ("pieChart") property registry, pinned to Microsoft's published
@@ -134,7 +135,7 @@ export type ResolvedPieChartStyle = {
  * to the shared theme tokens (palette/background/foreground) for
  * colour-like fields and a plain Power BI-typical default otherwise.
  */
-export function resolvePieChartStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedPieChartStyle {
+export function resolvePieChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedPieChartStyle {
   const p = PIE_CHART_PROPERTIES;
   return {
     dataPoint: {

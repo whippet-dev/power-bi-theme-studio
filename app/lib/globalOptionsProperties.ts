@@ -1,6 +1,6 @@
-import { boolProp, colorProp, enumProp, forState, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
-import type { PropertyDefinition, PropertyValueType } from "./properties";
-import { readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "./theme";
+import { boolProp, colorProp, enumProp, forStateId, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
+import type { PropertyDefinition, PropertyLookup, PropertyValueType, ThemeSource } from "./properties";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Report- and page-level settings — genuinely global, not tied to any
@@ -391,7 +391,7 @@ export type ResolvedGlobalOptionsStyle = {
     textSize: number;
     transparency: number;
   };
-  /** The $id: "Applied" state of the same filterCard group — see filterCardEntryIndex. */
+  /** The $id: "Applied" state of the same filterCard group, matched per layer — see forStateId. */
   pageFilterCardsApplied: {
     backgroundColor: string;
     border: boolean;
@@ -428,8 +428,8 @@ export type ResolvedGlobalOptionsStyle = {
  * `visualStyles["*"]["*"]` bucket where many real themes actually put it.
  */
 function resolveGlobalValue<T extends PropertyValueType>(
-  theme: PowerBITheme,
-  definition: PropertyDefinition<T>,
+  theme: ThemeSource,
+  definition: PropertyLookup<T>,
   // Borrow the fallback's type from resolveChromeValue rather than
   // restating its per-value-type mapping and drifting from it.
   fallback: Parameters<typeof resolveChromeValue<T>>[3],
@@ -449,22 +449,14 @@ function resolveGlobalValue<T extends PropertyValueType>(
  * wrong here: this is the exact same per-state pattern as actionButton's
  * hover/selected states (see STATEFUL_GROUPS in properties.ts), just
  * keyed by filter state instead of interaction state.
+ *
+ * Resolved via forStateId, so each layer is searched for its own
+ * `$id`-tagged entry — a base theme and a custom theme are free to list
+ * Applied/Available in different orders, or to declare only one of them.
  */
-function filterCardEntryIndex(theme: PowerBITheme, id: "Applied" | "Available"): number {
-  const entries = readThemeValueAtPath(theme, ["visualStyles", "page", "*", "filterCard"]);
-  if (!Array.isArray(entries)) return 0;
-  const isTaggedRecord = (value: unknown, tag: string): boolean =>
-    typeof value === "object" && value !== null && !Array.isArray(value) && (value as Record<string, unknown>).$id === tag;
-  const tagged = entries.findIndex((entry) => isTaggedRecord(entry, id));
-  if (tagged !== -1) return tagged;
-  const untagged = entries.findIndex(
-    (entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry) && (entry as Record<string, unknown>).$id === undefined,
-  );
-  return untagged !== -1 ? untagged : 0;
-}
 
 /** Resolves report/page-level global options, checking the specific bucket then the shared one. */
-export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedGlobalOptionsStyle {
+export function resolveGlobalOptionsStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedGlobalOptionsStyle {
   const p = GLOBAL_OPTIONS_PROPERTIES;
   return {
     reportFilterPaneState: {
@@ -486,10 +478,10 @@ export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedThe
     },
     // "Available" (no selection made, e.g. "is (All)") and "Applied" (a
     // selection is active) are genuinely different $id-tagged states in
-    // the real schema -- see filterCardEntryIndex.
+    // the real schema. Matched by $id per layer -- see PropertyLookup --
+    // because base and custom themes need not list them in the same order.
     pageFilterCards: (() => {
-      const index = filterCardEntryIndex(theme, "Available");
-      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>) => forState(def, index);
+      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>): PropertyLookup<T> => forStateId(def, "Available");
       return {
         backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), base.background),
         border: resolveGlobalValue(theme, at(p.pageFilterCards.border), false),
@@ -502,8 +494,7 @@ export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedThe
       };
     })(),
     pageFilterCardsApplied: (() => {
-      const index = filterCardEntryIndex(theme, "Applied");
-      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>) => forState(def, index);
+      const at = <T extends PropertyValueType>(def: PropertyDefinition<T>): PropertyLookup<T> => forStateId(def, "Applied");
       return {
         // Classic 2026's real filterCard entries set foregroundColor
         // identically for both states and don't set backgroundColor at

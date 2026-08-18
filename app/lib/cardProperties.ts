@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -7,7 +8,7 @@ import {
   resolvePropertyValue,
   textProp,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Card property registry, pinned to Microsoft's published schema
@@ -91,7 +92,7 @@ export type ResolvedCardStyle = {
  * shared theme tokens (palette/background/foreground) for colour-like
  * fields and a plain Power BI-typical default otherwise.
  */
-export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedCardStyle {
+export function resolveCardStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedCardStyle {
   const p = CARD_PROPERTIES;
   return {
     categoryLabels: {

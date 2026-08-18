@@ -2,17 +2,16 @@ import {
   boolProp,
   colorProp,
   enumProp,
-  forState,
+  forStateId,
   groupSupportsStates,
   numberProp,
   propertyThemePath,
   resolvePropertyValue,
-  stateEntryIndex,
-  textProp,
+    textProp,
 } from "./properties";
-import type { InteractionState, PropertyDefinition, PropertyValueType } from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Bookmark navigator — a row/grid of buttons that jump to report bookmarks,
@@ -151,15 +150,14 @@ export type ResolvedBookmarkNavigatorStyle = ResolvedShapeFamilyCore & {
 
 /** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
 export function resolveBookmarkNavigatorStyle(
-  theme: PowerBITheme,
+  theme: ThemeSource,
   base: ResolvedTheme,
   state: InteractionState = "default",
 ): ResolvedBookmarkNavigatorStyle {
   const p = BOOKMARK_NAVIGATOR_PROPERTIES;
   const accentBarStateful = groupSupportsStates("bookmarkNavigator", "accentBar");
-  const accentBarIndex = accentBarStateful ? stateEntryIndex(theme, "bookmarkNavigator", "accentBar", state) : 0;
-  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyDefinition<T> =>
-    accentBarStateful ? forState(definition, accentBarIndex) : definition;
+  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
+    accentBarStateful ? forStateId(definition, state) : definition;
   return {
     ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
     accentBar: {

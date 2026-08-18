@@ -2,15 +2,13 @@ import {
   boolProp,
   colorProp,
   enumProp,
-  forState,
+  forStateId,
   groupSupportsStates,
   numberProp,
   resolvePropertyValue,
-  stateEntryIndex,
-  textProp,
+    textProp,
 } from "./properties";
-import type { InteractionState, PropertyDefinition, PropertyValueType, VisualSchemaKey } from "./properties";
-import type { PowerBITheme } from "./theme";
+import type { InteractionState, PropertyDefinition, PropertyValueType, VisualSchemaKey, ThemeSource, PropertyLookup } from "./properties";
 
 /**
  * Shared base for the "shape family" of canvas-object visuals — Shape,
@@ -637,15 +635,15 @@ const SHAPE_PARAM_DEFAULTS: Record<string, string | number> = {
  * `at()` is a no-op there — passing a non-"default" state has no effect.
  */
 export function resolveShapeFamilyCore(
-  theme: PowerBITheme,
+  theme: ThemeSource,
   core: ShapeFamilyCore,
   baseForeground: string,
   baseFontFamily: string,
   state: InteractionState = "default",
 ): ResolvedShapeFamilyCore {
   const visual = core.fill.fillColor.visual;
-  const at = <T extends PropertyValueType>(group: string, definition: PropertyDefinition<T>): PropertyDefinition<T> =>
-    groupSupportsStates(visual, group) ? forState(definition, stateEntryIndex(theme, visual, group, state)) : definition;
+  const at = <T extends PropertyValueType>(group: string, definition: PropertyDefinition<T>): PropertyLookup<T> =>
+    groupSupportsStates(visual, group) ? forStateId(definition, state) : definition;
 
   const shape: Record<string, string | number> = {};
   for (const [key, definition] of Object.entries(core.shape)) {

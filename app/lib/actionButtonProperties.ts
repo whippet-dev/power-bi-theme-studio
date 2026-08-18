@@ -2,16 +2,15 @@ import {
   boolProp,
   colorProp,
   enumProp,
-  forState,
+  forStateId,
   groupSupportsStates,
   numberProp,
   propertyThemePath,
   resolvePropertyValue,
-  stateEntryIndex,
-} from "./properties";
-import type { InteractionState, PropertyDefinition, PropertyValueType } from "./properties";
+  } from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Action button — a clickable shape that triggers a report action
@@ -201,15 +200,14 @@ export type ResolvedActionButtonStyle = ResolvedShapeFamilyCore & {
  * visuals.
  */
 export function resolveActionButtonStyle(
-  theme: PowerBITheme,
+  theme: ThemeSource,
   base: ResolvedTheme,
   state: InteractionState = "default",
 ): ResolvedActionButtonStyle {
   const p = ACTION_BUTTON_PROPERTIES;
   const iconStateful = groupSupportsStates("actionButton", "icon");
-  const iconIndex = iconStateful ? stateEntryIndex(theme, "actionButton", "icon", state) : 0;
-  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyDefinition<T> =>
-    iconStateful ? forState(definition, iconIndex) : definition;
+  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
+    iconStateful ? forStateId(definition, state) : definition;
   return {
     ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
     icon: {

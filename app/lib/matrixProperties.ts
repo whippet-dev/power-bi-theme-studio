@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -7,7 +8,7 @@ import {
   resolvePropertyValue,
   textProp,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Matrix ("pivotTable") property registry, pinned to Microsoft's published
@@ -407,7 +408,7 @@ export type ResolvedMatrixStyle = {
  * the shared theme tokens (palette/background/foreground) for
  * colour-like fields and a plain Power BI-typical default otherwise.
  */
-export function resolveMatrixStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedMatrixStyle {
+export function resolveMatrixStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedMatrixStyle {
   const p = MATRIX_PROPERTIES;
   return {
     columnHeaders: {

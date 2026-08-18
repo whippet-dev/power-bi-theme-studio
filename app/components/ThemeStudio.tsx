@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import {
   cloneStarterTheme,
   deleteThemeValue,
-  mergeThemeOverBase,
   parseThemeJson,
   resolveTheme,
   themeFileName,
@@ -26,7 +25,7 @@ import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import { resolveMatrixStyle } from "../lib/matrixProperties";
 import { resolvePageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { resolvePieChartStyle } from "../lib/pieChartProperties";
-import type { VisualSchemaKey } from "../lib/properties";
+import { themeLayers, type VisualSchemaKey } from "../lib/properties";
 import { resolveShapeStyle } from "../lib/shapeProperties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
 import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
@@ -106,62 +105,65 @@ export function ThemeStudio() {
   // from-scratch example) happens to set.
   const [baseThemeId, setBaseThemeId] = useState<BaseThemeId>(DEFAULT_BASE_THEME_ID);
   const fileInput = useRef<HTMLInputElement>(null);
-  // Every resolver below reads from this, not the raw `theme` -- it's the
-  // working theme layered on top of the selected base theme, so a value
-  // the user never set still resolves to genuine Power BI base-theme data
-  // instead of straight to this app's own hardcoded fallback. `theme`
-  // itself (edited, exported, and used for "is this overridden?" checks)
-  // stays exactly what the user wrote, never merged.
-  const effectiveTheme = useMemo(() => mergeThemeOverBase(getBaseTheme(baseThemeId), theme), [theme, baseThemeId]);
+  // Resolution reads the user's theme and the base theme as separate
+  // layers, so it can report *which* layer supplied each value — see
+  // resolvePropertyEntry. Merging them first would both lose that and get
+  // the precedence wrong, since Power BI ranks every custom match above
+  // every base match. `theme` itself — edited, exported, and used for
+  // "is this overridden?" checks — stays exactly what the user wrote.
+  const themeSource = useMemo(() => themeLayers(theme, getBaseTheme(baseThemeId)), [theme, baseThemeId]);
+  // Root-level tokens, dataColors and textClasses genuinely do merge
+  // custom-over-base; that combined view is what `roots` carries.
+  const effectiveTheme = themeSource.roots;
   const resolved = useMemo(() => resolveTheme(effectiveTheme), [effectiveTheme]);
-  const tableStyle = useMemo(() => resolveTableStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const barChartStyle = useMemo(() => resolveBarChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const columnChartStyle = useMemo(() => resolveColumnChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const stackedBarChartStyle = useMemo(() => resolveStackedBarChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const tableStyle = useMemo(() => resolveTableStyle(themeSource, resolved), [themeSource, resolved]);
+  const barChartStyle = useMemo(() => resolveBarChartStyle(themeSource, resolved), [themeSource, resolved]);
+  const columnChartStyle = useMemo(() => resolveColumnChartStyle(themeSource, resolved), [themeSource, resolved]);
+  const stackedBarChartStyle = useMemo(() => resolveStackedBarChartStyle(themeSource, resolved), [themeSource, resolved]);
   const stackedColumnChartStyle = useMemo(
-    () => resolveStackedColumnChartStyle(effectiveTheme, resolved),
-    [effectiveTheme, resolved],
+    () => resolveStackedColumnChartStyle(themeSource, resolved),
+    [themeSource, resolved],
   );
-  const lineChartStyle = useMemo(() => resolveLineChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const cardStyle = useMemo(() => resolveCardStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const slicerStyle = useMemo(() => resolveSlicerStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const matrixStyle = useMemo(() => resolveMatrixStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const pieChartStyle = useMemo(() => resolvePieChartStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const shapeStyle = useMemo(() => resolveShapeStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const actionButtonStyle = useMemo(() => resolveActionButtonStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const lineChartStyle = useMemo(() => resolveLineChartStyle(themeSource, resolved), [themeSource, resolved]);
+  const cardStyle = useMemo(() => resolveCardStyle(themeSource, resolved), [themeSource, resolved]);
+  const slicerStyle = useMemo(() => resolveSlicerStyle(themeSource, resolved), [themeSource, resolved]);
+  const matrixStyle = useMemo(() => resolveMatrixStyle(themeSource, resolved), [themeSource, resolved]);
+  const pieChartStyle = useMemo(() => resolvePieChartStyle(themeSource, resolved), [themeSource, resolved]);
+  const shapeStyle = useMemo(() => resolveShapeStyle(themeSource, resolved), [themeSource, resolved]);
+  const actionButtonStyle = useMemo(() => resolveActionButtonStyle(themeSource, resolved), [themeSource, resolved]);
   const bookmarkNavigatorStyle = useMemo(
-    () => resolveBookmarkNavigatorStyle(effectiveTheme, resolved),
-    [effectiveTheme, resolved],
+    () => resolveBookmarkNavigatorStyle(themeSource, resolved),
+    [themeSource, resolved],
   );
-  const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const textboxStyle = useMemo(() => resolveTextboxStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
-  const imageStyle = useMemo(() => resolveImageStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(themeSource, resolved), [themeSource, resolved]);
+  const textboxStyle = useMemo(() => resolveTextboxStyle(themeSource, resolved), [themeSource, resolved]);
+  const imageStyle = useMemo(() => resolveImageStyle(themeSource, resolved), [themeSource, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({
-      card: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.card, resolved),
-      bar: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.bar, resolved),
-      column: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.column, resolved),
-      stackedBar: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.stackedBar, resolved),
-      stackedColumn: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.stackedColumn, resolved),
-      line: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.line, resolved),
-      table: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.table, resolved),
-      matrix: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.matrix, resolved),
-      pie: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.pie, resolved),
-      slicer: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.slicer, resolved),
-      shape: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.shape, resolved),
-      actionButton: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.actionButton, resolved),
-      bookmarkNavigator: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.bookmarkNavigator, resolved),
-      pageNavigator: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.pageNavigator, resolved),
-      textbox: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.textbox, resolved),
-      image: resolveChromeStyle(effectiveTheme, VISUAL_SCHEMA_KEY.image, resolved),
+      card: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.card, resolved),
+      bar: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.bar, resolved),
+      column: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.column, resolved),
+      stackedBar: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.stackedBar, resolved),
+      stackedColumn: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.stackedColumn, resolved),
+      line: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.line, resolved),
+      table: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.table, resolved),
+      matrix: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.matrix, resolved),
+      pie: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.pie, resolved),
+      slicer: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.slicer, resolved),
+      shape: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.shape, resolved),
+      actionButton: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.actionButton, resolved),
+      bookmarkNavigator: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.bookmarkNavigator, resolved),
+      pageNavigator: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.pageNavigator, resolved),
+      textbox: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.textbox, resolved),
+      image: resolveChromeStyle(themeSource, VISUAL_SCHEMA_KEY.image, resolved),
     }),
-    [effectiveTheme, resolved],
+    [themeSource, resolved],
   );
   // The shared default only (no visual-specific override blended in) — what
   // the "Theme" tab shows and edits, distinct from a single visual's fully
   // resolved chrome.
-  const sharedChromeStyle = useMemo(() => resolveChromeStyle(effectiveTheme, "*", resolved), [effectiveTheme, resolved]);
-  const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(effectiveTheme, resolved), [effectiveTheme, resolved]);
+  const sharedChromeStyle = useMemo(() => resolveChromeStyle(themeSource, "*", resolved), [themeSource, resolved]);
+  const globalOptionsStyle = useMemo(() => resolveGlobalOptionsStyle(themeSource, resolved), [themeSource, resolved]);
   const themeColors = useMemo(() => resolveThemeColors(effectiveTheme, resolved), [effectiveTheme, resolved]);
   const textClasses = useMemo(() => resolveTextClasses(effectiveTheme, resolved), [effectiveTheme, resolved]);
 
@@ -342,8 +344,7 @@ export function ThemeStudio() {
             >
               <VisualGallery
                 theme={resolved}
-                rawTheme={theme}
-                effectiveTheme={effectiveTheme}
+                themeSource={themeSource}
                 tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}

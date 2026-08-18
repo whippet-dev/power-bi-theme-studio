@@ -1,5 +1,6 @@
+import type { ThemeSource } from "./properties";
 import { colorProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Textbox — a free-form rich-text canvas object, `visual-textbox` in the
@@ -43,7 +44,7 @@ export type ResolvedTextboxStyle = {
   text: { color: string; fontFamily: string; fontSize: number };
 };
 
-export function resolveTextboxStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedTextboxStyle {
+export function resolveTextboxStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedTextboxStyle {
   const p = TEXTBOX_PROPERTIES;
   return {
     text: {

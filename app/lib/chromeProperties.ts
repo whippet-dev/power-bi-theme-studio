@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   chromeThemePath,
@@ -8,7 +9,7 @@ import {
   textProp,
   type VisualSchemaKey,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * "Chrome" properties — title, subtitle, background, border — are defined
@@ -1266,7 +1267,7 @@ export type ResolvedChromeStyle = {
  * fallback — see resolveChromeValue in properties.ts.
  */
 export function resolveChromeStyle(
-  theme: PowerBITheme,
+  theme: ThemeSource,
   activeVisual: VisualSchemaKey,
   base: ResolvedTheme,
 ): ResolvedChromeStyle {

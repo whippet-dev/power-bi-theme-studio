@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp as sharedBoolProp,
   colorProp as sharedColorProp,
@@ -8,7 +9,7 @@ import {
   textProp as sharedTextProp,
   type EnumOption,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Table ("tableEx") property registry, pinned to Microsoft's published
@@ -683,7 +684,7 @@ export type ResolvedTableStyle = {
  * simple theming recolours a table (accent header, light header text)
  * before any per-visual override exists.
  */
-export function resolveTableStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedTableStyle {
+export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedTableStyle {
   const p = TABLE_PROPERTIES;
   return {
     columnHeaders: {

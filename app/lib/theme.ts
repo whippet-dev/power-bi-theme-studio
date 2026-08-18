@@ -241,21 +241,32 @@ export function deleteThemeValue(theme: PowerBITheme, path: Array<string | numbe
 }
 
 /**
- * Layers `override` (the user's own theme) on top of `base` (the selected
- * base theme — see baseThemes.ts), recursively: object keys merge, array
- * entries merge by index (not concatenated or replaced wholesale), and a
- * primitive in `override` always wins. This is what lets every resolver's
- * existing "theme override, else hardcoded fallback" cascade gain a real
- * middle layer — sourced from genuine Power BI base-theme data instead of
- * this app's own guesses — without rewriting every individual default.
+ * A straightforward recursive merge of the user's theme over a base theme:
+ * object keys merge, array entries merge by index (not concatenated or
+ * replaced wholesale), and a value in `override` always wins.
  *
- * Only used to build the *preview's* resolution input; the user's actual
- * theme state (what gets edited and exported) stays exactly as they wrote
- * it, never merged. Passing an array through index-based merging can, in
- * principle, misalign `$id`-tagged per-state entries (actionButton /
- * bookmarkNavigator / pageNavigator) if a base theme and a user theme
- * order those states differently — an accepted, low-probability edge
- * case rather than a full $id-aware merge.
+ * Index-based array merging can in principle misalign `$id`-tagged
+ * per-state entries (actionButton / bookmarkNavigator / pageNavigator) if
+ * base and custom order those states differently — an accepted,
+ * low-probability edge case rather than a full $id-aware merge.
+ *
+ * Scope note. This is used for *root-level* reads — theme tokens,
+ * `dataColors`, `textClasses` — where custom-over-base merging is exactly
+ * the right semantics and there is no visual/wildcard axis to respect.
+ *
+ * It is deliberately **not** how `visualStyles` precedence is decided.
+ * Power BI considers every custom-theme match before any base-theme match,
+ * which a merge cannot express: merging discards which layer each value
+ * came from, so a later "visual, then wildcard" walk would let a *base*
+ * visual-specific value beat a *custom* wildcard one. That ordering now
+ * lives in resolvePropertyEntry (properties.ts), which walks the layers
+ * separately and reports the provenance it used. An earlier version of
+ * this function pre-flattened those four slots into each visual's bucket
+ * to compensate; provenance makes that both unnecessary and actively
+ * harmful, since flattening would make every value look custom-visual.
+ *
+ * The result is still never exported: the user's theme state stays exactly
+ * as they wrote it.
  */
 export function mergeThemeOverBase(base: PowerBITheme, override: PowerBITheme): PowerBITheme {
   return deepMergeJson(base as unknown as JsonValue, override as unknown as JsonValue) as unknown as PowerBITheme;

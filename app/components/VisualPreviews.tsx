@@ -28,7 +28,7 @@ import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import { resolvePageNavigatorStyle, type ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
-import type { InteractionState } from "../lib/properties";
+import type { InteractionState, ThemeSource } from "../lib/properties";
 import { areaPath, linePath, markerShape, type MarkerShape, type Point } from "../lib/lineGeometry";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import { StateSelector } from "./PropertyEditor";
@@ -39,7 +39,7 @@ import type { ResolvedStackedBarChartStyle } from "../lib/stackedBarChartPropert
 import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartProperties";
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
-import { readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
+import type { ResolvedTheme } from "../lib/theme";
 
 export type VisualKind =
   | "card"
@@ -69,16 +69,16 @@ export type VisualKind =
  * multiples grid; checking for a real override is the closest proxy this
  * theme-only tool has for "the user is looking at this setting".
  */
-function hasSmallMultiplesOverride(theme: PowerBITheme, visual: string): boolean {
-  const group = readThemeValueAtPath(theme, ["visualStyles", visual, "*", "smallMultiplesLayout"]);
-  return Array.isArray(group) && group.length > 0;
-}
+// Small multiples used to be detected here by reading raw theme JSON,
+// because resolution collapsed to bare values and so couldn't distinguish
+// "the user configured this" from "this resolved to its default". It now
+// arrives pre-resolved as `usesSmallMultiples` on each chart's style,
+// derived from provenance — see isGroupSetBy in app/lib/properties.ts.
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
-  rawTheme: PowerBITheme;
-  /** The working theme layered on top of the selected base theme — see mergeThemeOverBase. Used only for the hero's own interaction-state re-resolution; everything else already arrives pre-resolved via the *Style props below. */
-  effectiveTheme: PowerBITheme;
+  /** The layered custom/base resolution source — used only for the hero's own interaction-state re-resolution; everything else arrives pre-resolved via the *Style props below. */
+  themeSource: ThemeSource;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
@@ -875,8 +875,7 @@ function PreviewShell({
 
 export function VisualGallery({
   theme,
-  rawTheme,
-  effectiveTheme,
+  themeSource,
   tableStyle,
   barChartStyle,
   columnChartStyle,
@@ -921,13 +920,13 @@ export function VisualGallery({
   const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
   const isStatefulHero = selected === "actionButton" || selected === "bookmarkNavigator" || selected === "pageNavigator";
   const effectiveActionButtonStyle =
-    selected === "actionButton" ? resolveActionButtonStyle(effectiveTheme, theme, previewInteractionState) : actionButtonStyle;
+    selected === "actionButton" ? resolveActionButtonStyle(themeSource, theme, previewInteractionState) : actionButtonStyle;
   const effectiveBookmarkNavigatorStyle =
     selected === "bookmarkNavigator"
-      ? resolveBookmarkNavigatorStyle(effectiveTheme, theme, previewInteractionState)
+      ? resolveBookmarkNavigatorStyle(themeSource, theme, previewInteractionState)
       : bookmarkNavigatorStyle;
   const effectivePageNavigatorStyle =
-    selected === "pageNavigator" ? resolvePageNavigatorStyle(effectiveTheme, theme, previewInteractionState) : pageNavigatorStyle;
+    selected === "pageNavigator" ? resolvePageNavigatorStyle(themeSource, theme, previewInteractionState) : pageNavigatorStyle;
   const stateSelectorNode = isStatefulHero ? (
     <span className="preview-state-selector">
       <StateSelector state={previewInteractionState} onSelect={setPreviewInteractionState} />
@@ -1751,7 +1750,7 @@ export function VisualGallery({
 
   // A small-multiples layout replaces the single plot with a grid of
   // repeated mini-charts, one per category.
-  const lineUsesSmallMultiples = hasSmallMultiplesOverride(rawTheme, "lineChart");
+  const lineUsesSmallMultiples = lineChartStyle.usesSmallMultiples;
 
   const lineContent = (
     <span
@@ -2815,22 +2814,22 @@ export function VisualGallery({
   // Small multiples replace a chart's single plot with a grid of repeated
   // mini-charts, one per category — same treatment as the line chart above.
   const barSmallMultipleTitles = ["London", "North West", "Scotland", "Wales"];
-  const barFinalContent = hasSmallMultiplesOverride(rawTheme, "clusteredBarChart") ? (
+  const barFinalContent = barChartStyle.usesSmallMultiples ? (
     <SmallMultiplesGrid layout={barChartStyle.smallMultiplesLayout} subheader={barChartStyle.subheader} content={barContent} titles={barSmallMultipleTitles} />
   ) : (
     barContent
   );
-  const columnFinalContent = hasSmallMultiplesOverride(rawTheme, "clusteredColumnChart") ? (
+  const columnFinalContent = columnChartStyle.usesSmallMultiples ? (
     <SmallMultiplesGrid layout={columnChartStyle.smallMultiplesLayout} subheader={columnChartStyle.subheader} content={columnContent} titles={barSmallMultipleTitles} />
   ) : (
     columnContent
   );
-  const stackedBarFinalContent = hasSmallMultiplesOverride(rawTheme, "barChart") ? (
+  const stackedBarFinalContent = stackedBarChartStyle.usesSmallMultiples ? (
     <SmallMultiplesGrid layout={stackedBarChartStyle.smallMultiplesLayout} subheader={stackedBarChartStyle.subheader} content={stackedBarContent} titles={barSmallMultipleTitles} />
   ) : (
     stackedBarContent
   );
-  const stackedColumnFinalContent = hasSmallMultiplesOverride(rawTheme, "columnChart") ? (
+  const stackedColumnFinalContent = stackedColumnChartStyle.usesSmallMultiples ? (
     <SmallMultiplesGrid layout={stackedColumnChartStyle.smallMultiplesLayout} subheader={stackedColumnChartStyle.subheader} content={stackedColumnContent} titles={barSmallMultipleTitles} />
   ) : (
     stackedColumnContent

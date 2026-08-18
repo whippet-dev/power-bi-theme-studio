@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -6,8 +7,9 @@ import {
   propertyThemePath,
   resolvePropertyValue,
   textProp,
+  isGroupSetBy,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Line chart property registry, pinned to Microsoft's published schema
@@ -534,6 +536,14 @@ export const LINE_CHART_PROPERTIES = {
 } as const;
 
 export type ResolvedLineChartStyle = {
+  /**
+   * Whether the *user-supplied* theme configured small multiples.
+   * Base themes ship smallMultiplesLayout styling so the feature looks
+   * right when it is used, which is not a signal that anything enabled
+   * it — so only the custom layer counts. Replaces the renderer reading
+   * raw theme JSON to answer the same question.
+   */
+  usesSmallMultiples: boolean;
   dataPoint: {
     defaultColor: string;
     fill: string;
@@ -1013,9 +1023,10 @@ export type ResolvedLineChartStyle = {
  * to the shared theme tokens (palette/background/foreground) for
  * colour-like fields and a plain Power BI-typical default otherwise.
  */
-export function resolveLineChartStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedLineChartStyle {
+export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedLineChartStyle {
   const p = LINE_CHART_PROPERTIES;
   return {
+    usesSmallMultiples: isGroupSetBy(theme, "lineChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
       defaultColor: resolvePropertyValue(theme, p.dataPoint.defaultColor, base.palette[0] ?? base.foreground),
       fill: resolvePropertyValue(theme, p.dataPoint.fill, base.palette[0] ?? base.foreground),

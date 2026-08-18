@@ -1,6 +1,7 @@
+import type { ThemeSource } from "./properties";
 import { propertyThemePath } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Shape — a plain decorative canvas shape (rectangle, oval, arrow, speech
@@ -12,7 +13,7 @@ export const SHAPE_PROPERTIES = buildShapeFamilyCore("shape", { linecap: true })
 
 export type ResolvedShapeStyle = ResolvedShapeFamilyCore;
 
-export function resolveShapeStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedShapeStyle {
+export function resolveShapeStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedShapeStyle {
   return resolveShapeFamilyCore(theme, SHAPE_PROPERTIES, base.foreground, base.fontFamily);
 }
 

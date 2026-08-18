@@ -2,16 +2,15 @@ import {
   boolProp,
   colorProp,
   enumProp,
-  forState,
+  forStateId,
   groupSupportsStates,
   numberProp,
   propertyThemePath,
   resolvePropertyValue,
-  stateEntryIndex,
-} from "./properties";
-import type { InteractionState, PropertyDefinition, PropertyValueType } from "./properties";
+  } from "./properties";
+import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Page navigator — a row/grid of buttons that jump between report pages,
@@ -156,15 +155,14 @@ export type ResolvedPageNavigatorStyle = ResolvedShapeFamilyCore & {
 
 /** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
 export function resolvePageNavigatorStyle(
-  theme: PowerBITheme,
+  theme: ThemeSource,
   base: ResolvedTheme,
   state: InteractionState = "default",
 ): ResolvedPageNavigatorStyle {
   const p = PAGE_NAVIGATOR_PROPERTIES;
   const accentBarStateful = groupSupportsStates("pageNavigator", "accentBar");
-  const accentBarIndex = accentBarStateful ? stateEntryIndex(theme, "pageNavigator", "accentBar", state) : 0;
-  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyDefinition<T> =>
-    accentBarStateful ? forState(definition, accentBarIndex) : definition;
+  const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
+    accentBarStateful ? forStateId(definition, state) : definition;
   return {
     ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
     accentBar: {

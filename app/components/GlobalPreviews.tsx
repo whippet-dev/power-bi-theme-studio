@@ -33,8 +33,8 @@ import {
 export function FilterPanePreview({ globalOptions, theme }: { globalOptions: ResolvedGlobalOptionsStyle; theme: ResolvedTheme }) {
   const pane = globalOptions.pageFilterPane;
   // "Available" (no selection, e.g. "is (All)") vs "Applied" (a selection
-  // is active) are genuinely different states in the real schema — see
-  // filterCardEntryIndex in globalOptionsProperties.ts.
+  // is active) are genuinely different $id-tagged states in the real
+  // schema, resolved per layer — see forStateId in app/lib/properties.ts.
   const availableCard = globalOptions.pageFilterCards;
   const appliedCard = globalOptions.pageFilterCardsApplied;
   const state = globalOptions.reportFilterPaneState;

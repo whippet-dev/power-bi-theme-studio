@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -7,7 +8,7 @@ import {
   resolvePropertyValue,
   textProp,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Slicer property registry, pinned to Microsoft's published schema
@@ -313,7 +314,7 @@ export type ResolvedSlicerStyle = {
  * the shared theme tokens (palette/background/foreground) for colour-like
  * fields and a plain Power BI-typical default otherwise.
  */
-export function resolveSlicerStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedSlicerStyle {
+export function resolveSlicerStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedSlicerStyle {
   const p = SLICER_PROPERTIES;
   return {
     header: {

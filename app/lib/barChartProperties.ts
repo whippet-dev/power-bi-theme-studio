@@ -1,3 +1,4 @@
+import type { ThemeSource } from "./properties";
 import {
   boolProp,
   colorProp,
@@ -6,8 +7,9 @@ import {
   propertyThemePath,
   resolvePropertyValue,
   textProp,
+  isGroupSetBy,
 } from "./properties";
-import type { PowerBITheme, ResolvedTheme } from "./theme";
+import type { ResolvedTheme } from "./theme";
 
 /**
  * Clustered bar chart ("clusteredBarChart") property registry, pinned to
@@ -380,6 +382,14 @@ export const BAR_CHART_PROPERTIES = {
 } as const;
 
 export type ResolvedBarChartStyle = {
+  /**
+   * Whether the *user-supplied* theme configured small multiples.
+   * Base themes ship smallMultiplesLayout styling so the feature looks
+   * right when it is used, which is not a signal that anything enabled
+   * it — so only the custom layer counts. Replaces the renderer reading
+   * raw theme JSON to answer the same question.
+   */
+  usesSmallMultiples: boolean;
   dataPoint: {
     borderColor: string;
     borderColorMatchFill: boolean;
@@ -714,9 +724,10 @@ export type ResolvedBarChartStyle = {
  * the shared theme tokens (palette/background/foreground) for colour-like
  * fields and a plain Power BI-typical default otherwise.
  */
-export function resolveBarChartStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedBarChartStyle {
+export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedBarChartStyle {
   const p = BAR_CHART_PROPERTIES;
   return {
+    usesSmallMultiples: isGroupSetBy(theme, "clusteredBarChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
       borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, "#E3E3E3"),
       borderColorMatchFill: resolvePropertyValue(theme, p.dataPoint.borderColorMatchFill, false),
