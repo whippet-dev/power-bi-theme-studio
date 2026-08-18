@@ -93,11 +93,19 @@ export type ResolvedCardStyle = {
  */
 export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): ResolvedCardStyle {
   const p = CARD_PROPERTIES;
+  // Card's category label isn't styled from the data palette or the plain
+  // foreground colour — verified against a real report (private theme, Card
+  // (old), no overrides): it inherits `theme.thirdLevelElements`, the same
+  // Fluent text-hierarchy token this app already defaults to "#605E5C" for
+  // the Theme tab's own colour list (themeGlobalsProperties.ts) — that
+  // theme doesn't set it, and the rendered colour matched the app's
+  // existing default exactly.
+  const categoryLabelColor = typeof theme.thirdLevelElements === "string" ? theme.thirdLevelElements : "#605E5C";
   return {
     categoryLabels: {
       show: resolvePropertyValue(theme, p.categoryLabels.show, true),
       bold: resolvePropertyValue(theme, p.categoryLabels.bold, false),
-      color: resolvePropertyValue(theme, p.categoryLabels.color, base.palette[0] ?? base.foreground),
+      color: resolvePropertyValue(theme, p.categoryLabels.color, categoryLabelColor),
       fontFamily: resolvePropertyValue(theme, p.categoryLabels.fontFamily, ""),
       fontSize: resolvePropertyValue(theme, p.categoryLabels.fontSize, 6),
       italic: resolvePropertyValue(theme, p.categoryLabels.italic, false),
@@ -106,7 +114,9 @@ export function resolveCardStyle(theme: PowerBITheme, base: ResolvedTheme): Reso
     },
     labels: {
       bold: resolvePropertyValue(theme, p.labels.bold, false),
-      color: resolvePropertyValue(theme, p.labels.color, base.palette[0] ?? base.foreground),
+      // Verified against the same real report: the big value's colour is
+      // the global textClasses.callout colour, not the first data colour.
+      color: resolvePropertyValue(theme, p.labels.color, base.calloutColor),
       fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
       // Card's big value is typically much larger than other visuals' text —
       // 28 matches the existing textClasses.callout default it visually sits

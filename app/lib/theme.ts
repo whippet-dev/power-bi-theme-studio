@@ -27,6 +27,7 @@ export type ResolvedTheme = {
   fontFamily: string;
   titleSize: number;
   calloutSize: number;
+  calloutColor: string;
 };
 
 export const STARTER_THEME: PowerBITheme = {
@@ -123,6 +124,7 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
         : "Segoe UI",
     titleSize: readSize(title.fontSize, 12),
     calloutSize: readSize(callout.fontSize, 28),
+    calloutColor: readColor(callout.color, "#252423"),
   };
 }
 

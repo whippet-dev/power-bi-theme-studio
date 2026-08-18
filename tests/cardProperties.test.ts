@@ -38,6 +38,23 @@ test("resolveCardStyle falls back to sensible defaults when there is no override
   assert.equal(card.labels.fontSize, 28);
 });
 
+// Regression: verified against a real Power BI report (a private real-world
+// theme, Card (old), no per-visual overrides) — category label colour
+// comes from theme.thirdLevelElements (a Fluent text-hierarchy token, not
+// a data colour), and the big value's colour comes from
+// textClasses.callout.color, not the first data colour either.
+test("category label colour falls back to thirdLevelElements, and the value falls back to textClasses.callout.color — not a data colour", () => {
+  const theme: PowerBITheme = {
+    ...STARTER_THEME,
+    textClasses: { callout: { color: "#252423" } },
+  };
+  const base = resolveTheme(theme);
+  const card = resolveCardStyle(theme, base);
+
+  assert.equal(card.categoryLabels.color, "#605E5C");
+  assert.equal(card.labels.color, "#252423");
+});
+
 test("resolveCardStyle prefers a visualStyles.card override over defaults", () => {
   const base = resolveTheme(THEME_WITH_CARD_OVERRIDE);
   const card = resolveCardStyle(THEME_WITH_CARD_OVERRIDE, base);
