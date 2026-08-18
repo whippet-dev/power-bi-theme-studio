@@ -2235,7 +2235,7 @@ button { color: inherit; }
   width: 100%;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .navigator-preview__item {
@@ -2249,13 +2249,10 @@ button { color: inherit; }
   font-size: 10px;
 }
 
+/* Geometry (top/left/width/height/border-radius) is set inline per
+   render — it depends on which edge the accent bar setting picks. */
 .navigator-preview__accent {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 100%;
-  border-radius: 3px 0 0 3px;
 }
 
 .textbox-preview {

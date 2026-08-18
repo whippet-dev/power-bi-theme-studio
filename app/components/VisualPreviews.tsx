@@ -2513,30 +2513,59 @@ export function VisualGallery({
     String(actionIcon.placement),
   );
 
+  // The accent bar hugs whichever edge "position" names — Left/Top get a
+  // rounded outer corner pair, Right/Bottom the mirror image.
+  const accentBarStyle = (accentBar: { color: string; position: string | number; width: number; transparency: number }): CSSProperties => {
+    const color = hexWithAlpha(accentBar.color, accentBar.transparency);
+    const width = accentBar.width || 4;
+    switch (String(accentBar.position).toLowerCase()) {
+      case "right":
+        return { top: 0, right: 0, width, height: "100%", backgroundColor: color, borderRadius: "0 3px 3px 0" };
+      case "top":
+        return { top: 0, left: 0, width: "100%", height: width, backgroundColor: color, borderRadius: "3px 3px 0 0" };
+      case "bottom":
+        return { bottom: 0, left: 0, width: "100%", height: width, backgroundColor: color, borderRadius: "0 0 3px 3px" };
+      default:
+        return { top: 0, left: 0, width, height: "100%", backgroundColor: color, borderRadius: "3px 0 0 3px" };
+    }
+  };
+
   const navigatorButtons = (
     style: ResolvedShapeFamilyCore,
-    accentBar: { show: boolean; color: string },
-    orientation: string | number,
+    accentBar: { show: boolean; color: string; position: string | number; width: number; transparency: number },
+    layout: { orientation: string | number; columnCount: number; rowCount: number; cellPadding: number },
     labels: string[],
-  ) => (
-    <span className="navigator-preview" style={{ flexDirection: orientation === 1 ? "column" : "row" }}>
-      {labels.map((label, index) => (
-        <span className="navigator-preview__item" key={label}>
-          {shapeTile({ ...style, text: { ...style.text, text: label } }, label)}
-          {accentBar.show && index === 0 && <span className="navigator-preview__accent" style={{ backgroundColor: accentBar.color }} />}
-        </span>
-      ))}
-    </span>
-  );
+  ) => {
+    // Orientation: 2 = Horizontal, 1 = Vertical, 0 = Grid.
+    const isGrid = layout.orientation === 0;
+    return (
+      <span
+        className="navigator-preview"
+        style={{
+          display: isGrid ? "grid" : "flex",
+          flexDirection: !isGrid && layout.orientation === 1 ? "column" : "row",
+          gridTemplateColumns: isGrid ? `repeat(${Math.max(1, layout.columnCount || 2)}, 1fr)` : undefined,
+          gap: layout.cellPadding || 10,
+        }}
+      >
+        {labels.map((label, index) => (
+          <span className="navigator-preview__item" key={label}>
+            {shapeTile({ ...style, text: { ...style.text, text: label } }, label)}
+            {accentBar.show && index === 0 && <span className="navigator-preview__accent" style={accentBarStyle(accentBar)} />}
+          </span>
+        ))}
+      </span>
+    );
+  };
 
   const bookmarkNavigatorContent = navigatorButtons(
     bookmarkNavigatorStyle,
     bookmarkNavigatorStyle.accentBar,
-    bookmarkNavigatorStyle.layout.orientation,
+    bookmarkNavigatorStyle.layout,
     ["Overview", "Detail", "Trends"],
   );
 
-  const pageNavigatorContent = navigatorButtons(pageNavigatorStyle, pageNavigatorStyle.accentBar, pageNavigatorStyle.layout.orientation, [
+  const pageNavigatorContent = navigatorButtons(pageNavigatorStyle, pageNavigatorStyle.accentBar, pageNavigatorStyle.layout, [
     "Page 1",
     "Page 2",
     "Page 3",
@@ -2558,6 +2587,8 @@ export function VisualGallery({
   const imageContent = (
     <span
       className="image-preview"
+      role="img"
+      aria-label={imageStyle.image.altText || "Placeholder image"}
       style={{
         backgroundColor: imageStyle.image.backgroundEnabled
           ? hexWithAlpha(imageStyle.image.backgroundColor, imageStyle.image.backgroundTransparency)
@@ -2565,7 +2596,9 @@ export function VisualGallery({
         border: imageStyle.image.strokeShow
           ? `${imageStyle.image.strokeWidth}px ${imageStyle.image.strokePattern} ${hexWithAlpha(imageStyle.image.strokeColor, imageStyle.image.strokeTransparency)}`
           : "1px dashed #C8C6C4",
-        borderRadius: imageStyle.image.cornerRadius,
+        borderRadius: imageStyle.image.cornerRadiusAdvanced
+          ? `${imageStyle.image.cornerRadiusLeftTop}px ${imageStyle.image.cornerRadiusRightTop}px ${imageStyle.image.cornerRadiusRightBottom}px ${imageStyle.image.cornerRadiusLeftBottom}px`
+          : imageStyle.image.cornerRadius,
         opacity: 1 - imageStyle.image.transparency / 100,
         filter: imageStyle.image.effects
           ? `blur(${imageStyle.image.blur * 0.05}px) contrast(${100 + imageStyle.image.contrast}%) saturate(${100 + imageStyle.image.saturation}%)`
