@@ -243,11 +243,28 @@ export function AxisTickLabels({
 
   return (
     <span className={`chart-ticks chart-ticks--${orientation}`}>
-      {ticks.map((tick, i) => (
-        <span key={i} style={textStyle(axis)}>
-          {formatValue(tick, axis.labelDisplayUnits, axis.labelPrecision)}
-        </span>
-      ))}
+      {ticks.map((tick, i) => {
+        // Positioned at the exact same i/count fraction Gridlines uses,
+        // then centred on that point — `justify-content: space-between`
+        // (the previous approach) aligns box *edges*, not centres, so
+        // unequal-width labels like "0" and "82K" drift away from their
+        // gridline the further they sit from the container's own edges.
+        const offset = `${(i / count) * 100}%`;
+        return (
+          <span
+            key={i}
+            style={{
+              ...textStyle(axis),
+              position: "absolute",
+              ...(orientation === "horizontal"
+                ? { left: offset, transform: "translateX(-50%)" }
+                : { bottom: offset, transform: "translateY(50%)" }),
+            }}
+          >
+            {formatValue(tick, axis.labelDisplayUnits, axis.labelPrecision)}
+          </span>
+        );
+      })}
     </span>
   );
 }

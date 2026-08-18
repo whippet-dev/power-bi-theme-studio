@@ -751,7 +751,8 @@ button { color: inherit; }
   flex-direction: row-reverse;
 }
 
-.chart-preview--legend-side .chart-preview__plot {
+.chart-preview--legend-side .chart-preview__plot,
+.chart-preview--legend-side .chart-preview__body {
   flex: 1;
   min-width: 0;
 }
@@ -1022,8 +1023,14 @@ button { color: inherit; }
   flex-shrink: 0;
 }
 
+/* Children are absolutely positioned (see AxisTickLabels) so they can sit
+   at the exact same i/count fraction as their gridline rather than being
+   edge-aligned by flex's justify-content, which drifts with unequal-width
+   labels ("0" vs "82K"). Needs an explicit height since absolutely
+   positioned children no longer contribute to the flex box's own size. */
 .chart-ticks--horizontal {
-  justify-content: space-between;
+  position: relative;
+  height: 12px;
 }
 
 /* A vertical value axis sits in a gutter to the left of the plot. Absolute
@@ -1173,6 +1180,42 @@ button { color: inherit; }
 .chart-preview__axis-title--value {
   margin-top: 10px;
   text-align: center;
+}
+
+/* A horizontal bar chart's category axis runs down the left edge, so
+   Power BI draws its title rotated there instead of as a banner above
+   the plot — see .chart-preview__body below. */
+.chart-preview__axis-title--rotated {
+  flex-shrink: 0;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+/* Row layout for a horizontal bar chart: the rotated category axis
+   title (when shown) sits to the left of everything else — the plot,
+   value-axis ticks, and value-axis title — which together keep their
+   previous vertical stack inside .chart-preview__body-main. */
+.chart-preview__body {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 22px;
+}
+
+.chart-preview__body-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-preview__body-main .chart-preview__plot {
+  margin-top: 0;
 }
 
 .chart-preview__plot {
