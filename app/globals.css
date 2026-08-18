@@ -700,6 +700,18 @@ button { color: inherit; }
   opacity: 0.75;
 }
 
+.visual-header__icon--tooltip {
+  cursor: help;
+  border-radius: 3px;
+}
+
+.visual-header__icon--tooltip:hover,
+.visual-header__icon--tooltip:focus-visible {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+
 .preview-divider {
   display: block;
   margin: 6px 0;
@@ -1069,6 +1081,29 @@ button { color: inherit; }
   display: block;
   width: 630px;
   max-width: 100%;
+}
+
+/* Reveals the data-tooltip preview on demand rather than always — the
+   box used to float below the tile permanently with nothing explaining
+   what it was. */
+.tooltip-preview-trigger {
+  display: inline-flex;
+  align-items: center;
+  margin: 10px 0 0 24px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tooltip-preview-trigger:hover,
+.tooltip-preview-trigger:focus-visible {
+  border-color: #c3b6d7;
+  color: var(--ink);
 }
 
 .preview-tooltip {

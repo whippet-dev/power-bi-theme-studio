@@ -425,6 +425,13 @@ function PreviewShell({
   onSelect,
   children,
 }: PreviewShellProps) {
+  // The data tooltip preview used to float below the tile permanently,
+  // which read as a stray, unlabelled box rather than something that
+  // belongs to the visual. Power BI's own tooltip only appears on hover,
+  // so this reveals it the same way — via a small labelled trigger below
+  // the tile — rather than showing it all the time.
+  const [showTooltipPreview, setShowTooltipPreview] = useState(false);
+  const [showHeaderTooltipPreview, setShowHeaderTooltipPreview] = useState(false);
   // Power BI offsets a drop shadow by an angle + distance unless a named
   // preset overrides both; "Inner" draws it inside the visual's edge.
   const shadowOffset = (): { x: number; y: number } => {
@@ -522,7 +529,7 @@ function PreviewShell({
   // would bury the visuals themselves.
   const tooltip = chrome.visualTooltip;
   const tooltipIsReportPage = String(tooltip.type) === "Canvas";
-  const tooltipNode = variant === "hero" && tooltip.show && (
+  const tooltipNode = variant === "hero" && tooltip.show && showTooltipPreview && (
     <span
       className="preview-tooltip"
       style={{
@@ -578,8 +585,12 @@ function PreviewShell({
 
   // The visual header's own tooltip — shown next to the header when its
   // icon is enabled, so visualHeaderTooltip's 13 properties are visible.
+  // Only appears on hover/focus of the ⓘ icon itself, the same way it
+  // only appears on hover in real Power BI — and the same trigger pattern
+  // as the data tooltip's own button, so the two previews read as two
+  // distinct hover targets rather than two unexplained floating boxes.
   const headerTooltip = chrome.visualHeaderTooltip;
-  const headerTooltipNode = variant === "hero" && chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && (
+  const headerTooltipNode = variant === "hero" && chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && showHeaderTooltipPreview && (
     <span
       className="preview-header-tooltip"
       style={{
@@ -634,11 +645,27 @@ function PreviewShell({
           >
             {headerIcons
               .filter(([visible]) => visible)
-              .map(([, glyph, name]) => (
-                <span className="visual-header__icon" key={name} title={name} aria-hidden="true">
-                  {glyph}
-                </span>
-              ))}
+              .map(([, glyph, name]) =>
+                name === "Tooltip" ? (
+                  <span
+                    className="visual-header__icon visual-header__icon--tooltip"
+                    key={name}
+                    role="button"
+                    title="Hover to preview the header tooltip"
+                    tabIndex={0}
+                    onMouseEnter={() => setShowHeaderTooltipPreview(true)}
+                    onMouseLeave={() => setShowHeaderTooltipPreview(false)}
+                    onFocus={() => setShowHeaderTooltipPreview(true)}
+                    onBlur={() => setShowHeaderTooltipPreview(false)}
+                  >
+                    {glyph}
+                  </span>
+                ) : (
+                  <span className="visual-header__icon" key={name} title={name} aria-hidden="true">
+                    {glyph}
+                  </span>
+                ),
+              )}
             {headerTooltipNode}
           </span>
         )}
@@ -748,6 +775,16 @@ function PreviewShell({
       <span className="visual-hero-scale-wrap">
         <span className="visual-hero-scale">{tile}</span>
       </span>
+      {tooltip.show && (
+        <button
+          type="button"
+          className="tooltip-preview-trigger"
+          onClick={() => setShowTooltipPreview((value) => !value)}
+          aria-expanded={showTooltipPreview}
+        >
+          {showTooltipPreview ? "Hide" : "Show"} tooltip preview
+        </button>
+      )}
       {tooltipNode}
     </span>
   );
