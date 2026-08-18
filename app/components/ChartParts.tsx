@@ -179,12 +179,40 @@ export function ChartLegend({
 }
 
 /**
+ * The value axis's 0%/100% range doesn't always span a chart's full
+ * width/height — a horizontal bar chart's category-label and value-label
+ * columns sit either side of the actual track, so the axis needs to be
+ * inset by exactly those columns' widths or its ticks and gridlines land
+ * over the label gutters instead of the bars they're meant to measure.
+ * Both `start` and `end` are pixels, on whichever edge is the axis's 0%
+ * (left for horizontal, bottom for vertical).
+ */
+export type AxisInset = { start: number; end: number };
+const NO_INSET: AxisInset = { start: 0, end: 0 };
+
+export function insetOffset(i: number, count: number, inset: AxisInset): string {
+  const fraction = i / count;
+  if (inset.start === 0 && inset.end === 0) return `${fraction * 100}%`;
+  return `calc(${inset.start}px + (100% - ${inset.start + inset.end}px) * ${fraction})`;
+}
+
+/**
  * Gridlines drawn as real positioned lines, one per tick, so their colour,
  * thickness, and line style are all visible. The previous implementation
  * used a repeating gradient locked to 25% intervals, which couldn't show
  * the line style at all and ignored the axis range.
  */
-export function Gridlines({ axis, orientation, count = 4 }: { axis: AxisStyle; orientation: "vertical" | "horizontal"; count?: number }) {
+export function Gridlines({
+  axis,
+  orientation,
+  count = 4,
+  inset = NO_INSET,
+}: {
+  axis: AxisStyle;
+  orientation: "vertical" | "horizontal";
+  count?: number;
+  inset?: AxisInset;
+}) {
   if (!axis.gridlineShow) return null;
   const style = mapLineStyle(axis.gridlineStyle);
   // An explicit dash array wins over the named style, as elsewhere.
@@ -194,7 +222,7 @@ export function Gridlines({ axis, orientation, count = 4 }: { axis: AxisStyle; o
   return (
     <>
       {Array.from({ length: count + 1 }, (_, i) => {
-        const offset = `${(i / count) * 100}%`;
+        const offset = insetOffset(i, count, inset);
         return (
           <span
             className="chart-gridline"
@@ -232,11 +260,13 @@ export function AxisTickLabels({
   dataMax,
   orientation,
   count = 4,
+  inset = NO_INSET,
 }: {
   axis: AxisStyle;
   dataMax: number;
   orientation: "vertical" | "horizontal";
   count?: number;
+  inset?: AxisInset;
 }) {
   if (!axis.show) return null;
   const ticks = axisTicks(axis, dataMax, count);
@@ -249,7 +279,7 @@ export function AxisTickLabels({
         // (the previous approach) aligns box *edges*, not centres, so
         // unequal-width labels like "0" and "82K" drift away from their
         // gridline the further they sit from the container's own edges.
-        const offset = `${(i / count) * 100}%`;
+        const offset = insetOffset(i, count, inset);
         return (
           <span
             key={i}

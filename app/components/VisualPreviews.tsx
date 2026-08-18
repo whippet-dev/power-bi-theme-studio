@@ -196,6 +196,14 @@ function barThickness(gapSize: number): string {
   return `${100 - gap}%`;
 }
 
+// A horizontal bar chart's value axis (0%-100%) only spans .bar-row's
+// middle track column, not the whole row — the category-label and
+// value-label columns sit either side of it. Must match .bar-row's
+// `grid-template-columns: 68px minmax(80px, 1fr) 28px; gap: 8px;` in
+// globals.css, or gridlines/ticks drift onto the label gutters instead of
+// lining up with the bars they measure.
+const BAR_VALUE_AXIS_INSET = { start: 68 + 8, end: 8 + 28 };
+
 /** The glyph Power BI shows for each built-in action button icon. */
 function actionButtonGlyph(shapeType: string): string {
   const glyphs: Record<string, string> = {
@@ -786,6 +794,12 @@ export function VisualGallery({
     ["Scotland", 51],
     ["Wales", 38],
   ];
+  // London (82) is the dataset's max and matches every value-axis's
+  // dataMax={82_000} — so its bar/column must reach exactly 100%, not
+  // 82%. Every fill/error-bar position below scales against this rather
+  // than treating the raw value as a literal percentage.
+  const barCategoriesMax = Math.max(...barCategories.map(([, value]) => value));
+  const barPercent = (value: number): number => (value / barCategoriesMax) * 100;
 
   // Series shown in every cartesian chart's legend. Clustered charts show
   // one series; the stacked variants show the two they actually draw.
@@ -858,7 +872,7 @@ export function VisualGallery({
         )}
         <span className="chart-preview__body-main">
           <span className="chart-preview__plot" style={{ position: "relative" }}>
-            <Gridlines axis={barChartStyle.valueAxis} orientation="vertical" />
+            <Gridlines axis={barChartStyle.valueAxis} orientation="vertical" inset={BAR_VALUE_AXIS_INSET} />
             <ZoomSliders zoom={barChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
             {barChartStyle.referenceLine.show && (
               <span
@@ -897,7 +911,7 @@ export function VisualGallery({
                     <span
                       className="bar-row__fill"
                       style={{
-                        width: `${value}%`,
+                        width: `${barPercent(value)}%`,
                         // Gap size thins the bar within its slot; 0 keeps the
                         // Power BI default rather than collapsing the bar.
                         height: barThickness(barChartStyle.layout.clusteredGapSize),
@@ -918,7 +932,7 @@ export function VisualGallery({
                       className="bar-row__error"
                       aria-hidden="true"
                       title="Error bars are enabled — representative indicator, not a data-fit range"
-                      style={{ left: `${value}%` }}
+                      style={{ left: `${barPercent(value)}%` }}
                     >
                       <span
                         style={{
@@ -938,7 +952,7 @@ export function VisualGallery({
               </span>
             ))}
           </span>
-          <AxisTickLabels axis={barChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" />
+          <AxisTickLabels axis={barChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
           {barChartStyle.valueAxis.showAxisTitle && (
             <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(barChartStyle.valueAxis)}>
               {String(barChartStyle.valueAxis.titleText) || "Applications"}
@@ -976,7 +990,7 @@ export function VisualGallery({
         )}
         <span className="chart-preview__body-main">
           <span className="chart-preview__plot" style={{ position: "relative" }}>
-            <Gridlines axis={stackedBarChartStyle.valueAxis} orientation="vertical" />
+            <Gridlines axis={stackedBarChartStyle.valueAxis} orientation="vertical" inset={BAR_VALUE_AXIS_INSET} />
             <ZoomSliders zoom={stackedBarChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
             {stackedBarChartStyle.trend.show && (
               <span
@@ -1002,7 +1016,7 @@ export function VisualGallery({
                     <span
                       className="bar-row__fill"
                       style={{
-                        width: `${value}%`,
+                        width: `${barPercent(value)}%`,
                         height: barThickness(stackedBarChartStyle.layout.stackedGapSize),
                         opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
                         background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
@@ -1017,7 +1031,7 @@ export function VisualGallery({
                       className="bar-row__error"
                       aria-hidden="true"
                       title="Error bars are enabled — representative indicator, not a data-fit range"
-                      style={{ left: `${value}%` }}
+                      style={{ left: `${barPercent(value)}%` }}
                     >
                       <span
                         style={{
@@ -1037,7 +1051,7 @@ export function VisualGallery({
               </span>
             ))}
           </span>
-          <AxisTickLabels axis={stackedBarChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" />
+          <AxisTickLabels axis={stackedBarChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
           {stackedBarChartStyle.valueAxis.showAxisTitle && (
             <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(stackedBarChartStyle.valueAxis)}>
               {String(stackedBarChartStyle.valueAxis.titleText) || "Applications"}
@@ -1108,7 +1122,7 @@ export function VisualGallery({
                   <span
                     className="column-item__fill"
                     style={{
-                      height: `${value}%`,
+                      height: `${barPercent(value)}%`,
                       width: barThickness(columnChartStyle.layout.clusteredGapSize),
                       backgroundColor: hexWithAlpha(columnChartStyle.dataPoint.fill, columnChartStyle.dataPoint.fillTransparency),
                       border: columnChartStyle.dataPoint.borderShow
@@ -1122,7 +1136,7 @@ export function VisualGallery({
                     className="column-item__error"
                     aria-hidden="true"
                     title="Error bars are enabled — representative indicator, not a data-fit range"
-                    style={{ bottom: `${value}%` }}
+                    style={{ bottom: `${barPercent(value)}%` }}
                   >
                     <span
                       style={{
@@ -1221,7 +1235,7 @@ export function VisualGallery({
                   <span
                     className="column-item__fill"
                     style={{
-                      height: `${value}%`,
+                      height: `${barPercent(value)}%`,
                       width: barThickness(stackedColumnChartStyle.layout.stackedGapSize),
                       opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
                       background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
@@ -1236,7 +1250,7 @@ export function VisualGallery({
                     className="column-item__error"
                     aria-hidden="true"
                     title="Error bars are enabled — representative indicator, not a data-fit range"
-                    style={{ bottom: `${value}%` }}
+                    style={{ bottom: `${barPercent(value)}%` }}
                   >
                     <span
                       style={{

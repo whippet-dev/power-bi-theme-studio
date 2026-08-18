@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { axisTicks, formatValue, labelIsInside, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle } from "../app/components/ChartParts";
+import { axisTicks, formatValue, insetOffset, labelIsInside, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle } from "../app/components/ChartParts";
 
 test("formatValue abbreviates by display unit and honours precision", () => {
   assert.equal(formatValue(82_000, "1000", 0), "82K");
@@ -36,6 +36,23 @@ test("axisTicks spans 0..dataMax unless the axis pins a range", () => {
   assert.deepEqual(blank, [0, 20, 40, 60, 80]);
   const inverted = axisTicks({ ...base, start: "50", end: "10" }, 90, 2);
   assert.ok(inverted.every((t) => Number.isFinite(t)));
+});
+
+// Regression: a horizontal bar chart's value axis doesn't span the whole
+// row — the category-label and value-label columns sit either side of the
+// track — so gridlines/ticks need an inset or they land over those label
+// gutters instead of the bars they measure (found from a real Power BI
+// screenshot where "0" and the max tick sat outside the actual bars).
+test("insetOffset spans the full width with no inset, and is bounded by the inset otherwise", () => {
+  assert.equal(insetOffset(0, 4, { start: 0, end: 0 }), "0%");
+  assert.equal(insetOffset(4, 4, { start: 0, end: 0 }), "100%");
+
+  // With an inset, i=0 must land exactly on `start` and i=count exactly
+  // on `calc(100% - end)` — the two points AxisTickLabels' translateX(-50%)
+  // needs to line up with Gridlines at 0% and 100% of the track itself.
+  assert.equal(insetOffset(0, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 0)");
+  assert.equal(insetOffset(4, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 1)");
+  assert.equal(insetOffset(2, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 0.5)");
 });
 
 test("an inverted axis reverses its ticks", () => {

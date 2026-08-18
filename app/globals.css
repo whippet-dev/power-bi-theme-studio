@@ -1281,7 +1281,6 @@ button { color: inherit; }
   align-items: flex-end;
   overflow: hidden;
   border-radius: 2px 2px 0 0;
-  background: #ece9ee;
 }
 
 .column-item__fill {
@@ -1330,7 +1329,6 @@ button { color: inherit; }
   height: 11px;
   overflow: hidden;
   border-radius: 2px;
-  background: #ece9ee;
 }
 
 .bar-row__fill {
