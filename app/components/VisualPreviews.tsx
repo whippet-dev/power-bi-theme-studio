@@ -1016,7 +1016,7 @@ export function VisualGallery({
           </span>
         )}
         <span className="chart-preview__body-main">
-          <span className="chart-preview__plot" style={{ position: "relative" }}>
+          <span className="chart-preview__plot" style={{ position: "relative", gap: `${barChartStyle.categoryAxis.innerPadding}%` }}>
             <Gridlines axis={barChartStyle.valueAxis} orientation="vertical" inset={BAR_VALUE_AXIS_INSET} />
             <ZoomSliders zoom={barChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
             {barChartStyle.referenceLine.show && (
@@ -1134,7 +1134,7 @@ export function VisualGallery({
           </span>
         )}
         <span className="chart-preview__body-main">
-          <span className="chart-preview__plot" style={{ position: "relative" }}>
+          <span className="chart-preview__plot" style={{ position: "relative", gap: `${stackedBarChartStyle.categoryAxis.innerPadding}%` }}>
             <Gridlines axis={stackedBarChartStyle.valueAxis} orientation="vertical" inset={BAR_VALUE_AXIS_INSET} />
             <ZoomSliders zoom={stackedBarChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
             {stackedBarChartStyle.trend.show && (
@@ -1256,7 +1256,7 @@ export function VisualGallery({
             }}
           />
         )}
-        <span className="column-preview__columns">
+        <span className="column-preview__columns" style={{ gap: `${columnChartStyle.categoryAxis.innerPadding}%` }}>
           {barCategories.map(([label, value], index) => (
             <span className="column-item" key={label}>
               {labelVisibleAt(index, barCategories.length, columnChartStyle.labels.labelDensity) && (
@@ -1359,7 +1359,7 @@ export function VisualGallery({
             }}
           />
         )}
-        <span className="column-preview__columns">
+        <span className="column-preview__columns" style={{ gap: `${stackedColumnChartStyle.categoryAxis.innerPadding}%` }}>
           {barCategories.map(([label, value], index) => (
             <span className="column-item" key={label}>
               {stackedColumnChartStyle.totals.show && (
@@ -2299,6 +2299,25 @@ export function VisualGallery({
     })
     .join(", ");
   const pieLegendAtBottom = String(pieChartStyle.legend.position).startsWith("Bottom");
+  // labelStyle picks which of category/data value/percent-of-total the
+  // slice's own label shows, alone or combined — previously always "45%"
+  // regardless of this setting, so the property had no visible effect.
+  // Matched against the enum's exact raw values (not display labels) --
+  // "Both" is category+data value with no percent, so it can't be
+  // inferred from substrings of the string itself.
+  const pieCategoryLabel = "North";
+  const pieDataLabel = formatValue(pieSliceValues[0] * 1000, pieChartStyle.labels.labelDisplayUnits, pieChartStyle.labels.labelPrecision);
+  const piePercentLabel = `${pieSliceValues[0].toFixed(pieChartStyle.labels.percentageLabelPrecision)}%`;
+  const pieLabelPartsByStyle: Record<string, string[]> = {
+    Category: [pieCategoryLabel],
+    Data: [pieDataLabel],
+    "Percent of total": [piePercentLabel],
+    Both: [pieCategoryLabel, pieDataLabel],
+    "Category, percent of total": [pieCategoryLabel, piePercentLabel],
+    "Data value, percent of total": [pieDataLabel, piePercentLabel],
+    "Category, data value, percent of total": [pieCategoryLabel, pieDataLabel, piePercentLabel],
+  };
+  const pieLabelText = (pieLabelPartsByStyle[String(pieChartStyle.labels.labelStyle)] ?? [piePercentLabel]).join(", ");
 
   const pieContent = (
     <span className="pie-preview" style={{ opacity: 1 - pieChartStyle.dataPoint.fillTransparency / 100 }}>
@@ -2333,9 +2352,15 @@ export function VisualGallery({
                 fontWeight: pieChartStyle.labels.bold ? 700 : 400,
                 fontStyle: pieChartStyle.labels.italic ? "italic" : "normal",
                 textDecoration: pieChartStyle.labels.underline ? "underline" : "none",
+                // "Overflow text" lets a label spill past its slice's edge
+                // instead of being clipped when it doesn't fit.
+                overflow: pieChartStyle.labels.overflow ? "visible" : "hidden",
+                textOverflow: pieChartStyle.labels.overflow ? "clip" : "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: pieChartStyle.labels.overflow ? "none" : "72px",
               }}
             >
-              45%
+              {pieLabelText}
             </span>
           )}
         </span>
@@ -2773,7 +2798,7 @@ export function VisualGallery({
           : imageStyle.image.cornerRadius,
         opacity: 1 - imageStyle.image.transparency / 100,
         filter: imageStyle.image.effects
-          ? `blur(${imageStyle.image.blur * 0.05}px) contrast(${100 + imageStyle.image.contrast}%) saturate(${100 + imageStyle.image.saturation}%)`
+          ? `blur(${imageStyle.image.blur * 0.05}px) brightness(${100 + imageStyle.image.exposure}%) contrast(${100 + imageStyle.image.contrast}%) saturate(${100 + imageStyle.image.saturation}%)`
           : undefined,
       }}
     >

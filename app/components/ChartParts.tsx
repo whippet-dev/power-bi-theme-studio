@@ -320,6 +320,10 @@ export type DataLabelStyle = {
   labelPosition: string | number;
   labelContentLayout: string | number;
   labelContainerMaxWidth: number;
+  // Not every chart's labels group carries this either (pie chart calls
+  // its equivalent field just "overflow", handled separately in
+  // VisualPreviews.tsx rather than through this shared component).
+  labelOverflow?: boolean;
   // Not every chart's labels group carries these — the line chart has no
   // orientation or word-wrap setting, for instance.
   labelOrientation?: string | number;
@@ -409,6 +413,10 @@ export function DataLabel({
         padding: labels.enableBackground ? "1px 4px" : undefined,
         borderRadius: labels.enableBackground ? 3 : undefined,
         maxWidth: labels.labelContainerMaxWidth || undefined,
+        // "Overflow text" lets a label spill past its own container
+        // instead of being clipped when it doesn't fit.
+        overflow: labels.labelOverflow ? "visible" : "hidden",
+        textOverflow: labels.labelOverflow ? "clip" : "ellipsis",
         opacity: 1 - (labels.transparency ?? 0) / 100,
         textAlign: /left|right|center/i.test(String(labels.horizontalAlignment ?? ""))
           ? (String(labels.horizontalAlignment).toLowerCase() as CSSProperties["textAlign"])
