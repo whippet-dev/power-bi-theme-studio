@@ -1220,11 +1220,13 @@ export function VisualGallery({
       style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100 }}
     >
       {!columnLegendAtBottom && columnLegendNode}
-      {columnChartStyle.valueAxis.showAxisTitle && (
-        <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(columnChartStyle.valueAxis)}>
-          {String(columnChartStyle.valueAxis.titleText) || "Applications"}
-        </span>
-      )}
+      <span className="chart-preview__body">
+        {columnChartStyle.valueAxis.showAxisTitle && (
+          <span className="chart-preview__axis-title chart-preview__axis-title--rotated" style={axisTitleStyle(columnChartStyle.valueAxis)}>
+            {String(columnChartStyle.valueAxis.titleText) || "Applications"}
+          </span>
+        )}
+        <span className="chart-preview__body-main">
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={columnChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={columnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
@@ -1307,6 +1309,8 @@ export function VisualGallery({
           {String(columnChartStyle.categoryAxis.titleText) || "Region"}
         </span>
       )}
+        </span>
+      </span>
       {columnLegendAtBottom && columnLegendNode}
     </span>
   );
@@ -1329,14 +1333,16 @@ export function VisualGallery({
       style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100 }}
     >
       {!stackedColumnLegendAtBottom && stackedColumnLegendNode}
-      {stackedColumnChartStyle.valueAxis.showAxisTitle && (
-        <span
-          className="chart-preview__axis-title chart-preview__axis-title--value"
-          style={axisTitleStyle(stackedColumnChartStyle.valueAxis)}
-        >
-          {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications"}
-        </span>
-      )}
+      <span className="chart-preview__body">
+        {stackedColumnChartStyle.valueAxis.showAxisTitle && (
+          <span
+            className="chart-preview__axis-title chart-preview__axis-title--rotated"
+            style={axisTitleStyle(stackedColumnChartStyle.valueAxis)}
+          >
+            {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications"}
+          </span>
+        )}
+        <span className="chart-preview__body-main">
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={stackedColumnChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={stackedColumnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
@@ -1431,6 +1437,8 @@ export function VisualGallery({
           {String(stackedColumnChartStyle.categoryAxis.titleText) || "Region"}
         </span>
       )}
+        </span>
+      </span>
       {stackedColumnLegendAtBottom && stackedColumnLegendNode}
     </span>
   );
@@ -1748,13 +1756,19 @@ export function VisualGallery({
       style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100 }}
     >
       {!lineLegendAtBottom && lineLegendNode}
-      {lineChartStyle.valueAxis.showAxisTitle && (
-        <span className="chart-preview__axis-title" style={axisTitleStyle(lineChartStyle.valueAxis)}>
-          {String(lineChartStyle.valueAxis.titleText) || "Applications"}
-        </span>
-      )}
-      {y2TitleNode}
-      <span className="line-preview__plot" style={{ position: "relative" }}>
+      <span className="chart-preview__body">
+        {/* Power BI draws a line/column chart's value-axis title rotated
+            along the left edge, beside the plot — not as a horizontal
+            banner above it (that treatment belongs to a horizontal
+            category axis, which this chart doesn't have). */}
+        {lineChartStyle.valueAxis.showAxisTitle && (
+          <span className="chart-preview__axis-title chart-preview__axis-title--rotated" style={axisTitleStyle(lineChartStyle.valueAxis)}>
+            {String(lineChartStyle.valueAxis.titleText) || "Applications"}
+          </span>
+        )}
+        <span className="chart-preview__body-main">
+          {y2TitleNode}
+          <span className="line-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
         <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
         <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
@@ -1864,6 +1878,8 @@ export function VisualGallery({
           {String(lineChartStyle.categoryAxis.titleText) || "Month"}
         </span>
       )}
+        </span>
+      </span>
       {lineLegendAtBottom && lineLegendNode}
     </span>
   );

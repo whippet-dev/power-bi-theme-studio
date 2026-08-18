@@ -779,11 +779,23 @@ button { color: inherit; }
 
 .visual-header__icon {
   opacity: 0.75;
+  /* Real Power BI's header icons all highlight on hover — without this,
+     only the tooltip icon (the one with something to actually show) had
+     any hover feedback at all, so the whole row read as inert and there
+     was no way to tell, short of trial and error, which one of twenty
+     near-identical glyphs was interactive. */
+  border-radius: 3px;
+  padding: 2px 3px;
+  margin: -2px -3px;
+}
+
+.visual-header__icon:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .visual-header__icon--tooltip {
   cursor: help;
-  border-radius: 3px;
 }
 
 .visual-header__icon--tooltip:hover,
@@ -1513,6 +1525,13 @@ button { color: inherit; }
 }
 
 .line-preview__svg {
+  /* Gridlines (.chart-gridline) are position:absolute; without this, an
+     unpositioned (static) element always paints behind every positioned
+     sibling regardless of DOM order, so the gridlines rendered before
+     this SVG in markup were incorrectly showing in front of the line and
+     area fill instead of behind them. Making the SVG itself positioned
+     puts it back in normal DOM-order stacking with its siblings. */
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
