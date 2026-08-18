@@ -450,20 +450,62 @@ button { color: inherit; }
   writing-mode: vertical-rl;
 }
 
+.filter-pane__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .filter-pane__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
 }
 
+.filter-pane__title-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.85;
+  font-size: 11px;
+}
+
 .filter-pane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 4px;
   font-weight: 650;
   opacity: 0.85;
 }
 
 .filter-pane__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 8px;
   border-radius: 3px;
   opacity: 0.85;
+}
+
+.filter-pane__search-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.filter-pane__search-placeholder {
+  opacity: 0.75;
+}
+
+.filter-pane__placeholder {
+  padding: 10px;
+  border: 1px dashed currentColor;
+  border-radius: 4px;
+  opacity: 0.6;
+  text-align: center;
+  font-size: 10px;
 }
 
 .filter-card {
@@ -472,6 +514,21 @@ button { color: inherit; }
   gap: 6px;
   padding: 9px;
   border-radius: 4px;
+}
+
+.filter-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.filter-card__header-icons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.7;
+  font-size: 10px;
 }
 
 .filter-card__name {

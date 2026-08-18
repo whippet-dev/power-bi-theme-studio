@@ -366,7 +366,7 @@ export function ThemeStudio() {
                 onSelect={setSelectedVisual}
               />
             </div>
-            {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} />}
+            {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} theme={resolved} />}
           </div>
 
           {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} textClasses={textClasses} />}

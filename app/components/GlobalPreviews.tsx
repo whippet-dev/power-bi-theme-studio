@@ -21,11 +21,20 @@ import {
  * `visualStyles.report["*"].outspacePane` controls whether the pane starts
  * visible/expanded, so this reflects that state rather than always drawing
  * an open pane.
+ *
+ * A filter card's *field name* ("Category", "Region", ...) isn't styled by
+ * `filterCard.foregroundColor` — that's the value text below it ("is
+ * (All)"). Real Power BI tints the field name with the report's first data
+ * colour instead, confirmed against a real screenshot and the user's own
+ * private theme (dataColors[0] is a dark navy blue, exactly what the field
+ * name renders as; filterCard.foregroundColor there is a plain near-black,
+ * which is what the value text actually shows).
  */
-export function FilterPanePreview({ globalOptions }: { globalOptions: ResolvedGlobalOptionsStyle }) {
+export function FilterPanePreview({ globalOptions, theme }: { globalOptions: ResolvedGlobalOptionsStyle; theme: ResolvedTheme }) {
   const pane = globalOptions.pageFilterPane;
   const card = globalOptions.pageFilterCards;
   const state = globalOptions.reportFilterPaneState;
+  const fieldNameColor = theme.palette[0] ?? card.foregroundColor;
 
   if (!state.visible) {
     return (
@@ -60,6 +69,21 @@ export function FilterPanePreview({ globalOptions }: { globalOptions: ResolvedGl
     fontSize: card.textSize,
   };
 
+  const filterCard = (name: string, body: ReactNode, key: string) => (
+    <span className="filter-card" style={cardStyle} key={key}>
+      <span className="filter-card__header">
+        <span className="filter-card__name" style={{ color: fieldNameColor }}>
+          {name}
+        </span>
+        <span className="filter-card__header-icons" aria-hidden="true">
+          <span title="Clear filter">⟲</span>
+          <span title="Filter type">▾</span>
+        </span>
+      </span>
+      {body}
+    </span>
+  );
+
   return (
     <aside
       className="filter-pane"
@@ -72,27 +96,40 @@ export function FilterPanePreview({ globalOptions }: { globalOptions: ResolvedGl
         fontFamily: pane.fontFamily || undefined,
       }}
     >
-      <span className="filter-pane__title" style={{ fontSize: pane.titleSize }}>
-        Filters
-      </span>
-
-      <span className="filter-pane__search" style={{ backgroundColor: pane.inputBoxColor, fontSize: pane.searchTextSize }}>
-        Search
-      </span>
-
-      <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
-        Filters on this page
-      </span>
-
-      <span className="filter-card" style={cardStyle}>
-        <span className="filter-card__name">Region</span>
-        <span className="filter-card__value" style={{ backgroundColor: card.inputBoxColor }}>
-          is (All)
+      <span className="filter-pane__title-row">
+        <span className="filter-pane__title" style={{ fontSize: pane.titleSize }}>
+          <span aria-hidden="true">▽</span> Filters
+        </span>
+        <span className="filter-pane__title-icons" aria-hidden="true">
+          <span title="Show applied filters only">◎</span>
+          <span title="Collapse filter pane">≫</span>
         </span>
       </span>
 
-      <span className="filter-card" style={cardStyle}>
-        <span className="filter-card__name">Status</span>
+      <span className="filter-pane__search" style={{ backgroundColor: pane.inputBoxColor, fontSize: pane.searchTextSize }}>
+        <span aria-hidden="true" className="filter-pane__search-icon">
+          ⚲
+        </span>
+        <span className="filter-pane__search-placeholder">Search</span>
+      </span>
+
+      <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
+        <span>Filters on this page</span>
+        <span aria-hidden="true" title="More options">
+          ⋯
+        </span>
+      </span>
+
+      {filterCard(
+        "Region",
+        <span className="filter-card__value" style={{ backgroundColor: card.inputBoxColor }}>
+          is (All)
+        </span>,
+        "region",
+      )}
+
+      {filterCard(
+        "Status",
         <span className="filter-card__options">
           {["Approved", "In review"].map((label, index) => (
             <span className="filter-card__option" key={label}>
@@ -110,12 +147,21 @@ export function FilterPanePreview({ globalOptions }: { globalOptions: ResolvedGl
               {label}
             </span>
           ))}
-        </span>
-      </span>
+        </span>,
+        "status",
+      )}
 
       <span className="filter-pane__apply" style={{ backgroundColor: pane.checkboxAndApplyColor }}>
         Apply
       </span>
+
+      <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
+        <span>Filters on all pages</span>
+        <span aria-hidden="true" title="More options">
+          ⋯
+        </span>
+      </span>
+      <span className="filter-pane__placeholder">Add data fields here</span>
     </aside>
   );
 }
