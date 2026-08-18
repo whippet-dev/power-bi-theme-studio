@@ -5,6 +5,8 @@
 **Status at review:** build clean, lint clean, 147 tests passing
 **Scope:** independent assessment of the property-mapping architecture and renderer quality. No code was changed.
 
+> **Sections 1–8 are the review exactly as written on 2026-08-18 and are deliberately left unchanged, including findings since fixed.** They record what was true at commit `201a1a4`. What has been remediated since is tracked separately in [§9](#9-remediation-status).
+
 ---
 
 ## Contents
@@ -17,6 +19,7 @@
 6. [Prioritised remediation plan](#6-prioritised-remediation-plan)
 7. [Things that should NOT be rewritten](#7-things-that-should-not-be-rewritten)
 8. [Repository hygiene](#8-repository-hygiene)
+9. [Remediation status](#9-remediation-status) — *added after the review*
 
 ---
 
@@ -421,3 +424,73 @@ Derive the cartesian registries from one shared factory with per-visual deltas �
   - Both require rewriting as part of handover.
 
 **Build state at review:** `tsc` clean, `eslint` clean, 147 tests passing — with the caveat in §3.8 that 6 further tests exist on disk and do not run.
+
+---
+
+## 9. Remediation status
+
+**Updated:** 2026-08-18 · **at commit:** `fe481de` · **state:** build clean, lint clean, **206 tests passing** (was 147).
+
+Sections 1–8 above are the original review and have not been edited. This section records what has changed since, so the review stays usable as a historical baseline while remaining an accurate guide to current work.
+
+### 9.1 Fixed
+
+| Finding | What was done | Evidence |
+|---|---|---|
+| **§3.1** Wildcard bucket ignored for ~94% of properties | Resolution walks `visualStyles["*"]["*"]` for every property, not just chrome. Chrome and per-visual resolution now share one implementation (`resolvePropertyEntry`) so they cannot drift apart again. | `tests/wildcardBucket.test.ts` (6 tests), incl. Fluent 2's real shared-bucket axis styling reaching the charts that inherit it |
+| **§3.2** Theme token references silently dropped | `resolveColorValue` handles all three colour forms — literal hex (6- and 8-digit), named theme tokens, and `ThemeDataColor` expressions with `Percent` shading via the new `tintOrShade`. | `tests/themeColorValues.test.ts` (10 tests) |
+| **§3.6** Resolution collapses "unset" and "set to the default value" | `resolvePropertyEntry` returns `{ value, source, isSet }`. `isSet` distinguishes an explicit `false`/`0`/`""` from an unset property. `hasSmallMultiplesOverride` is **deleted**; the renderer no longer reads raw theme JSON anywhere. | `tests/provenance.test.ts` (19 tests), incl. explicit-zero and explicit-false cases |
+| **§3.8** `npm test` does not run all tests | Test script switched to a glob (`tests/**/*.test.ts`, `tests/**/*.test.mjs`). `mergeThemeOverBase.test.ts` now runs; new files cannot be silently skipped. | Test count rose 147 → 206 |
+
+### 9.2 Fixed — issues the review did not identify
+
+Three further defects surfaced while implementing the above. All three produced silently wrong output and none was visible from reading source alone; each was proved by a failing test before being fixed.
+
+**Cross-layer precedence was inverted.** Resolution walked visual-specific before wildcard *across the merged theme*, so a **base** visual-specific value beat a **custom** wildcard one. Microsoft's ordering is the opposite: every custom-theme match is considered before any base-theme match — the layer axis dominates the specificity axis. The effect was that a user's own theme-wide setting was silently overridden by the selected base theme. Fixed by resolving `custom` and `base` as separate layers (`themeLayers` / `ThemeSource`); see `tests/layerPrecedence.test.ts`.
+
+**`$id`-tagged state entries were matched by array position.** An index computed from the *merged* view was applied to both layers. Nothing in the theme format requires two themes to declare the same states, in the same order, or at all — Fluent 2 writes five entries for `actionButton.fill` where a custom theme may write one. Resolution therefore read one state's properties as another's: "selected" rendered using "hover" values, or a base `show: false` from the default entry leaked into an unrelated state. Reads now match `$id` **within each layer independently** (`forStateId`), and a state absent from a layer falls through instead of defaulting to index 0. See `tests/stateIdMatching.test.ts` (11 tests). This also exposed `resolveChromeEntry` silently dropping `stateId`, which made filter-card *Applied* read *Available*'s value.
+
+**The state write path emitted sparse arrays.** Reserving index 0 for `"default"` left a hole when a non-default state was written first, serialising as `"fill": [null, {"$id": "selected", …}]`. This is **schema-invalid**: validated with ajv against Microsoft's current report-theme schema, array items must be objects, and `null` is a distinct JSON Schema type. A fresh entry now takes index 0 whatever its state, identified by its own `$id`, producing the compact `"fill": [{"$id": "selected", …}]` — confirmed valid, and adding zero new schema errors when editing on top of the real Fluent 2 fixture.
+
+### 9.3 Architectural consequence — `mergeThemeOverBase` (revises §2 and §7)
+
+§2 and §7 both recommend keeping `mergeThemeOverBase` and placing it *under* the new resolution chain. That is now only half right, and the distinction matters:
+
+- **Root-level reads** (theme tokens, `dataColors`, `textClasses`) still merge, and that is exactly correct — there is no visual/wildcard axis to respect.
+- **`visualStyles` precedence must not merge.** A merge discards which layer each value came from, and cross-layer precedence is *defined* by that distinction. An intermediate implementation pre-flattened the four precedence slots into each visual's bucket to compensate; once resolution reported provenance this became actively harmful, because flattening makes every value look `custom-visual`. It was reverted, and `mergeThemeOverBase` is a plain recursive merge again.
+
+`tests/layerPrecedence.test.ts` pins this deliberately, asserting that resolving a *merged* theme gets the precedence case **wrong** — so nobody reinstates that path believing it equivalent to passing layers.
+
+### 9.4 Partially addressed
+
+**§3.5 Two parallel resolution models.** The two parallel *resolution paths* are gone: `resolveChromeValue` now delegates to `resolvePropertyEntry`. The two parallel *view models* remain — resolvers still take `(source: ThemeSource, base: ResolvedTheme)`, and `ResolvedTheme` still attracts visual-specific fields. The boundary is still unprincipled.
+
+### 9.5 Outstanding — unchanged from the original review
+
+| Finding | Status |
+|---|---|
+| **§3.3** Style presets entirely unimplemented | Outstanding. Preset buckets round-trip untouched but are never read. |
+| **§3.4** No declarative property → rendered-element mapping | Outstanding — still the central conceptual gap (§5D). |
+| **§3.7** Per-visual duplication and observable drift | Outstanding. The `labelContainerMaxWidth` / `preferredCategoryWidth` defaults still differ between sibling charts. |
+| **§3.9** `forState` assumes a fixed `["group", index, "prop"]` path shape | Outstanding. `resolvePropertyEntry` makes the same assumption when applying a `stateId`. Still worth an assertion. |
+| **§4** Renderer coverage and fidelity | Outstanding. No visuals added; no renderer changes made. |
+| **P2 / P3** items 7–12 | Outstanding. |
+
+Two further questions are open and are **not** code defects:
+
+1. **`ThemeDataColor` `ColorId` indexing.** Implemented as a 0-based index into `dataColors` — the literal reading — but Microsoft's Fluent 2 documentation says buttons use "your first theme data color" while Fluent 2's own JSON gives every button `ColorId: 2`. Both readings are defensible from available evidence. Isolated in `resolveColorValue` so it is a one-line change once settled against a real Power BI render.
+2. **Untagged default entries appearing *after* tagged ones.** If a user sets `hover` before `default`, the untagged default entry lands last. Schema-valid, and this app's resolver reads it correctly, but Fluent 2 always writes its untagged entry first, so whether Power BI Desktop treats a trailing untagged entry as the default is unconfirmed. **Requires a Power BI Desktop test.** Deliberately not guessed at.
+
+### 9.6 Note on the schema as an oracle
+
+Validation was performed with ajv against Microsoft's published report-theme schema. Two caveats emerged that anyone repeating this should know:
+
+- The schema **fails its own meta-validation** (duplicate `enum` items in `actionStates-advancedSlicerVisual`), so it must be compiled with `validateSchema: false`.
+- **Microsoft's own shipped base themes do not validate against it.** Pristine `themes/base/fluent2.json`, extracted from a Power BI Desktop install, produces **91 errors** — mostly `ThemeDataColor` expressions in `fillColor.solid.color` where the schema permits only hex. (The single error each on `classic2018` / `classic2026` is this repository's own `_note` annotation, not a Microsoft defect.)
+
+Treat the schema as a strong signal, not ground truth: Desktop clearly accepts more than the schema advertises. The sparse-array `null` was still worth fixing because it is a *type* violation, categorically more serious than a permissiveness gap.
+
+### 9.7 Repository hygiene (updates §8)
+
+- **`.claude/`** — `settings.local.json` was found to be covered already by the user's global gitignore. `launch.json` (dev-server config) is committed alongside the handover documentation.
+- **Documentation staleness** — resolved. `README.md` and `PROJECT_OVERVIEW.md` have been rewritten to describe 16 visuals, base themes, theme layering, provenance-aware resolution and round-trip preservation. `CODEX_HANDOVER.md` has been added for an incoming developer.
