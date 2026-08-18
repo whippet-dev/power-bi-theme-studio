@@ -1271,6 +1271,20 @@ export function resolveChromeStyle(
   base: ResolvedTheme,
 ): ResolvedChromeStyle {
   const p = CHROME_PROPERTIES;
+  // Classic 2026 (themes/base/classic2026.json) overrides background.show
+  // and visualHeader.show back to false for every "canvas object" visual
+  // type (shape, image, actionButton, textbox, pageNavigator,
+  // bookmarkNavigator — plus "group"/"basicShape", which this app doesn't
+  // model as distinct visual types) — unlike data visuals, these don't get
+  // a white background box or the options/filter/pin icon header by
+  // default.
+  const isCanvasObject =
+    activeVisual === "shape" ||
+    activeVisual === "image" ||
+    activeVisual === "actionButton" ||
+    activeVisual === "textbox" ||
+    activeVisual === "pageNavigator" ||
+    activeVisual === "bookmarkNavigator";
   return {
     title: {
       show: resolveChromeValue(theme, activeVisual, p.title.show, true),
@@ -1305,8 +1319,9 @@ export function resolveChromeStyle(
       // show/transparency verified against themes/base/classic2026.json's
       // shared background group ({show: true, transparency: 0}) — this
       // visual chrome background is a distinct group from the page's own
-      // outspace/background (see globalOptionsProperties.ts).
-      show: resolveChromeValue(theme, activeVisual, p.background.show, true),
+      // outspace/background (see globalOptionsProperties.ts). Canvas
+      // objects (see isCanvasObject above) override this back to false.
+      show: resolveChromeValue(theme, activeVisual, p.background.show, !isCanvasObject),
       color: resolveChromeValue(theme, activeVisual, p.background.color, base.background),
       transparency: resolveChromeValue(theme, activeVisual, p.background.transparency, 0),
     },
@@ -1370,7 +1385,10 @@ export function resolveChromeStyle(
       name: resolveChromeValue(theme, activeVisual, p.stylePreset.name, ""),
     },
     visualHeader: {
-      show: resolveChromeValue(theme, activeVisual, p.visualHeader.show, true),
+      // Verified against classic2026.json's per-visual-type overrides —
+      // canvas objects (see isCanvasObject above) don't get the
+      // options/filter/pin icon header by default.
+      show: resolveChromeValue(theme, activeVisual, p.visualHeader.show, !isCanvasObject),
       background: resolveChromeValue(theme, activeVisual, p.visualHeader.background, base.background),
       border: resolveChromeValue(theme, activeVisual, p.visualHeader.border, "#E3E3E3"),
       foreground: resolveChromeValue(theme, activeVisual, p.visualHeader.foreground, base.foreground),

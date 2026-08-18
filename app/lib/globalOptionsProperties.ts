@@ -439,7 +439,10 @@ export function resolveGlobalOptionsStyle(theme: PowerBITheme, base: ResolvedThe
     },
     pageBackground: {
       color: resolveGlobalValue(theme, p.pageBackground.color, base.background),
-      transparency: resolveGlobalValue(theme, p.pageBackground.transparency, 0),
+      // Verified against themes/base/classic2026.json's page["*"].background
+      // group -- the page's own background is fully transparent by
+      // default (0 would make it opaque, hiding whatever renders beneath).
+      transparency: resolveGlobalValue(theme, p.pageBackground.transparency, 100),
     },
     pageAlignment: {
       verticalAlignment: resolveGlobalValue(theme, p.pageAlignment.verticalAlignment, "Top"),
