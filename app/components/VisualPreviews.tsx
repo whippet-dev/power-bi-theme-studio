@@ -787,6 +787,20 @@ export function VisualGallery({
 
   const cardContent = (
     <span className="card-preview">
+      <span
+        className="card-preview__value"
+        style={{
+          fontSize: cardStyle.labels.fontSize,
+          color: cardStyle.labels.color,
+          fontFamily: cardStyle.labels.fontFamily || undefined,
+          fontWeight: cardStyle.labels.bold ? 700 : 400,
+          fontStyle: cardStyle.labels.italic ? "italic" : "normal",
+          textDecoration: cardStyle.labels.underline ? "underline" : "none",
+          whiteSpace: cardStyle.labels.preserveWhitespace ? "pre-wrap" : undefined,
+        }}
+      >
+        {formatCardValue(8_400_000, cardStyle.labels.labelDisplayUnits, cardStyle.labels.labelPrecision, cardStyle.general.formatString)}
+      </span>
       {cardStyle.categoryLabels.show && (
         <span
           className="card-preview__category"
@@ -803,8 +817,10 @@ export function VisualGallery({
                 ? "normal"
                 : "nowrap",
             // "Space between label and value" is a shared chrome property
-            // rather than a Card one, but the Card is where it applies.
-            marginBottom: chromeStyles.card.spacing.customizeSpacing
+            // rather than a Card one, but the Card is where it applies —
+            // the category label sits below the value, so the gap is
+            // this label's top margin.
+            marginTop: chromeStyles.card.spacing.customizeSpacing
               ? chromeStyles.card.spacing.verticalSpacing
               : undefined,
           }}
@@ -812,28 +828,6 @@ export function VisualGallery({
           Applications approved
         </span>
       )}
-      <span
-        className="card-preview__value"
-        style={{
-          fontSize: cardStyle.labels.fontSize,
-          color: cardStyle.labels.color,
-          fontFamily: cardStyle.labels.fontFamily || undefined,
-          fontWeight: cardStyle.labels.bold ? 700 : 400,
-          fontStyle: cardStyle.labels.italic ? "italic" : "normal",
-          textDecoration: cardStyle.labels.underline ? "underline" : "none",
-          whiteSpace: cardStyle.labels.preserveWhitespace ? "pre-wrap" : undefined,
-        }}
-      >
-        {formatCardValue(8_400_000, cardStyle.labels.labelDisplayUnits, cardStyle.labels.labelPrecision, cardStyle.general.formatString)}
-      </span>
-      <span className="card-preview__trend" style={{ color: palette[1] ?? palette[0] }}>
-        <span aria-hidden="true">↗</span> 7.2% vs last quarter
-      </span>
-      <span className="card-preview__spark" aria-hidden="true">
-        {[34, 48, 41, 61, 55, 76, 84].map((height, index) => (
-          <span key={height + index} style={{ height: `${height}%`, backgroundColor: palette[0] }} />
-        ))}
-      </span>
     </span>
   );
 

@@ -1098,6 +1098,12 @@ button { color: inherit; }
   flex-direction: column;
 }
 
+.card-preview {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
 .card-preview__category {
   display: block;
   margin-top: 4px;
@@ -1105,32 +1111,9 @@ button { color: inherit; }
 }
 
 .card-preview__value {
-  margin-top: 8px;
   font-weight: 680;
   letter-spacing: -0.045em;
   line-height: 1;
-}
-
-.card-preview__trend {
-  margin-top: 7px;
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.card-preview__spark {
-  height: 48px;
-  margin-top: auto;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  border-bottom: 1px solid #d9d5dc;
-}
-
-.card-preview__spark span {
-  flex: 1;
-  max-width: 32px;
-  border-radius: 2px 2px 0 0;
-  opacity: 0.88;
 }
 
 .chart-preview__legend {
