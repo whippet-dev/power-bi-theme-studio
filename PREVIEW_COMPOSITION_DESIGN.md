@@ -103,18 +103,23 @@ Action button states: four, and coherence is exactly the question — **variants
 This is the structural half of the guardrails in §8, stated once here because the rest of the model depends on it.
 
 ```
-.report-surface            wallpaper
+.report-surface            the simulated Power BI report
   .report-page             ← ONLY primary surfaces live here
     hero primary
     thumbnail primaries
-  .filter-pane
-.preview-inspector         ← NEW region, outside the page
-  variant surfaces
-  example surfaces
+  .filter-pane             ← genuine report chrome: inside the report,
+                             outside the page
+.preview-inspector         ← NEW region, sibling of .report-surface —
+  variant surfaces           Theme Studio only, not part of the
+  example surfaces           simulated report at all
   transient surfaces
 ```
 
-The page contains report content and nothing else. Supporting surfaces render in a sibling region below it, visually distinct from page chrome — no wallpaper, no page background, explicitly labelled — so that nothing on screen implies "this is what your report looks like" when it is not.
+Three distinct ownerships, and the boundaries matter more than the nesting:
+
+- **`.report-page` holds actual report-page visual content** — the hero primary and the thumbnail primaries. Nothing else.
+- **`.filter-pane` is genuine Power BI report chrome.** It belongs inside the simulated `.report-surface`, because a real report has one — but *not* inside `.report-page`, because it is not page content. Its current placement is already correct.
+- **`.preview-inspector` is Theme Studio's own explanatory UI**, a sibling of `.report-surface` and no part of the simulated report. Supporting surfaces render here, visually distinct from report chrome — no wallpaper, no page background, explicitly labelled — so that nothing on screen implies "this is what your report looks like" when it is not.
 
 **This is not the current state, and the drift has already begun.** `VisualGallery` renders inside `.report-page` (`ThemeStudio.tsx:353`), and `PreviewShell`'s hero branch appends the tooltip callout and the interaction-state selector as siblings of the scaled tile (`VisualPreviews.tsx:856–872`). Both therefore sit **inside the simulated page today**. Two ad-hoc supporting surfaces already exist; they are simply in the wrong place and have no name. That is the evidence that the need is real, and the reason to name it now rather than after it has happened four more times.
 
@@ -283,7 +288,7 @@ Also worth noting: `PreviewShell` currently owns `showTooltipPreview` and `showH
 
 **Step 1 — a descriptor shape, no new components.** `VisualGallery`'s `descriptors` array already carries `{ id, label, defaultTitle, chrome, content }`. Widen `content` to accept either a node (coerced to a one-surface composition) or `{ primary, supporting }`. Fifteen visuals change by zero characters. Nothing renders differently yet.
 
-**Step 2 — one region component.** `<PreviewInspector surfaces={…} />`, rendered by the canvas *outside* `.report-page`, next to where `PaletteLegend` already lives. Move the tooltip callout and the state selector into it as the first two declared surfaces, and delete `extraControls` and the two `useState`s from `PreviewShell`. This is a refactor with a visible behaviour change (things move out of the page) and no new capability — the right size for a single reviewable commit.
+**Step 2 — one region component.** `<PreviewInspector surfaces={…} />`, rendered by the canvas as a sibling of `.report-surface`, next to where `PaletteLegend` already lives. Move the tooltip callout and the state selector into it as the first two declared surfaces, and delete `extraControls` and the two `useState`s from `PreviewShell`. This is a refactor with a visible behaviour change (things move out of the page) and no new capability — the right size for a single reviewable commit.
 
 **Step 3 — bind the surface into the stamper.** `TargetStamper` gains a surface, but *not* at every call site. Create it per surface:
 
@@ -450,7 +455,7 @@ Matrix follows Table, with one possible exception: if stepped-vs-tabular layout 
 
 The risk is concrete and named in the brief: the centre canvas degrades from *a simulated report page* into *a component gallery*, at which point the studio stops answering "what will my report look like?" — which is the only question it exists to answer. Nine rules, in rough order of how load-bearing they are.
 
-**G1 — The page holds primary surfaces and nothing else.** `.report-page` contains the hero primary, the thumbnail primaries, and the filter pane. Every supporting surface renders in a sibling inspector region outside the page. This is structural, enforceable in one place, and non-negotiable; everything else here is secondary to it. *(Currently violated by the tooltip callout and state selector — §1.4.)*
+**G1 — The page holds primary surfaces and nothing else.** `.report-page` contains the hero primary and the thumbnail primaries. The filter pane stays where it is — inside `.report-surface`, beside the page, because it is genuine report chrome rather than page content. Every supporting surface renders in `.preview-inspector`, a sibling of `.report-surface` and outside the simulated report entirely. This is structural, enforceable in one place, and non-negotiable; everything else here is secondary to it. *(Currently violated by the tooltip callout and state selector — §1.4.)*
 
 **G2 — The primary's bounds are invariant to supporting surfaces.** `RENDERER_AUDIT.md` §6 measured that toggling the filter pane leaves the hero's bounds untouched, and argued the hero's job is to be a stable comparison surface. Composition multiplies the ways that could break. Assert it: showing, hiding or adding a supporting surface must not change the primary's `outer` rect by one pixel.
 
@@ -486,7 +491,7 @@ The risk is concrete and named in the brief: the centre canvas degrades from *a 
 - It does **not** change theme resolution, import/export, or the registry architecture.
 - It does **not** modify `PreviewBinding`, `TargetRelationship`, `Representation`, `Severity`, `Gap` or `NonPreviewable`. `PreviewMap` gains one field; `PreviewTarget` gains none.
 - It does **not** implement `ChartLayout`, and adds no requirement to it beyond purity, which it already needed.
-- It does **not** redesign the studio's UX. The rail, the canvas, the report-page metaphor, the property panel and the hero comparison surface are unchanged; one new region appears beneath the page.
+- It does **not** redesign the studio's UX. The rail, the canvas, the report-page metaphor, the property panel and the hero comparison surface are unchanged; one new region appears beneath the report surface.
 - It does **not** propose an example per formatting value. §5 predicts zero supporting surfaces for six of sixteen visuals and at most three for any of them, and §6.1 spends most of its length arguing *against* the largest specimen opportunity in the app.
 - It does **not** re-audit the renderer or the property registries. Every figure quoted here comes from `RENDERER_AUDIT.md` or the three pilots.
 - It does **not** claim any of the classifications in §5 are settled. They are predictions, to be decided per visual when it is mapped.

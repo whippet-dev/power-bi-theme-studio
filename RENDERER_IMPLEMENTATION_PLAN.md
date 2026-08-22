@@ -242,7 +242,16 @@ Three reasons the containment fix must precede the layout work:
 2. **It is not a cartesian problem.** Clipping affects all sixteen visuals. Eleven of them will never have a `ChartLayout`, so gating their containment on it strands them.
 3. **It is independent.** A fit-to-container scale factor needs the *container's* width and the tile's fixed pre-scale width — both available today, neither requiring a plot rect.
 
-**Part 1 (T2, before the engine):** replace the fixed `transform: scale(1.5)` on `.visual-hero-scale` (`globals.css:775`) with a scale computed from the available width of `.visual-hero-scale-wrap` (`globals.css:766`, currently a hard `width: 630px; height: 510px; overflow: hidden`). The tile stays 420px pre-scale; the factor becomes `min(1.5, available / 420)`. Nothing is clipped at any width, and above ~1900px nothing changes at all.
+**Part 1 (T2, before the engine):** replace the fixed `transform: scale(1.5)` on `.visual-hero-scale` (`globals.css:775`) with a scale computed from the available width of `.visual-hero-scale-wrap` (`globals.css:766`, currently a hard `width: 630px; height: 510px; overflow: hidden`). The tile stays 420px pre-scale; the factor becomes `min(1.5, available / 420)`. Nothing is clipped at any width, on either axis, and above ~1900px nothing changes at all.
+
+**Both dimensions, not just width.** `transform` does not affect layout sizing — that is why the two-box arrangement exists, and the existing source comment at `globals.css:762–765` says so explicitly. The wrap must therefore reserve the scaled **height** as well as the scaled width, from the same computed factor. Two failure modes follow from getting one of them wrong, and the acceptance criteria must catch both:
+
+- **Reserved height too small** — the scaled hero overflows its wrap and either gets clipped at the bottom or paints over whatever follows it (thumbnails, the filter pane's lower edge, the inspector region).
+- **Reserved height too large** — the wrap keeps a footprint computed for a scale factor the hero is no longer using, leaving a large empty band below the hero that reads as a layout bug.
+
+Both are the *same* arithmetic mistake as the horizontal clipping, one axis over.
+
+One asymmetry to note before implementing: `.visual-tile--hero` sets `width: 420px` but **no height** (`globals.css:800`) — the tile's height is content-driven and varies by visual. So the wrap's current `height: 510px` is a hardcoded reservation guessing at the tallest case, not a figure derived from anything. Width can be reserved arithmetically (`420 × factor`); height cannot, and must come from the tile's own measured natural height multiplied by the same factor.
 
 **Part 2 (deferred past this phase):** remove `transform: scale` entirely in favour of passing a real `outer` rect into `computeChartLayout`, which is what finally makes `fontSize: 10.5` render at 10.5px rather than 15.75px. That needs all five charts migrated *and* an answer for the eleven structural visuals, so it belongs to phase 2. **T2 does not attempt it.**
 
@@ -300,7 +309,7 @@ Only genuine on-screen containment needs a real browser. Those become a **docume
 |---|---|---|---|
 | 1 | Hidden category axis detaches bars | **pure** | With `categoryAxis.show:false`: `layout.categoryAxis === null`; `layout.plot.x === outer.x`; `layout.plot.width` equals the shown-case width **plus exactly the former gutter**; `scale.value(dataMax) === plot.x + plot.width` |
 | 2 | Column baseline 18px above zero gridline | **pure** | `scale.value(0) === plot.y + plot.height` in both axis states; `plot.height + categoryAxis.height + valueAxisTitle.height === outer.height` |
-| 3 | Hero clipped below ~1900px | **browser** | at 1280×720: `wrap.scrollWidth === wrap.clientWidth`; no rendered plot pixel outside the wrap |
+| 3 | Hero clipped below ~1900px | **browser** | at 1280×720: `wrap.scrollWidth === wrap.clientWidth` **and** `wrap.scrollHeight === wrap.clientHeight`; no rendered pixel outside the wrap on either axis; the wrap's reserved footprint equals the scaled tile's rect |
 | 4 | Pinned axis range changes labels not bars | **pure** | With `start:0,end:100000` and `dataMax:82000`: `scale.value(82000) < plot.x + plot.width`; and `scale.value(t) ` for each `t` in `scale.ticks` matches the gridline offsets exactly |
 | 5 | Value-axis labels reserve zero width | **pure** | `valueAxis.width > 0` when `show`; `layout.plot.width` is smaller by exactly that amount vs `show:false` |
 | 6 | No plot rectangle anywhere | **pure** | the engine's existence; plus: no test may compute a plot dimension independently |
@@ -349,7 +358,9 @@ Run through the Browser pane against `npm run dev`; record figures in the commit
 
 Measure with `getBoundingClientRect()`:
 
-- `.visual-hero-scale-wrap` — `clientWidth` vs `scrollWidth` (containment)
+- `.visual-hero-scale-wrap` — `clientWidth` vs `scrollWidth` **and** `clientHeight` vs `scrollHeight` (containment on both axes)
+- `.visual-hero-scale-wrap` vs the hero tile — both full rects, to confirm the wrap reserves exactly the scaled footprint and no more
+- the first element following the hero wrap — `top` vs the wrap's `bottom` (no overlap, and no artificial gap)
 - the hero's plot element — `x`, `width` (does it fit; does it move when it should not)
 - each `.chart-gridline` — `x` or `y`, against `scale.value(tick)` computed from the same style
 - the data-mark track — `x`, `width`, and whether gridline 0 and gridline N coincide with its two edges
@@ -387,12 +398,19 @@ Eleven tasks. Nine touch three files or fewer. Difficulty is *implementation* di
 
 ### T2 — Hero containment: fit-to-container scale
 
-- **Goal.** Nothing rendered is invisible at any supported viewport. Establish the measurement environment for everything after.
+- **Goal.** Nothing rendered is invisible at any supported viewport, on either axis. Establish the measurement environment for everything after.
 - **Files.** `app/globals.css` (`.visual-hero-scale`, `.visual-hero-scale-wrap`, `.visual-hero-wrap`), `app/components/VisualPreviews.tsx` (hero branch, ~856).
-- **Approach.** Compute `scale = min(1.5, availableWidth / 420)` from the wrap's own width (`ResizeObserver` or a width-driven CSS custom property). Keep the two-box structure — the wrap must still reserve the post-scale footprint so surrounding layout does not overlap.
-- **Changes.** Below ~1900px the hero renders smaller instead of clipped. `overflow: hidden` stops hiding content.
+- **Approach.** Compute `scale = min(1.5, availableWidth / 420)` from the wrap's own width (`ResizeObserver` or a width-driven CSS custom property). Keep the two-box structure — `transform` does not affect layout sizing, so the wrap must reserve the **full scaled footprint in both dimensions**: `420 × factor` wide, and the tile's measured natural height `× factor` tall (§4.1 — the tile has no fixed height). Retire the hardcoded `height: 510px`.
+- **Changes.** Below ~1900px the hero renders smaller instead of clipped, horizontally and vertically. `overflow: hidden` stops hiding content. The reserved footprint tracks the factor instead of being fixed.
 - **Must not change.** Above ~1900px, nothing at all — the factor stays 1.5 and every rect is identical. The hero must not respond to the filter pane, colour reference or tooltip. Thumbnails untouched.
-- **Accept when.** At all five viewports (§6.5): `scrollWidth === clientWidth` on the wrap and no plot pixel outside it. At 1920×1080: every measured rect identical to pre-T2. Hero rect byte-identical with filter pane on vs off, and with colour reference on vs off, at 1280 and 1920.
+- **Accept when.** At all five viewports (§6.5), for the tallest hero visual available (Table or Matrix) as well as a chart:
+  1. **No horizontal clipping** — `wrap.scrollWidth === wrap.clientWidth`, and the hero tile's rect right edge is at or inside the wrap's.
+  2. **No vertical clipping** — `wrap.scrollHeight === wrap.clientHeight`, and the tile's rect bottom edge is at or inside the wrap's.
+  3. **Footprint reserved** — `wrap.getBoundingClientRect()` height and width each equal the tile's own rect within 1px. The wrap is neither smaller than what it contains nor larger.
+  4. **No overlap** — the first element after the hero has a rect `top` at or below the wrap's `bottom`. Nothing paints over the scaled hero and it paints over nothing.
+  5. **No artificial gap** — the vertical distance between the wrap's `bottom` and the next element's `top` equals the intended CSS gap, not a leftover reservation. At 1280×720 this gap must be within a few px of what it is at 1920×1080.
+  6. **Bounds stable against auxiliary content** — hero rect byte-identical with the filter pane on vs off, the colour reference on vs off, and the tooltip shown vs hidden, at 1280 and 1920.
+  7. At 1920×1080: every measured rect identical to pre-T2.
 - **Depends on.** None (T1 recommended first only so the bar chart is worth looking at).
 - **Difficulty / risk.** Medium / Medium — it is the most *visible* change in the phase.
 
@@ -501,10 +519,10 @@ Eleven tasks. Nine touch three files or fewer. Difficulty is *implementation* di
 
 - **Goal.** Establish the inspector region and make guardrail G2 assertable — **without creating any new surface.**
 - **Files.** `app/components/ThemeStudio.tsx`, `app/components/VisualPreviews.tsx` (`PreviewShell` loses `extraControls` and its two `useState`s), `app/globals.css`.
-- **Approach.** A `.preview-inspector` region rendered as a sibling of `.report-surface`, alongside where `PaletteLegend` already sits. Move the tooltip callout and the state selector into it. Style it as visibly *not* page content (guardrail G9).
+- **Approach.** A `.preview-inspector` region rendered as a sibling of `.report-surface`, alongside where `PaletteLegend` already sits — Theme Studio's own UI, outside the simulated report entirely. Move the tooltip callout and the state selector into it. Style it as visibly *not* report content (guardrail G9). **The filter pane does not move**: it is genuine Power BI report chrome and correctly sits inside `.report-surface` beside `.report-page` already.
 - **Changes.** Both elements appear below the report surface instead of inside the page. The tooltip may become persistent rather than toggled (composition design §6.3) — acceptable here since it is a relocation of existing content, **but if it adds any ambiguity, keep the toggle and defer the change**.
-- **Must not change.** The hero's rect, at any viewport, with these elements shown or hidden. What the tooltip and state selector *render* — same markup, same styling, same resolved values. No new surface, no new target, no `PreviewMap`.
-- **Accept when.** Hero `getBoundingClientRect()` identical with the tooltip shown vs hidden and with each interaction state selected, at 1280 and 1920. Nothing inside `.report-page` other than visual tiles and the filter pane. `PreviewShell` no longer holds tooltip state.
+- **Must not change.** The hero's rect, at any viewport, with these elements shown or hidden. What the tooltip and state selector *render* — same markup, same styling, same resolved values. The filter pane's position and behaviour. No new surface, no new target, no `PreviewMap`.
+- **Accept when.** Hero `getBoundingClientRect()` identical with the tooltip shown vs hidden and with each interaction state selected, at 1280 and 1920. `.report-page` contains visual tiles and nothing else. `.filter-pane` is still a child of `.report-surface` and a sibling of `.report-page`. `.preview-inspector` is a sibling of `.report-surface`, not a descendant of it. `PreviewShell` no longer holds tooltip state.
 - **Depends on.** T5.
 - **Difficulty / risk.** Low / Medium — it moves DOM the hero's own CSS currently contains.
 
