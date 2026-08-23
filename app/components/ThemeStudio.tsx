@@ -25,7 +25,7 @@ import { resolveLineChartStyle } from "../lib/lineChartProperties";
 import { resolveMatrixStyle } from "../lib/matrixProperties";
 import { resolvePageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { resolvePieChartStyle } from "../lib/pieChartProperties";
-import { themeLayers, type VisualSchemaKey } from "../lib/properties";
+import { themeLayers, type InteractionState, type VisualSchemaKey } from "../lib/properties";
 import { resolveShapeStyle } from "../lib/shapeProperties";
 import { resolveSlicerStyle } from "../lib/slicerProperties";
 import { resolveStackedBarChartStyle } from "../lib/stackedBarChartProperties";
@@ -136,6 +136,43 @@ export function ThemeStudio() {
     [themeSource, resolved],
   );
   const pageNavigatorStyle = useMemo(() => resolvePageNavigatorStyle(themeSource, resolved), [themeSource, resolved]);
+
+  // Action button, Bookmark navigator, and Page navigator style differently
+  // per interaction state ($id: default/hover/selected/disabled — see
+  // STATEFUL_GROUPS in properties.ts). The property panel already lets each
+  // state be edited blind; this lets the hero preview actually show what
+  // each one looks like, re-resolving from the raw theme at the chosen
+  // state rather than always rendering "default".
+  //
+  // Resolution lives here rather than in the renderer so VisualGallery
+  // receives values that are already resolved and never touches theme JSON
+  // itself. The `selectedVisual === …` guard is what keeps thumbnails on
+  // the default state: a visual is only ever the hero *or* a thumbnail, so
+  // guarding on selection means only the hero picks up the chosen state.
+  // The unguarded styles above still go to the property panel unchanged.
+  const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
+  const heroActionButtonStyle = useMemo(
+    () =>
+      selectedVisual === "actionButton"
+        ? resolveActionButtonStyle(themeSource, resolved, previewInteractionState)
+        : actionButtonStyle,
+    [selectedVisual, themeSource, resolved, previewInteractionState, actionButtonStyle],
+  );
+  const heroBookmarkNavigatorStyle = useMemo(
+    () =>
+      selectedVisual === "bookmarkNavigator"
+        ? resolveBookmarkNavigatorStyle(themeSource, resolved, previewInteractionState)
+        : bookmarkNavigatorStyle,
+    [selectedVisual, themeSource, resolved, previewInteractionState, bookmarkNavigatorStyle],
+  );
+  const heroPageNavigatorStyle = useMemo(
+    () =>
+      selectedVisual === "pageNavigator"
+        ? resolvePageNavigatorStyle(themeSource, resolved, previewInteractionState)
+        : pageNavigatorStyle,
+    [selectedVisual, themeSource, resolved, previewInteractionState, pageNavigatorStyle],
+  );
+
   const textboxStyle = useMemo(() => resolveTextboxStyle(themeSource, resolved), [themeSource, resolved]);
   const imageStyle = useMemo(() => resolveImageStyle(themeSource, resolved), [themeSource, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
@@ -344,7 +381,6 @@ export function ThemeStudio() {
             >
               <VisualGallery
                 theme={resolved}
-                themeSource={themeSource}
                 tableStyle={tableStyle}
             barChartStyle={barChartStyle}
             columnChartStyle={columnChartStyle}
@@ -356,13 +392,15 @@ export function ThemeStudio() {
             matrixStyle={matrixStyle}
             pieChartStyle={pieChartStyle}
             shapeStyle={shapeStyle}
-            actionButtonStyle={actionButtonStyle}
-            bookmarkNavigatorStyle={bookmarkNavigatorStyle}
-            pageNavigatorStyle={pageNavigatorStyle}
+            actionButtonStyle={heroActionButtonStyle}
+            bookmarkNavigatorStyle={heroBookmarkNavigatorStyle}
+            pageNavigatorStyle={heroPageNavigatorStyle}
             textboxStyle={textboxStyle}
             imageStyle={imageStyle}
                 chromeStyles={chromeStyles}
                 visibleVisuals={visibleVisuals}
+                previewInteractionState={previewInteractionState}
+                onPreviewInteractionStateChange={setPreviewInteractionState}
                 selected={selectedVisual}
                 onSelect={setSelectedVisual}
               />

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { resolveActionButtonStyle, type ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
+import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
-import { resolveBookmarkNavigatorStyle, type ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
+import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { hexWithAlpha } from "../lib/colorUtils";
 import { formatValue, mapTextAlign, SmallMultiplesGrid } from "./ChartParts";
@@ -10,9 +10,9 @@ import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
 import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
-import { resolvePageNavigatorStyle, type ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
+import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
-import type { InteractionState, ThemeSource } from "../lib/properties";
+import type { InteractionState } from "../lib/properties";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import { BarChartPreview } from "./previews/BarChartPreview";
 import { chartMarker } from "./previews/chartPrimitives";
@@ -66,8 +66,6 @@ export type VisualKind =
 
 type VisualGalleryProps = {
   theme: ResolvedTheme;
-  /** The layered custom/base resolution source — used only for the hero's own interaction-state re-resolution; everything else arrives pre-resolved via the *Style props below. */
-  themeSource: ThemeSource;
   tableStyle: ResolvedTableStyle;
   barChartStyle: ResolvedBarChartStyle;
   columnChartStyle: ResolvedColumnChartStyle;
@@ -86,6 +84,9 @@ type VisualGalleryProps = {
   imageStyle: ResolvedImageStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
+  /** The state the hero's stateful styles above were resolved at. Owned by ThemeStudio; this component only reports the selector's changes back. */
+  previewInteractionState: InteractionState;
+  onPreviewInteractionStateChange: (state: InteractionState) => void;
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -833,7 +834,6 @@ function PreviewShell({
 
 export function VisualGallery({
   theme,
-  themeSource,
   tableStyle,
   barChartStyle,
   columnChartStyle,
@@ -852,6 +852,8 @@ export function VisualGallery({
   imageStyle,
   chromeStyles,
   visibleVisuals,
+  previewInteractionState,
+  onPreviewInteractionStateChange,
   selected,
   onSelect,
 }: VisualGalleryProps) {
@@ -868,26 +870,15 @@ export function VisualGallery({
   const [slicerDropdownOpen, setSlicerDropdownOpen] = useState(false);
 
   // Action button, Bookmark navigator, and Page navigator style differently
-  // per interaction state ($id: default/hover/selected/disabled — see
-  // STATEFUL_GROUPS in properties.ts). The property panel already lets
-  // each state be edited blind; this lets the hero preview actually show
-  // what each one looks like, re-resolving from the raw theme with the
-  // chosen state rather than always rendering "default". Only the hero
-  // visual responds — thumbnails always show the default state, since
-  // there's no selector attached to them.
-  const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
+  // per interaction state. The styles below arrive already resolved at the
+  // selected state — ThemeStudio owns both the state and the resolution, so
+  // nothing here reads theme JSON. Only the hero responds to the selector;
+  // thumbnails stay on the default state, which ThemeStudio enforces by
+  // resolving per-state only for the currently selected visual.
   const isStatefulHero = selected === "actionButton" || selected === "bookmarkNavigator" || selected === "pageNavigator";
-  const effectiveActionButtonStyle =
-    selected === "actionButton" ? resolveActionButtonStyle(themeSource, theme, previewInteractionState) : actionButtonStyle;
-  const effectiveBookmarkNavigatorStyle =
-    selected === "bookmarkNavigator"
-      ? resolveBookmarkNavigatorStyle(themeSource, theme, previewInteractionState)
-      : bookmarkNavigatorStyle;
-  const effectivePageNavigatorStyle =
-    selected === "pageNavigator" ? resolvePageNavigatorStyle(themeSource, theme, previewInteractionState) : pageNavigatorStyle;
   const stateSelectorNode = isStatefulHero ? (
     <span className="preview-state-selector">
-      <StateSelector state={previewInteractionState} onSelect={setPreviewInteractionState} />
+      <StateSelector state={previewInteractionState} onSelect={onPreviewInteractionStateChange} />
     </span>
   ) : undefined;
 
@@ -1756,9 +1747,9 @@ export function VisualGallery({
 
   const shapeContent = shapeTile(shapeStyle, "shape");
 
-  const actionIcon = effectiveActionButtonStyle.icon;
+  const actionIcon = actionButtonStyle.icon;
   const actionButtonContent = shapeTile(
-    effectiveActionButtonStyle,
+    actionButtonStyle,
     "actionButton",
     actionIcon.show && (
       <span
@@ -1829,16 +1820,16 @@ export function VisualGallery({
   };
 
   const bookmarkNavigatorContent = navigatorButtons(
-    effectiveBookmarkNavigatorStyle,
-    effectiveBookmarkNavigatorStyle.accentBar,
-    effectiveBookmarkNavigatorStyle.layout,
+    bookmarkNavigatorStyle,
+    bookmarkNavigatorStyle.accentBar,
+    bookmarkNavigatorStyle.layout,
     ["Overview", "Detail", "Trends"],
   );
 
   const pageNavigatorContent = navigatorButtons(
-    effectivePageNavigatorStyle,
-    effectivePageNavigatorStyle.accentBar,
-    effectivePageNavigatorStyle.layout,
+    pageNavigatorStyle,
+    pageNavigatorStyle.accentBar,
+    pageNavigatorStyle.layout,
     ["Page 1", "Page 2", "Page 3"],
   );
 
