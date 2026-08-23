@@ -1,4 +1,4 @@
-import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { resolveActionButtonStyle, type ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import { resolveBookmarkNavigatorStyle, type ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
@@ -267,6 +267,22 @@ function outlineFromBitmask(mask: number, color: string, weight: number): CSSPro
   };
 }
 
+/** The hero's measured natural size and the scale chosen to fit its slot. */
+type HeroFit = { scale: number; naturalWidth: number; naturalHeight: number };
+
+/**
+ * The hero's maximum scale, read from the `--hero-max-scale` custom
+ * property so globals.css stays the single source of truth. CSS also uses
+ * it for the pre-measurement fallback transform and for the width the
+ * report page reserves, and a second copy here would be one more
+ * hand-maintained duplicate of a geometry constant.
+ */
+function heroMaxScale(element: Element): number {
+  const raw = getComputedStyle(element).getPropertyValue("--hero-max-scale");
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1.5;
+}
+
 /**
  * Bar/column thickness from the chart's gap-size setting. Power BI's gap
  * is the share of each category slot left empty, so a larger gap means a
@@ -514,6 +530,68 @@ function PreviewShell({
   // the tile — rather than showing it all the time.
   const [showTooltipPreview, setShowTooltipPreview] = useState(false);
   const [showHeaderTooltipPreview, setShowHeaderTooltipPreview] = useState(false);
+  const heroWrapRef = useRef<HTMLSpanElement>(null);
+  const heroScaleRef = useRef<HTMLSpanElement>(null);
+  const [heroFit, setHeroFit] = useState<HeroFit | null>(null);
+
+  // Fit-to-container. The hero used to be a fixed scale(1.5) inside a
+  // 630x510 box with overflow:hidden, so on a narrower slot it was
+  // rendered and then simply cut off — measured 303px of 630px invisible
+  // at 1280x720, with no scrollbar. Scale down to fit instead, and derive
+  // the reserved footprint from the tile's measured natural size rather
+  // than the hardcoded 510px, which was a guess at the tallest visual and
+  // already left ~17px of dead space under a bar chart.
+  //
+  // A layout effect (not useEffect) so the measurement lands before paint
+  // and there is no first-frame flash at the fallback size.
+  const measureHero = useCallback(() => {
+    const wrap = heroWrapRef.current;
+    const scaleBox = heroScaleRef.current;
+    if (!wrap || !scaleBox) return;
+    // offsetWidth/Height are layout sizes, unaffected by the transform, so
+    // they stay the tile's natural pre-scale dimensions.
+    const naturalWidth = scaleBox.offsetWidth;
+    const naturalHeight = scaleBox.offsetHeight;
+    if (!naturalWidth || !naturalHeight) return;
+    const available = wrap.getBoundingClientRect().width;
+    const scale = Math.min(heroMaxScale(wrap), available / naturalWidth);
+    // Returning `previous` unchanged lets React bail out of the re-render,
+    // which is what stops the every-render effect below from looping.
+    setHeroFit((previous) =>
+      previous &&
+      previous.naturalWidth === naturalWidth &&
+      previous.naturalHeight === naturalHeight &&
+      Math.abs(previous.scale - scale) < 0.0005
+        ? previous
+        : { scale, naturalWidth, naturalHeight },
+    );
+  }, []);
+
+  // Deliberately no dependency array: the tile's height is content-driven,
+  // so it changes whenever a theme edit adds or removes a legend, an axis
+  // or a label row — a re-render with no remount and no resize. Measuring
+  // on every render is what keeps the reserved footprint honest, and makes
+  // correctness independent of ResizeObserver firing.
+  useLayoutEffect(() => {
+    if (variant !== "hero") return;
+    measureHero();
+  });
+
+  // Covers the resizes React never hears about: the viewport, and the
+  // container width changing under it. The wrap for available width, the
+  // scale box because its natural height can also change without a render.
+  // Neither observation can loop -- this only writes a transform (no
+  // layout size) on the scale box, and sizes the wrap's *child*.
+  useLayoutEffect(() => {
+    if (variant !== "hero") return;
+    const wrap = heroWrapRef.current;
+    const scaleBox = heroScaleRef.current;
+    if (!wrap || !scaleBox) return;
+    const observer = new ResizeObserver(measureHero);
+    observer.observe(wrap);
+    observer.observe(scaleBox);
+    return () => observer.disconnect();
+  }, [variant, measureHero]);
   // Power BI offsets a drop shadow by an angle + distance unless a named
   // preset overrides both; "Inner" draws it inside the visual's edge.
   const shadowOffset = (): { x: number; y: number } => {
@@ -850,12 +928,28 @@ function PreviewShell({
   // appending the tooltip inside it (as this used to do) pushed the
   // content past the reserved height and got clipped by the scale
   // wrap's overflow:hidden, right at the tile's rounded corner. Rendering
-  // it as a sibling below the (still-clipped) scaled tile avoids both
-  // problems at once.
+  // it as a sibling below the scaled tile avoids both problems at once,
+  // and keeps it outside the footprint the wrap reserves, so showing or
+  // hiding it cannot move the hero's own bounds.
   return (
-    <span className="visual-hero-wrap">
-      <span className="visual-hero-scale-wrap">
-        <span className="visual-hero-scale">{tile}</span>
+    <span className="visual-hero-wrap" ref={heroWrapRef}>
+      <span
+        className="visual-hero-scale-wrap"
+        // The reserved footprint, in both dimensions, is the tile's
+        // measured natural size times the chosen scale — never a guess.
+        style={
+          heroFit
+            ? { width: heroFit.naturalWidth * heroFit.scale, height: heroFit.naturalHeight * heroFit.scale }
+            : undefined
+        }
+      >
+        <span
+          className="visual-hero-scale"
+          ref={heroScaleRef}
+          style={heroFit ? { transform: `scale(${heroFit.scale})` } : undefined}
+        >
+          {tile}
+        </span>
       </span>
       {extraControls}
       {tooltip.show && (

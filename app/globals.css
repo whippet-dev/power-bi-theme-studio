@@ -9,6 +9,15 @@
   --brand-soft: #eee9f8;
   --yellow: #f4c542;
   --font-ui: "Segoe UI Variable", "Segoe UI", Arial, sans-serif;
+
+  /* Hero geometry, declared once so CSS and the fit-to-container script in
+     VisualPreviews.tsx cannot drift apart. The tile renders at a fixed
+     pre-scale width and is enlarged by a transform so resolved font sizes
+     (often 8-12px) stay legible; --hero-max-scale is the cap, read back
+     from here by the script rather than duplicated in TypeScript. */
+  --hero-tile-width: 420px;
+  --hero-max-scale: 1.5;
+  --report-page-padding: 18px;
 }
 
 * { box-sizing: border-box; }
@@ -406,14 +415,26 @@ button { color: inherit; }
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 16px;
+  /* The page below reserves enough width for a full-scale hero, so on a
+     narrow viewport the page plus the filter pane can exceed the surface.
+     Scroll here rather than letting either of them be squeezed. */
+  overflow-x: auto;
 }
 
 .report-page {
   flex: 1;
-  min-width: 0;
+  /* Guarantees the hero a slot that the filter pane cannot take away.
+     The pane is content-sized (~320px) with flex-shrink: 0, so without
+     this it halves the page's width -- measured 700.6px -> 362.6px at
+     1280x720 -- and the hero's slot with it. The hero would then rescale
+     whenever the pane was toggled, which is exactly what a stable
+     comparison surface must not do. The surface scrolls instead. */
+  min-width: calc(
+    var(--hero-tile-width) * var(--hero-max-scale) + var(--report-page-padding) * 2
+  );
   display: flex;
   flex-direction: column;
-  padding: 18px;
+  padding: var(--report-page-padding);
   border-radius: 10px;
 }
 
@@ -762,20 +783,27 @@ button { color: inherit; }
 /* Hero: rendered at a fixed pre-scale size, then visually enlarged with a
    transform so resolved font sizes (often 8-12px) stay legible. The wrap
    reserves the post-scale footprint so surrounding layout doesn't overlap;
-   transform itself doesn't affect layout sizing, hence the two-box setup. */
+   transform itself doesn't affect layout sizing, hence the two-box setup.
+
+   Both the wrap's size and the scale factor are set inline by
+   PreviewShell's fit-to-container measurement (VisualPreviews.tsx), which
+   runs in a layout effect before paint. The declarations here are the
+   pre-measurement fallback only. The wrap's height in particular must not
+   be a hardcoded guess: the tile's width is fixed but its height is
+   content-driven, so the reserved footprint is derived from the tile's
+   measured natural height times the chosen scale. */
 .visual-hero-scale-wrap {
   display: block;
-  width: 630px;
+  width: calc(var(--hero-tile-width) * var(--hero-max-scale));
   max-width: 100%;
-  height: 510px;
   overflow: hidden;
   border-radius: 12px;
 }
 
 .visual-hero-scale {
   display: block;
-  width: 420px;
-  transform: scale(1.5);
+  width: var(--hero-tile-width);
+  transform: scale(var(--hero-max-scale));
   transform-origin: top left;
 }
 
@@ -797,7 +825,7 @@ button { color: inherit; }
   transition: border-color 150ms ease, transform 150ms ease;
 }
 
-.visual-tile--hero { width: 420px; }
+.visual-tile--hero { width: var(--hero-tile-width); }
 .visual-tile--thumb { width: 200px; }
 
 .visual-tile:hover {
@@ -1245,11 +1273,13 @@ button { color: inherit; }
 }
 
 /* Positions the sample tooltip as a floating callout under the hero
-   tile rather than inside it — see the comment at its call site. */
+   tile rather than inside it — see the comment at its call site. Its
+   width tracks the hero's full-scale footprint, so the fit-to-container
+   measurement has a stable box to measure its available width against. */
 .visual-hero-wrap {
   position: relative;
   display: block;
-  width: 630px;
+  width: calc(var(--hero-tile-width) * var(--hero-max-scale));
   max-width: 100%;
 }
 
@@ -2630,11 +2660,13 @@ button { color: inherit; }
   .canvas-panel { padding: 26px 16px 38px; }
   .canvas-panel__intro { align-items: flex-start; }
   .preview-badge { display: none; }
-  .visual-hero-scale-wrap {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 630 / 510;
-  }
+  /* On a phone, scaling the hero down to fit is better than reserving a
+     full-scale slot and scrolling the surface, so release the guarantee
+     and let the fit-to-container measurement take over. The scale wrap
+     needs no override now that its footprint is measured rather than
+     assumed from a 630x510 aspect ratio. */
+  .report-page { min-width: 0; }
+  .visual-hero-wrap { width: 100%; }
   .visual-tile--thumb { width: 100%; }
 }
 
