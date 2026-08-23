@@ -154,13 +154,35 @@ The private theme overrides that layer to Arial 10 / Arial 12.
 
 | Fallback | Value | Verdict | Evidence |
 |---|---|---|---|
-| axis `fontSize`, `titleFontSize` | `6` | **Definitely incorrect** | Classic 2026 is a verbatim Power BI file that declares *zero* `fontSize` in `visualStyles` while deliberately declaring `textClasses.label.fontSize = 10`. Power BI has no other source to render axis labels from, so it must inherit from `textClasses`. Fluent, which does declare axis typography, chose `10.5` — the same visual ballpark, and nothing near 6. The resolver never consults `textClasses` for any visual property (only `cardProperties.ts` does, for `callout`) |
+| axis `fontSize`, `titleFontSize` | `6` | **Definitely incorrect** | Microsoft documents that text classes supply the default typography for named visual text roles — axis titles from `title`, category axis labels from `lightLabel`, value axis labels from `smallLightLabel` (see §4.1). Classic 2026, a verbatim Power BI file, is consistent with that: it declares *zero* `fontSize` in `visualStyles` and declares `textClasses.label.fontSize = 10`. Fluent, which does declare axis typography explicitly, chose `10.5` — the same visual ballpark, and nothing near 6. The resolver never consults `textClasses` for any visual property (only `cardProperties.ts` does, for `callout`) |
 | axis `fontFamily`, `titleFontFamily` | `""` | **Definitely incorrect** | Same argument. `""` means "inherit from CSS", so the preview silently uses the app's own font rather than the theme's Arial. The private theme explicitly asks for Arial and the preview does not show it |
 | `legend.fontSize`, `labels.fontSize` | `6` | **Definitely incorrect** | Same root cause, and note these resolve to `6` under **both** bases — Fluent does not declare them either, so this defect is not Classic-specific |
 | `legend.position` | `"Top"` | **Likely incorrect** | Power BI's documented default legend position for cartesian visuals is Bottom, and Fluent's base states `Bottom` explicitly for `*.*` and for `clusteredBarChart`. Classic 2026 declares `position` only for pie/donut (`RightCenter`), implying the cartesian default lives in Power BI's internal visual defaults, not the theme file. `Top` looks like an app choice |
 | `categoryAxis.innerPadding` | `10` | **Probably correct but not proven** | Not declared anywhere in Classic 2026, so it comes from Power BI's internal visual defaults, which no artefact available here exposes. Fluent's `50` is a deliberate Fluent restyle, not evidence of the general default |
 | `categoryAxis.maxMarginFactor` | `10` | **Probably correct but not proven** | Same |
 | `layout.clusteredGapSize` | `10` | **Proven correct** | Fluent explicitly declares `10` for `clusteredBarChart.layout` |
+
+### 4.1 The documented text-class associations
+
+Microsoft documents which text class supplies each visual text role. The
+mapping is **not** “everything comes from `label`”:
+
+| Text class | Supplies |
+|---|---|
+| `title` | category axis title, value axis title |
+| `lightLabel` | legend text, category axis labels |
+| `smallLightLabel` | data labels, value axis labels |
+| `smallLabel` | reference-line labels |
+
+Secondary classes (`lightLabel`, `smallLightLabel`, `smallLabel`, and the
+rest) **derive automatically from their associated primary class** when a
+theme does not supply them. A theme declaring only the four primary classes
+is therefore complete, and a correct implementation must reproduce that
+derivation rather than treating an absent secondary class as absent.
+
+The private fixture happens to declare several secondary classes explicitly, so
+it does not exercise the derivation path on its own — which is precisely why
+the implementation cannot be validated against this fixture alone.
 
 A secondary units question, flagged not resolved: Power BI theme JSON expresses
 font size in **points**, and the preview applies the number directly as CSS
@@ -380,10 +402,12 @@ generated-registry issue**, not one bad value.
 **1 — Visual properties never inherit from `textClasses`.** *(correctness:
 critical · breadth: whole app · regression risk: medium)*
 
-The single largest fidelity defect found. Classic 2026 is a verbatim Power BI
-file with **zero** `fontSize` in `visualStyles` and a populated `textClasses`;
-the only way Power BI can render its axis labels is by inheriting from that
-layer. Studio instead falls back to `6` for 66 properties across 9 registries,
+The single largest fidelity defect found. Microsoft documents text classes as
+the source of default typography for named visual text roles, with secondary
+classes deriving from their primary when absent (§4.1). Classic 2026, a
+verbatim Power BI file, matches that shape: **zero** `fontSize` in
+`visualStyles` alongside a populated `textClasses`. Studio applies none of it
+— it falls back to a literal `6` for 66 properties across 9 registries,
 and to `""` for 72 font families. Any partial theme — which is most real
 themes, including this one — renders with 6px axis text in the app's own font
 instead of the 10pt Arial it asks for.
@@ -419,12 +443,48 @@ Ordered by correctness impact, with breadth and risk stated.
 
 | # | Fix | Impact | Breadth | Risk | Notes |
 |---|---|---|---|---|---|
-| 1 | Make typography properties fall back through `textClasses` rather than to a literal | Critical | 66+72 properties, 9 registries | Medium | Needs a decision on which text class each property maps to (`label` for axis/legend/data labels, `title` for titles). Should be one shared helper, not 138 edits. Verify against Classic 2026 + Fluent, both of which then agree |
-| 2 | Snap mark edges to device pixels in the renderer | Critical | Cartesian family | Low | The narrowest correct fix is to round the mark's **rendered** rect, not its fraction — i.e. give every category the same integer pixel height derived once, rather than rounding percentages. **Do not** round inside `ChartLayout`: the engine is correct and must stay resolution-independent. Needs care so bars still tile their slots |
+| 1 | Apply Power BI's text-class defaults instead of falling back to a literal | Critical | 66+72 properties, 9 registries | Medium | More than picking one class — see the design constraints below. Should be one shared helper, not 138 edits |
+| 2 | Give every category mark the same rasterised thickness | Critical | Cartesian family | Unknown | **Defect proven, remediation not.** One *candidate* is snapping mark edges to device pixels in the renderer, but it has not been designed or validated and must not be treated as the chosen solution. See the design constraints below |
 | 3 | Correct `legend.position` fallback to `Bottom` | Moderate | Cartesian family | Low | One-line per registry; verify against Fluent's explicit value |
 | 4 | Derive the natural box height from resolved typography, or grow it | Moderate | Cartesian family | Medium | Do **after** fix 1, since fix 1 changes the required budget |
 | 5 | Investigate pt → px conversion | Moderate | Whole app | Medium | Diagnostic first, like this task |
 | 6 | Establish real defaults for `innerPadding` / `maxMarginFactor` | Low | Cartesian family | Low | Needs a Power BI artefact this audit did not have |
+
+### Design constraints for fix 1 — text-class inheritance
+
+The shared helper must resolve a **semantic text role**, not read one primary
+class. Concretely it needs:
+
+1. a text-role → text-class mapping following §4.1 — an axis *title* is not a
+   `label`, and a category axis label does not come from the same class as a
+   value axis label;
+2. support for the secondary text classes, not only the four primary ones;
+3. Power BI-compatible derivation of a secondary class from its associated
+   primary class when the theme does not declare it, so a theme carrying only
+   the four primary classes resolves the same way it would in Power BI;
+4. explicit `visualStyles` properties continuing to win over any text-class
+   default — the existing resolution chain stays in front, and the text-class
+   lookup becomes the step that runs *instead of* the literal fallback.
+
+Validating (3) needs at least one theme that declares **only** primary
+classes. The private fixture declares several secondary classes and so cannot
+prove that path by itself.
+
+### Design constraints for fix 2 — equal rasterised thickness
+
+The defect is proven (§5). The remediation is not, and no solution has been
+selected. Whatever is chosen must hold across every condition the preview
+actually renders in:
+
+- `devicePixelRatio` values other than 1;
+- browser zoom;
+- hero scales at and below 1.5;
+- thumbnails at 1.0;
+- responsive chart sizes, where the plot's own dimensions are fractional.
+
+It must also leave `ChartLayout` resolution-independent: the engine is
+provably correct here and rounding inside it would trade a visible artefact
+for a wrong model. Designing and proving this is its own task.
 
 Fixes 1 and 2 are independent and can land in either order. Fix 4 depends on 1.
 
@@ -442,9 +502,11 @@ Fixes 1 and 2 are independent and can land in either order. Fix 4 depends on 1.
    Fluent supplies is met by a Studio fallback on the Classic side.
 3. **Which come from Studio fallbacks?** 38 of 40. Listed in §2.
 4. **Is the Classic axis typography fallback of `6` faithful?** **No —
-   definitely incorrect.** Classic 2026 declares no font size in `visualStyles`
-   at all and declares `textClasses.label.fontSize = 10`; Power BI must inherit
-   from there.
+   definitely incorrect.** Microsoft documents text classes as the source of
+   default typography for named visual text roles (§4.1), and Classic 2026
+   matches that shape: no font size in `visualStyles` at all, alongside a
+   populated `textClasses`. Nothing in Power BI's documented behaviour yields
+   6.
 5. **Are the four Fluent bars mathematically equal in ChartLayout?** Yes —
    identical 25% slots, identical 12.5% marks.
 6. **Equal in browser layout before hero scaling?** Yes — 5.79688px each,
