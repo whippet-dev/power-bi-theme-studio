@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   axisRange,
   axisTickValues,
+  categoryPercent,
   computeChartLayout,
   estimateText,
   type AxisLayoutStyle,
@@ -625,5 +626,110 @@ test("the plot starts after the category gutter and ends before the value gutter
       assert.ok(near(l.plot.x, cat.x + cat.width), "horizontal: plot starts after the category gutter");
       assert.ok(near(l.plot.y + l.plot.height, val.y), "horizontal: plot ends where the value gutter begins");
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Category-axis inversion
+// ---------------------------------------------------------------------------
+
+test("categoryAxis.invertAxis reverses which slot each index occupies", () => {
+  // The exact claim: index 0 lands where index 3 used to, and vice versa.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const normal = layout({ orientation });
+    const inverted = layout({ orientation, categoryAxis: axis({ invertAxis: true }) });
+    const n = CATEGORIES.length;
+    for (let i = 0; i < n; i++) {
+      const a = normal.scale.category(i, n);
+      const b = inverted.scale.category(n - 1 - i, n);
+      assert.ok(near(a.start, b.start), `${orientation}: index ${i} and inverted ${n - 1 - i} must share a slot`);
+      assert.ok(near(a.size, b.size), `${orientation}: inversion must not change slot size`);
+    }
+  }
+});
+
+test("category inversion leaves slot sizes and the plot untouched", () => {
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const normal = layout({ orientation });
+    const inverted = layout({ orientation, categoryAxis: axis({ invertAxis: true }) });
+    // Same gutters, same plot: inversion is a mapping, not a re-layout.
+    assert.deepEqual(inverted.plot, normal.plot, `${orientation}: plot must not move`);
+    assert.deepEqual(inverted.categoryAxis, normal.categoryAxis, `${orientation}: category gutter must not move`);
+    assert.deepEqual(inverted.valueAxis, normal.valueAxis, `${orientation}: value gutter must not move`);
+    for (let i = 0; i < CATEGORIES.length; i++) {
+      assert.ok(
+        near(inverted.scale.category(i, 4).size, normal.scale.category(i, 4).size),
+        `${orientation}: slot ${i} changed size`,
+      );
+    }
+  }
+});
+
+test("inverted category slots stay inside the plot and stay monotonic in slot order", () => {
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    for (const innerPadding of [0, 20, 90]) {
+      const l = layout({ orientation, innerPadding, categoryAxis: axis({ invertAxis: true }) });
+      const origin = orientation === "vertical" ? l.plot.x : l.plot.y;
+      const extent = orientation === "vertical" ? l.plot.width : l.plot.height;
+      const slots = CATEGORIES.map((_, i) => l.scale.category(i, CATEGORIES.length));
+      for (const s of slots) {
+        assert.ok(s.start >= origin - 1e-9, `${orientation} pad=${innerPadding}: inverted slot before the plot`);
+        assert.ok(s.start + s.size <= origin + extent + 1e-9, `${orientation}: inverted slot past the plot`);
+      }
+      // Index order now runs backwards along the axis, which is the point.
+      for (let i = 1; i < slots.length; i++) {
+        assert.ok(slots[i].start < slots[i - 1].start, `${orientation}: inverted slots must descend by index`);
+      }
+    }
+  }
+});
+
+test("category and value inversion are independent", () => {
+  // Turning one on must not disturb the other: they answer different
+  // questions — which slot a category takes, and which end a value maps to.
+  const base = layout({ valueAxis: axis({ start: "0", end: "100" }) });
+  const catOnly = layout({
+    valueAxis: axis({ start: "0", end: "100" }),
+    categoryAxis: axis({ invertAxis: true }),
+  });
+  const valOnly = layout({ valueAxis: axis({ start: "0", end: "100", invertAxis: true }) });
+  const both = layout({
+    valueAxis: axis({ start: "0", end: "100", invertAxis: true }),
+    categoryAxis: axis({ invertAxis: true }),
+  });
+
+  // Category inversion must not move any value.
+  for (const v of [0, 50, 100]) {
+    assert.ok(near(catOnly.scale.value(v), base.scale.value(v)), "category inversion moved a value");
+    assert.ok(near(both.scale.value(v), valOnly.scale.value(v)), "category inversion moved an inverted value");
+  }
+  // Value inversion must not move any category slot.
+  for (let i = 0; i < 4; i++) {
+    assert.ok(near(valOnly.scale.category(i, 4).start, base.scale.category(i, 4).start), "value inversion moved a slot");
+    assert.ok(
+      near(both.scale.category(i, 4).start, catOnly.scale.category(i, 4).start),
+      "value inversion moved an inverted slot",
+    );
+  }
+});
+
+test("categoryPercent reflects the reversed scale without the caller reversing anything", () => {
+  // This is what keeps marks and labels together: both call categoryPercent,
+  // so neither can be reversed independently of the other.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const normal = layout({ orientation });
+    const inverted = layout({ orientation, categoryAxis: axis({ invertAxis: true }) });
+    const n = CATEGORIES.length;
+    for (let i = 0; i < n; i++) {
+      const a = categoryPercent(normal, i, n);
+      const b = categoryPercent(inverted, n - 1 - i, n);
+      assert.ok(near(a.offset, b.offset, 1e-6), `${orientation}: percent offset ${i} did not mirror`);
+      assert.ok(near(a.size, b.size, 1e-6), `${orientation}: percent size ${i} changed`);
+    }
+    // And the first category really does end up last along the axis.
+    assert.ok(
+      categoryPercent(inverted, 0, n).offset > categoryPercent(inverted, n - 1, n).offset,
+      `${orientation}: index 0 must sit after index ${n - 1} once inverted`,
+    );
   }
 });

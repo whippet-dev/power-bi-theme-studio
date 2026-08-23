@@ -403,6 +403,13 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     return vertical ? plot.y + plot.height - fraction * plot.height : plot.x + fraction * plot.width;
   };
 
+  // The category axis inverts independently of the value axis: one reverses
+  // which slot a category occupies, the other which end of the plot a value
+  // maps to. Both belong to the scale rather than to a renderer — reversing
+  // an array in a chart component would flip its marks and leave its labels
+  // behind, because the two read the slots separately.
+  const categoryInverted = Boolean(categoryAxis.invertAxis);
+
   const category = (index: number, count: number): { start: number; size: number } => {
     if (count <= 0) return { start: vertical ? plot.x : plot.y, size: 0 };
     const total = vertical ? plot.width : plot.height;
@@ -411,7 +418,10 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     // innerPadding is a percentage of the slot left empty, so half of it
     // sits either side of the mark and every slot stays inside the plot.
     const padding = slot * (Math.max(0, Math.min(100, innerPadding)) / 100);
-    return { start: origin + index * slot + padding / 2, size: Math.max(0, slot - padding) };
+    // Inversion changes which slot the index lands in, not the slot's size:
+    // index 0 takes the last slot, index 1 the second-last, and so on.
+    const position = categoryInverted ? count - 1 - index : index;
+    return { start: origin + position * slot + padding / 2, size: Math.max(0, slot - padding) };
   };
 
   return {
