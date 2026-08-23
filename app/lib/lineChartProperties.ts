@@ -9,6 +9,7 @@ import {
   textProp,
   isGroupSetBy,
 } from "./properties";
+import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -1025,6 +1026,25 @@ export type ResolvedLineChartStyle = {
  */
 export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedLineChartStyle {
   const p = LINE_CHART_PROPERTIES;
+  /**
+   * Power BI's text-class defaults for the roles this visual has, exactly as
+   * the Clustered Bar pilot established them (app/lib/textClasses.ts).
+   *
+   * They are the LAST resort, not an override: resolvePropertyValue still
+   * walks custom-visual, custom-wildcard, base-visual and base-wildcard
+   * first, so Fluent 2's explicit axis typography continues to win.
+   *
+   * Only roles Power BI's own model proves are used here. Series labels,
+   * totals, sub-headers, error-bar labels, data-label titles and the
+   * secondary value axis keep their old fallbacks — see PHASE_2_BACKLOG.md.
+   */
+  const categoryAxisLabelText = resolveTextRole(theme, "categoryAxisLabel");
+  const categoryAxisTitleText = resolveTextRole(theme, "categoryAxisTitle");
+  const dataLabelText = resolveTextRole(theme, "dataLabel");
+  const legendText = resolveTextRole(theme, "legendText");
+  const referenceLineLabelText = resolveTextRole(theme, "referenceLineLabel");
+  const valueAxisLabelText = resolveTextRole(theme, "valueAxisLabel");
+  const valueAxisTitleText = resolveTextRole(theme, "valueAxisTitle");
   return {
     usesSmallMultiples: isGroupSetBy(theme, "lineChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
@@ -1080,11 +1100,11 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       bold: resolvePropertyValue(theme, p.categoryAxis.bold, false),
       concatenateLabels: resolvePropertyValue(theme, p.categoryAxis.concatenateLabels, false),
       end: resolvePropertyValue(theme, p.categoryAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.categoryAxis.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.categoryAxis.fontFamily, categoryAxisLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, categoryAxisLabelText.fontSize),
       invertAxis: resolvePropertyValue(theme, p.categoryAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.categoryAxis.italic, false),
-      labelColor: resolvePropertyValue(theme, p.categoryAxis.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.categoryAxis.labelColor, categoryAxisLabelText.color),
       labelDisplayUnits: resolvePropertyValue(theme, p.categoryAxis.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.categoryAxis.labelPrecision, 0),
       logAxisScale: resolvePropertyValue(theme, p.categoryAxis.logAxisScale, false),
@@ -1103,9 +1123,9 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       gridlineThickness: resolvePropertyValue(theme, p.categoryAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.categoryAxis.gridlineTransparency, 0),
       titleBold: resolvePropertyValue(theme, p.categoryAxis.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.categoryAxis.titleColor, base.foreground),
-      titleFontFamily: resolvePropertyValue(theme, p.categoryAxis.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.categoryAxis.titleFontSize, 6),
+      titleColor: resolvePropertyValue(theme, p.categoryAxis.titleColor, categoryAxisTitleText.color),
+      titleFontFamily: resolvePropertyValue(theme, p.categoryAxis.titleFontFamily, categoryAxisTitleText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.categoryAxis.titleFontSize, categoryAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.categoryAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.categoryAxis.titleText, ""),
       titleUnderline: resolvePropertyValue(theme, p.categoryAxis.titleUnderline, false),
@@ -1115,11 +1135,11 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       axisStyle: resolvePropertyValue(theme, p.valueAxis.axisStyle, "showTitleOnly"),
       bold: resolvePropertyValue(theme, p.valueAxis.bold, false),
       end: resolvePropertyValue(theme, p.valueAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.valueAxis.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.valueAxis.fontFamily, valueAxisLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
       invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.valueAxis.italic, false),
-      labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, valueAxisLabelText.color),
       labelDisplayUnits: resolvePropertyValue(theme, p.valueAxis.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.valueAxis.labelPrecision, 0),
       logAxisScale: resolvePropertyValue(theme, p.valueAxis.logAxisScale, false),
@@ -1141,9 +1161,9 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
       titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, base.foreground),
-      titleFontFamily: resolvePropertyValue(theme, p.valueAxis.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, 6),
+      titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, valueAxisTitleText.color),
+      titleFontFamily: resolvePropertyValue(theme, p.valueAxis.titleFontFamily, valueAxisTitleText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, valueAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.valueAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.valueAxis.titleText, ""),
       titleUnderline: resolvePropertyValue(theme, p.valueAxis.titleUnderline, false),
@@ -1175,10 +1195,10 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
     legend: {
       show: resolvePropertyValue(theme, p.legend.show, true),
       bold: resolvePropertyValue(theme, p.legend.bold, false),
-      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.legend.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, legendText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.legend.fontSize, legendText.fontSize),
       italic: resolvePropertyValue(theme, p.legend.italic, false),
-      labelColor: resolvePropertyValue(theme, p.legend.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.legend.labelColor, legendText.color),
       legendMarkerRendering: resolvePropertyValue(theme, p.legend.legendMarkerRendering, "markerCircleDefault"),
       matchLineColor: resolvePropertyValue(theme, p.legend.matchLineColor, false),
       position: resolvePropertyValue(theme, p.legend.position, "Top"),
@@ -1192,14 +1212,14 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       backgroundTransparency: resolvePropertyValue(theme, p.labels.backgroundTransparency, 0),
       enableBackground: resolvePropertyValue(theme, p.labels.enableBackground, false),
       bold: resolvePropertyValue(theme, p.labels.bold, false),
-      color: resolvePropertyValue(theme, p.labels.color, base.palette[0] ?? base.foreground),
+      color: resolvePropertyValue(theme, p.labels.color, dataLabelText.color),
       enableDetailDataLabel: resolvePropertyValue(theme, p.labels.enableDetailDataLabel, false),
       enableTitleDataLabel: resolvePropertyValue(theme, p.labels.enableTitleDataLabel, false),
       // The value is a data label's default content; title and detail are
       // additions to it, not replacements for it.
       enableValueDataLabel: resolvePropertyValue(theme, p.labels.enableValueDataLabel, true),
-      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.labels.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, dataLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.labels.fontSize, dataLabelText.fontSize),
       horizontalAlignment: resolvePropertyValue(theme, p.labels.horizontalAlignment, "left"),
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelContainerMaxWidth: resolvePropertyValue(theme, p.labels.labelContainerMaxWidth, 0),
@@ -1394,7 +1414,7 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       transparency: resolvePropertyValue(theme, p.referenceLine.transparency, 0),
       value: resolvePropertyValue(theme, p.referenceLine.value, 0),
       width: resolvePropertyValue(theme, p.referenceLine.width, 1),
-      dataLabelColor: resolvePropertyValue(theme, p.referenceLine.dataLabelColor, base.foreground),
+      dataLabelColor: resolvePropertyValue(theme, p.referenceLine.dataLabelColor, referenceLineLabelText.color),
       dataLabelDecimalPoints: resolvePropertyValue(theme, p.referenceLine.dataLabelDecimalPoints, 0),
       dataLabelDisplayUnits: resolvePropertyValue(theme, p.referenceLine.dataLabelDisplayUnits, 0),
       dataLabelHorizontalPosition: resolvePropertyValue(theme, p.referenceLine.dataLabelHorizontalPosition, "left"),
@@ -1419,7 +1439,7 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       transparency: resolvePropertyValue(theme, p.xAxisReferenceLine.transparency, 0),
       value: resolvePropertyValue(theme, p.xAxisReferenceLine.value, ""),
       width: resolvePropertyValue(theme, p.xAxisReferenceLine.width, 1),
-      dataLabelColor: resolvePropertyValue(theme, p.xAxisReferenceLine.dataLabelColor, base.foreground),
+      dataLabelColor: resolvePropertyValue(theme, p.xAxisReferenceLine.dataLabelColor, referenceLineLabelText.color),
       dataLabelDecimalPoints: resolvePropertyValue(theme, p.xAxisReferenceLine.dataLabelDecimalPoints, 0),
       dataLabelDisplayUnits: resolvePropertyValue(theme, p.xAxisReferenceLine.dataLabelDisplayUnits, 0),
       dataLabelHorizontalPosition: resolvePropertyValue(theme, p.xAxisReferenceLine.dataLabelHorizontalPosition, "left"),
@@ -1444,7 +1464,7 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       transparency: resolvePropertyValue(theme, p.y1AxisReferenceLine.transparency, 0),
       value: resolvePropertyValue(theme, p.y1AxisReferenceLine.value, 0),
       width: resolvePropertyValue(theme, p.y1AxisReferenceLine.width, 1),
-      dataLabelColor: resolvePropertyValue(theme, p.y1AxisReferenceLine.dataLabelColor, base.foreground),
+      dataLabelColor: resolvePropertyValue(theme, p.y1AxisReferenceLine.dataLabelColor, referenceLineLabelText.color),
       dataLabelDecimalPoints: resolvePropertyValue(theme, p.y1AxisReferenceLine.dataLabelDecimalPoints, 0),
       dataLabelDisplayUnits: resolvePropertyValue(theme, p.y1AxisReferenceLine.dataLabelDisplayUnits, 0),
       dataLabelHorizontalPosition: resolvePropertyValue(theme, p.y1AxisReferenceLine.dataLabelHorizontalPosition, "left"),
