@@ -147,7 +147,7 @@ const BUILT_IN_NEUTRAL_SECONDARY = "#605E5C";
  *   BI passes it as the `i` argument, which is checked first.
  * - `weight` — the classes that exist to be bold or semibold.
  *
- * Corroborated independently by the private theme, which was authored against
+ * Corroborated independently by a private real-world theme, authored against
  * Classic 2026 and hard-codes the values this table produces:
  * `largeLabel` 12 = label 10 × 1.2, `largeTitle` 14 = title 12 × 7/6, and
  * `lightLabel.color` `#605E5C` = Classic 2026's `foregroundNeutralSecondary`

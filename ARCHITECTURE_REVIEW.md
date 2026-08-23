@@ -413,7 +413,7 @@ Derive the cartesian registries from one shared factory with per-visual deltas â
 - `dist/` exists locally, correctly gitignored, **not tracked**.
 - Dependencies minimal and appropriate â€” React + React-DOM only at runtime; no unused runtime deps.
 - No meaningful dead code found; sampled exports (`chromeThemePath`, `INTERACTION_STATES`, `propertyThemePath`) are all consumed.
-- `themes/local/` (private private theme) correctly gitignored.
+- `themes/local/` (private local themes) correctly gitignored.
 
 **Needs attention:**
 

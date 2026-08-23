@@ -156,7 +156,7 @@ test("chromeThemePath('*', ...) writes to the shared bucket; a specific visual k
   assert.equal(slicerChrome.title.fontColor, "#ABCDEF");
 });
 
-// Regression: a real theme (a private real-world theme) set the Card visual's
+// Regression: a private real-world theme set the Card visual's
 // title background to a transparent white — Power BI writes an 8-digit
 // #RRGGBBAA when a colour carries its own alpha. The hex validator only
 // matched exactly 6 digits, so this value was silently treated as unset

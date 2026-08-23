@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
+import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import type { ResolvedTheme } from "../lib/theme";
 import {
@@ -26,7 +27,7 @@ import {
  * `filterCard.foregroundColor` — that's the value text below it ("is
  * (All)"). Real Power BI tints the field name with the report's first data
  * colour instead, confirmed against a real screenshot and the user's own
- * private theme (dataColors[0] is a dark navy blue, exactly what the field
+ * private real-world theme (dataColors[0] is a dark navy blue, exactly what the field
  * name renders as; filterCard.foregroundColor there is a plain near-black,
  * which is what the value text actually shows).
  */
@@ -70,7 +71,7 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
     border: card.border ? `1px solid ${card.borderColor}` : "1px solid transparent",
     color: card.foregroundColor,
     fontFamily: card.fontFamily || undefined,
-    fontSize: card.textSize,
+    fontSize: themeFontSizeToCssPx(card.textSize),
   });
 
   const filterCard = (name: string, card: ResolvedGlobalOptionsStyle["pageFilterCards"], body: ReactNode, key: string) => (
@@ -101,7 +102,7 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
       }}
     >
       <span className="filter-pane__title-row">
-        <span className="filter-pane__title" style={{ fontSize: pane.titleSize }}>
+        <span className="filter-pane__title" style={{ fontSize: themeFontSizeToCssPx(pane.titleSize) }}>
           <span aria-hidden="true">▽</span> Filters
         </span>
         <span className="filter-pane__title-icons" aria-hidden="true">
@@ -114,7 +115,7 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
         className="filter-pane__search"
         style={{
           backgroundColor: pane.inputBoxColor,
-          fontSize: pane.searchTextSize,
+          fontSize: themeFontSizeToCssPx(pane.searchTextSize),
           border: `1px solid ${hexWithAlpha(pane.foregroundColor, 55)}`,
         }}
       >
@@ -124,7 +125,7 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
         <span className="filter-pane__search-placeholder">Search</span>
       </span>
 
-      <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
+      <span className="filter-pane__header" style={{ fontSize: themeFontSizeToCssPx(pane.headerSize) }}>
         <span>Filters on this page</span>
         <span aria-hidden="true" title="More options">
           ⋯
@@ -180,7 +181,7 @@ export function FilterPanePreview({ globalOptions, theme }: { globalOptions: Res
         "status",
       )}
 
-      <span className="filter-pane__header" style={{ fontSize: pane.headerSize }}>
+      <span className="filter-pane__header" style={{ fontSize: themeFontSizeToCssPx(pane.headerSize) }}>
         <span>Filters on all pages</span>
         <span aria-hidden="true" title="More options">
           ⋯

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
+import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import { categoryPercent, valueFraction, type ChartLayout } from "../lib/chartLayout";
 import {
   constantLineCap,
@@ -91,7 +92,7 @@ export function textStyle(source: {
   return {
     color: source.labelColor ?? source.color,
     fontFamily: source.fontFamily || undefined,
-    fontSize: source.fontSize,
+    fontSize: themeFontSizeToCssPx(source.fontSize),
     fontWeight: source.bold ? 700 : 400,
     fontStyle: source.italic ? "italic" : "normal",
     textDecoration: source.underline ? "underline" : "none",
@@ -102,7 +103,7 @@ export function axisTitleStyle(axis: AxisStyle): CSSProperties {
   return {
     color: axis.titleColor,
     fontFamily: axis.titleFontFamily || undefined,
-    fontSize: axis.titleFontSize,
+    fontSize: themeFontSizeToCssPx(axis.titleFontSize),
     fontWeight: axis.titleBold ? 700 : 400,
     fontStyle: axis.titleItalic ? "italic" : "normal",
     textDecoration: axis.titleUnderline ? "underline" : "none",
@@ -241,7 +242,7 @@ function labelPartStyle(part: {
   return {
     color: hexWithAlpha(part.color, part.transparency),
     fontFamily: part.fontFamily || undefined,
-    fontSize: part.fontSize,
+    fontSize: themeFontSizeToCssPx(part.fontSize),
     fontWeight: part.bold ? 700 : 400,
     fontStyle: part.italic ? "italic" : "normal",
     textDecoration: part.underline ? "underline" : "none",
@@ -462,7 +463,7 @@ export function SmallMultiplesGrid({
               style={{
                 color: subheader.fontColor,
                 fontFamily: subheader.fontFamily || undefined,
-                fontSize: subheader.fontSize,
+                fontSize: themeFontSizeToCssPx(subheader.fontSize),
                 fontWeight: subheader.bold ? 700 : 400,
                 fontStyle: subheader.italic ? "italic" : "normal",
                 textDecoration: subheader.underline ? "underline" : "none",

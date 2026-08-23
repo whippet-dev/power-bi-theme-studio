@@ -1,5 +1,6 @@
 import { Fragment, type CSSProperties } from "react";
 import { hexWithAlpha } from "../../lib/colorUtils";
+import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import {
   CategoryAxisGutter,
   CategoryGridlines,
@@ -236,7 +237,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
   const y2TextStyle: CSSProperties = {
     color: y2.secLabelColor,
     fontFamily: y2.secFontFamily || undefined,
-    fontSize: y2.secFontSize,
+    fontSize: themeFontSizeToCssPx(y2.secFontSize),
     fontWeight: y2.secBold ? 700 : 400,
     fontStyle: y2.secItalic ? "italic" : "normal",
     textDecoration: y2.secUnderline ? "underline" : "none",
@@ -260,7 +261,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
       style={{
         color: y2.secTitleColor,
         fontFamily: y2.secTitleFontFamily || undefined,
-        fontSize: y2.secTitleFontSize,
+        fontSize: themeFontSizeToCssPx(y2.secTitleFontSize),
         fontWeight: y2.secTitleBold ? 700 : 400,
         fontStyle: y2.secTitleItalic ? "italic" : "normal",
         textDecoration: y2.secTitleUnderline ? "underline" : "none",
@@ -322,7 +323,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
         flexDirection: seriesLabelOnLeft ? "row-reverse" : "row",
         color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
         fontFamily: sl.seriesFontFamily || undefined,
-        fontSize: sl.textSize,
+        fontSize: themeFontSizeToCssPx(sl.textSize),
         fontWeight: sl.bold ? 700 : 400,
         fontStyle: sl.italic ? "italic" : "normal",
         textDecoration: sl.underline ? "underline" : "none",
@@ -370,7 +371,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
         top: `${pointPercent(3).top}%`,
         color: err.labelMatchSeriesColor ? lineChartStyle.dataPoint.fill : err.labelColor,
         fontFamily: err.labelFontFamily || undefined,
-        fontSize: err.labelFontSize,
+        fontSize: themeFontSizeToCssPx(err.labelFontSize),
         fontWeight: err.labelBold ? 700 : 400,
         fontStyle: err.labelItalic ? "italic" : "normal",
         textDecoration: err.labelUnderline ? "underline" : "none",

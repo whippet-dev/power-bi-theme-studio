@@ -243,18 +243,22 @@ test("reference-line data labels use smallLabel across the family", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The real private theme
+// An optional private real-world theme
 // ---------------------------------------------------------------------------
 
-const PRIVATE_THEME_PATH = `${process.env.USERPROFILE ?? ""}/Downloads/private-theme-fixture.json`;
+// Deliberately not in the repository — it belongs to someone else. Point
+// PBI_PRIVATE_THEME at a theme JSON file to run these; they skip otherwise.
+const PRIVATE_THEME_PATH =
+  process.env.PBI_PRIVATE_THEME ??
+  `${process.env.USERPROFILE ?? process.env.HOME ?? ""}/Downloads/private-theme-fixture.json`;
 const hasPrivateTheme = existsSync(PRIVATE_THEME_PATH);
 
-test("private theme + Classic: every cartesian visual uses the theme's Arial", {
-  skip: hasPrivateTheme ? false : "private fixture not present",
+test("private theme + Classic: every cartesian visual uses that theme's Arial", {
+  skip: hasPrivateTheme ? false : "private theme fixture not present",
 }, () => {
-  const privateThemeFixture = JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
+  const theme = JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
   for (const entry of CARTESIAN) {
-    const s = styleOf(entry, privateThemeFixture, "classic2026");
+    const s = styleOf(entry, theme, "classic2026");
     for (const [label, family] of MIGRATED_FAMILIES(s)) {
       assert.equal(family, "Arial", `${entry.name}: ${label}`);
     }
@@ -262,21 +266,21 @@ test("private theme + Classic: every cartesian visual uses the theme's Arial", {
   }
 });
 
-test("private theme + Fluent: the private theme's own explicit barChart values still beat Fluent's wildcard", {
-  skip: hasPrivateTheme ? false : "private fixture not present",
+test("private theme + Fluent: its own explicit barChart values still beat Fluent's wildcard", {
+  skip: hasPrivateTheme ? false : "private theme fixture not present",
 }, () => {
-  // The one legitimate asymmetry in the family. the private theme declares
+  // The one legitimate asymmetry in the family. The private theme declares
   // barChart.categoryAxis typography explicitly — Stacked Bar's schema name —
   // and a custom visualStyles value outranks a base wildcard one.
-  const privateThemeFixture = JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
-  const stacked = styleOf(CARTESIAN[1], privateThemeFixture, "fluent2");
-  assert.equal(stacked.categoryAxis.fontFamily, "Arial", "the private theme's explicit value");
+  const theme = JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
+  const stacked = styleOf(CARTESIAN[1], theme, "fluent2");
+  assert.equal(stacked.categoryAxis.fontFamily, "Arial", "its explicit value");
   assert.equal(stacked.categoryAxis.fontSize, 10);
 
   // Every other cartesian visual takes Fluent's explicit wildcard instead,
   // because the private theme declares nothing for them.
   for (const entry of [CARTESIAN[0], CARTESIAN[2], CARTESIAN[3], CARTESIAN[4]]) {
-    const s = styleOf(entry, privateThemeFixture, "fluent2");
+    const s = styleOf(entry, theme, "fluent2");
     assert.equal(s.categoryAxis.fontSize, 10.5, `${entry.name}: Fluent's value`);
     assert.ok(String(s.categoryAxis.fontFamily).startsWith("'Segoe UI'"), `${entry.name}: Fluent's family`);
   }
@@ -284,7 +288,7 @@ test("private theme + Fluent: the private theme's own explicit barChart values s
   // And the legend, which neither declares in visualStyles, falls through to
   // the private theme's text classes on all five.
   for (const entry of CARTESIAN) {
-    const s = styleOf(entry, privateThemeFixture, "fluent2");
+    const s = styleOf(entry, theme, "fluent2");
     assert.equal(s.legend.fontFamily, "Arial", `${entry.name}: legend from the text class`);
   }
 });

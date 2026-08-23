@@ -5,6 +5,7 @@ import {
   type ChartLayout,
   type Rect,
 } from "../../lib/chartLayout";
+import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import { formatValue } from "../ChartParts";
 
 /**
@@ -89,6 +90,20 @@ export type CartesianLayoutInput = {
  * an earlier `useCartesianLayout` read as a React hook while holding no
  * state and obeying none of the rules of hooks.
  */
+/**
+ * The same axis style with its font sizes in CSS pixels.
+ *
+ * Only the two the engine measures with are converted; everything else is
+ * passed through, so this cannot quietly change an unrelated field.
+ */
+function inCssPixels<T extends { fontSize: number; titleFontSize: number }>(axis: T): T {
+  return {
+    ...axis,
+    fontSize: themeFontSizeToCssPx(axis.fontSize),
+    titleFontSize: themeFontSizeToCssPx(axis.titleFontSize),
+  };
+}
+
 export function computePreviewCartesianLayout(input: CartesianLayoutInput): ChartLayout {
   const {
     box,
@@ -106,9 +121,19 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     outer: box,
     orientation,
     // The engine measures whatever title text will actually render, which
-    // is the resolved text or the renderer's fallback.
-    categoryAxis: { ...categoryAxis, titleText: String(categoryAxis.titleText) || categoryAxisTitleFallback },
-    valueAxis: { ...valueAxis, titleText: String(valueAxis.titleText) || valueAxisTitleFallback },
+    // is the resolved text or the renderer's fallback — and at the size the
+    // browser will actually draw it. `inCssPixels` converts the theme's
+    // points here, at the single measurement boundary, because a gutter
+    // sized against 10 while the label renders at 13.333 is exactly the
+    // geometry drift ChartLayout exists to prevent.
+    categoryAxis: inCssPixels({
+      ...categoryAxis,
+      titleText: String(categoryAxis.titleText) || categoryAxisTitleFallback,
+    }),
+    valueAxis: inCssPixels({
+      ...valueAxis,
+      titleText: String(valueAxis.titleText) || valueAxisTitleFallback,
+    }),
     categories,
     dataMax,
     innerPadding,
