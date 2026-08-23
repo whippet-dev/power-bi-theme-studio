@@ -961,7 +961,6 @@ button { color: inherit; }
   flex-direction: row-reverse;
 }
 
-.chart-preview--legend-side .chart-preview__plot,
 .chart-preview--legend-side .chart-preview__body {
   flex: 1;
   min-width: 0;
@@ -1121,11 +1120,10 @@ button { color: inherit; }
   gap: 0;
 }
 
-.bar-row__value--inside {
+.bar-item__value--inside {
   /* An inside label sits over the end of the bar rather than after it. */
-  margin-left: -46px;
-  position: relative;
-  z-index: 1;
+  transform: translate(-100%, -50%);
+  margin-left: -4px;
 }
 
 /* Zoom sliders sit against the axis they belong to. */
@@ -1472,17 +1470,6 @@ button { color: inherit; }
   flex-direction: column;
 }
 
-.chart-preview__body-main .chart-preview__plot {
-  margin-top: 0;
-}
-
-.chart-preview__plot {
-  margin-top: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 /* The column chart's natural chart box. Its `height: 128px` and the flex
    stack that derived the plot from it are gone: ChartLayout now computes
    the plot and both gutters, and the renderer applies them inline. The
@@ -1506,10 +1493,21 @@ button { color: inherit; }
   font-size: 9px;
 }
 
+/* A vertical chart's value axis runs up the left edge: title outermost,
+   ticks right-aligned to the plot. */
 .chart-axis-gutter--value {
   top: 0;
   left: 0;
   align-items: stretch;
+}
+
+/* A horizontal chart's value axis is the transpose — along the bottom,
+   with the ticks above the title. */
+.chart-axis-gutter--value.chart-axis-gutter--horizontal {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  flex-direction: column;
 }
 
 .chart-axis-gutter__ticks {
@@ -1527,20 +1525,82 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
+/* Transposed: along the bottom the ticks hang below the plot edge and are
+   centred on their gridline horizontally instead of vertically. */
+.chart-axis-gutter--horizontal .chart-axis-gutter__ticks span {
+  right: auto;
+  top: 4px;
+  transform: translateX(-50%);
+}
+
 .chart-axis-gutter--category {
   right: 0;
   bottom: 0;
   flex-direction: column;
 }
 
-.chart-axis-gutter--category .column-item__label {
+/* A horizontal chart's category axis runs down the left edge: title
+   outermost (rotated, as Power BI draws it), labels beside the plot. */
+.chart-axis-gutter--category.chart-axis-gutter--vertical {
+  right: auto;
+  top: 0;
+  left: 0;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* The labels' own box, mirroring .chart-axis-gutter__ticks so both gutters
+   have the same shape: an axis title in flow, and a positioned box for the
+   text that tracks the scale. */
+.chart-axis-gutter__labels {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.chart-axis-gutter__category-label {
   position: absolute;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Vertical chart: labels sit under their column, centred on its slot. */
+.chart-axis-gutter--category .chart-axis-gutter__category-label {
   top: 0;
   text-align: center;
 }
 
+/* Horizontal chart: labels sit beside their row, right-aligned to the plot
+   and vertically centred on the slot. */
+.chart-axis-gutter--vertical .chart-axis-gutter__category-label {
+  top: auto;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
 .chart-axis-gutter__title {
   margin-top: auto;
+  text-align: center;
+}
+
+/* Both gutters render their title after their labels, because that is the
+   reading order. Visually the title belongs on the OUTER edge — furthest
+   from the plot — which for a vertical chart's bottom category gutter is
+   simply "last", but for the transposed cases needs reordering:
+   a bar chart's rotated category title sits left of its labels, and its
+   value title sits below its ticks. */
+.chart-axis-gutter--vertical .chart-axis-gutter__title {
+  order: -1;
+  margin-top: 0;
+}
+
+.chart-axis-gutter--horizontal .chart-preview__axis-title {
+  order: 1;
+  margin-top: 0;
   text-align: center;
 }
 
@@ -1602,61 +1662,50 @@ button { color: inherit; }
   border-radius: 1px;
 }
 
-.column-item__label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+/* The bar chart's natural chart box, the transpose of .column-preview__plot.
+   What used to be here was `.bar-row`'s three-column CSS Grid — a 68px
+   label column, a 1fr track, a 28px value column — with the value axis
+   inset by BAR_VALUE_AXIS_INSET, a TypeScript constant hand-copied from
+   that template. Two sources of truth for one geometry, which disagreed
+   the moment a conditional child was omitted (RENDERER_AUDIT §2.2/§2.3).
+   Both are gone: ChartLayout computes the plot and gutters, and no CSS
+   here decides where data goes. */
+.bar-preview__plot {
+  position: relative;
+  margin-top: 22px;
 }
 
-.bar-row {
-  display: grid;
-  grid-template-columns: 68px minmax(80px, 1fr) 28px;
-  align-items: center;
-  gap: 8px;
+/* A bar occupies its category slot; the slot comes from scale.category, so
+   a bar cannot drift from the label naming it. */
+.bar-item {
+  position: absolute;
+  left: 0;
+  right: 0;
   color: var(--preview-muted);
   font-size: 9px;
 }
 
-/* Grid placement must not depend on which children happen to exist. Two of
-   the three are conditional: the category label is omitted when
-   categoryAxis.show is false, and the value label when label density thins
-   it out (or, on the stacked chart, when totals are off). Without explicit
-   placement the survivors auto-flow into columns 1 and 2, so hiding the
-   category axis moves the bar track into the 68px label gutter — measured
-   at 369px -> 102px — while the gridlines and BAR_VALUE_AXIS_INSET stay
-   where they were, leaving bars and axis with no overlap at all.
-   RENDERER_AUDIT.md §2.2.
-
-   Because the track column is unchanged in both states, BAR_VALUE_AXIS_INSET
-   stays correct as-is and needs no stopgap.
-
-   Interim fix — removed by ChartLayout, see RENDERER_IMPLEMENTATION_PLAN.md T8,
-   which deletes this block along with the hardcoded three-column template
-   above it. */
-.bar-row__label { grid-column: 1; }
-.bar-row__track-wrap { grid-column: 2; }
-.bar-row__value { grid-column: 3; }
-
-.bar-row__track-wrap {
-  position: relative;
-  display: block;
-}
-
-.bar-row__track {
-  display: block;
-  height: 11px;
-  overflow: hidden;
-  border-radius: 2px;
-}
-
-.bar-row__fill {
-  height: 100%;
+/* Start and length come from scale.value, never from a percentage of the
+   sample maximum. */
+.bar-item__fill {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   display: block;
   border-radius: 2px;
 }
 
-.bar-row__error {
+.bar-item__value {
+  position: absolute;
+  top: 50%;
+  transform: translate(4px, -50%);
+  white-space: nowrap;
+  color: var(--preview-fg);
+  font-weight: 650;
+  text-align: right;
+}
+
+.bar-item__error {
   position: absolute;
   top: 50%;
   width: 16px;
@@ -1664,7 +1713,7 @@ button { color: inherit; }
   pointer-events: none;
 }
 
-.bar-row__error span {
+.bar-item__error span {
   display: block;
   width: 100%;
   border-radius: 1px;
@@ -1724,12 +1773,6 @@ button { color: inherit; }
   justify-content: space-between;
   color: var(--preview-muted);
   font-size: 9px;
-}
-
-.bar-row__value {
-  color: var(--preview-fg);
-  font-weight: 650;
-  text-align: right;
 }
 
 .table-preview__row {

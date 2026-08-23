@@ -796,31 +796,45 @@ export function CategoryAxisGutter({
   return (
     <span
       className={`chart-axis-gutter chart-axis-gutter--category${vertical ? "" : " chart-axis-gutter--vertical"}`}
+      // [T8] The horizontal branch used to say `top: offset`, which pushed
+      // the gutter DOWN by the value axis's height instead of stopping it
+      // short of it. Both gutters stop short of the other one, so both take
+      // `bottom` — the vertical branch already did. Found by the Bar pair
+      // becoming the horizontal branch's first consumer.
       style={
         vertical
           ? { height: layout.categoryAxis.height, left: offset }
-          : { width: layout.categoryAxis.width, top: offset }
+          : { width: layout.categoryAxis.width, bottom: offset }
       }
     >
-      {categories.map((label, index) => {
-        const slot = categoryPercent(layout, index, categories.length);
-        return (
-          <span
-            className="column-item__label"
-            key={label}
-            style={{
-              ...textStyle(axis),
-              ...(vertical
-                ? { left: `${slot.offset}%`, width: `${slot.size}%` }
-                : { top: `${slot.offset}%`, height: `${slot.size}%` }),
-            }}
-          >
-            {label}
-          </span>
-        );
-      })}
+      {/* Labels sit in their own box, exactly as the value gutter's ticks
+          do, so the axis title can be a flow sibling that takes the outer
+          edge and the labels get the rest. The two gutters are transposes
+          of each other and their markup should be too. */}
+      <span className="chart-axis-gutter__labels">
+        {categories.map((label, index) => {
+          const slot = categoryPercent(layout, index, categories.length);
+          return (
+            <span
+              className="chart-axis-gutter__category-label"
+              key={label}
+              style={{
+                ...textStyle(axis),
+                ...(vertical
+                  ? { left: `${slot.offset}%`, width: `${slot.size}%` }
+                  : { top: `${slot.offset}%`, height: `${slot.size}%` }),
+              }}
+            >
+              {label}
+            </span>
+          );
+        })}
+      </span>
       {axis.showAxisTitle && (
-        <span className="chart-preview__axis-title chart-axis-gutter__title" style={axisTitleStyle(axis)}>
+        <span
+          className={`chart-preview__axis-title chart-axis-gutter__title${vertical ? "" : " chart-preview__axis-title--rotated"}`}
+          style={axisTitleStyle(axis)}
+        >
           {String(axis.titleText) || titleFallback}
         </span>
       )}

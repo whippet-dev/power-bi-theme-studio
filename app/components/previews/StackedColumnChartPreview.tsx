@@ -13,6 +13,7 @@ import {
 } from "../ChartParts";
 import { BAR_DATA_MAX, barCategories, stackedSegmentColor, stackedSegmentShare } from "../../lib/previewSampleData";
 import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { barThickness } from "./chartPrimitives";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
 type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[] };
@@ -123,7 +124,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
                       style={{
                         bottom: `${bottom}%`,
                         height: `${height}%`,
-                        width: barThicknessPercent(stackedColumnChartStyle.layout.stackedGapSize),
+                        width: barThickness(stackedColumnChartStyle.layout.stackedGapSize),
                         opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
                         // The 62% split stays exactly as it was: a known
                         // fiction (RENDERER_AUDIT §4.2), and sample-data work
@@ -169,10 +170,4 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
       {stackedColumnLegendAtBottom && stackedColumnLegendNode}
     </span>
   );
-}
-
-/** Bar thickness as a share of its category slot, matching the old helper. */
-function barThicknessPercent(gapSize: number): string {
-  const gap = Math.max(0, Math.min(90, gapSize || 20));
-  return `${100 - gap}%`;
 }

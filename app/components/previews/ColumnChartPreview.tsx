@@ -13,6 +13,7 @@ import {
 } from "../ChartParts";
 import { BAR_DATA_MAX, barCategories } from "../../lib/previewSampleData";
 import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { barThickness } from "./chartPrimitives";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
 type Props = { columnChartStyle: ResolvedColumnChartStyle };
@@ -117,7 +118,7 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
                       style={{
                         bottom: `${bottom}%`,
                         height: `${height}%`,
-                        width: barThicknessPercent(columnChartStyle.layout.clusteredGapSize),
+                        width: barThickness(columnChartStyle.layout.clusteredGapSize),
                         backgroundColor: hexWithAlpha(columnChartStyle.dataPoint.fill, columnChartStyle.dataPoint.fillTransparency),
                         border: columnChartStyle.dataPoint.borderShow
                           ? `${columnChartStyle.dataPoint.borderSize}px solid ${columnChartStyle.dataPoint.borderColor}`
@@ -158,10 +159,4 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
       {columnLegendAtBottom && columnLegendNode}
     </span>
   );
-}
-
-/** Bar thickness as a share of its category slot, matching the old helper. */
-function barThicknessPercent(gapSize: number): string {
-  const gap = Math.max(0, Math.min(90, gapSize || 20));
-  return `${100 - gap}%`;
 }

@@ -34,7 +34,12 @@ export const barCategories: ReadonlyArray<readonly [string, number]> = [
  */
 export const barCategoriesMax = Math.max(...barCategories.map(([, value]) => value));
 
-export const barPercent = (value: number): number => (value / barCategoriesMax) * 100;
+/**
+ * `barPercent` used to live here: value / sample-maximum as a percentage.
+ * Every chart that used it now measures from the axis range through
+ * `ChartLayout.scale.value`, which is why pinning a range moves the marks
+ * instead of only the tick labels. Removed in T8 with its last consumer.
+ */
 
 /**
  * The value-axis maximum every bar and column chart labels its ticks

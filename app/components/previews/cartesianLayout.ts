@@ -39,6 +39,19 @@ import { formatValue } from "../ChartParts";
  */
 export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
 
+/**
+ * The bar chart's natural chart box. Replaces a coordinate system that was
+ * never really a box at all: `.bar-row`'s `grid-template-columns: 68px
+ * minmax(80px,1fr) 28px`, with the value axis inset by a TypeScript
+ * constant hand-copied from it (RENDERER_AUDIT §2.3).
+ *
+ * 84 rather than the column chart's 128 because a bar chart's four rows
+ * read across, not up: the old layout gave them ~57px of plot, and this
+ * keeps the visual footprint close while letting the engine own the
+ * gutters. Width is nominal, as above.
+ */
+export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 84 };
+
 export type CartesianLayoutInput = {
   box: Rect;
   orientation: CartesianOrientation;

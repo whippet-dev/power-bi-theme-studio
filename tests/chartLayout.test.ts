@@ -599,3 +599,31 @@ test("the layout reports the orientation it was computed for", () => {
   assert.equal(layout({ orientation: "vertical" }).orientation, "vertical");
   assert.equal(layout({ orientation: "horizontal" }).orientation, "horizontal");
 });
+
+test("the plot starts after the category gutter and ends before the value gutter", () => {
+  // [T8] Written after a wrong assumption cost a bug. Bands are subtracted
+  // from a shrinking remainder in a fixed order, so whichever gutter is
+  // taken FIRST also claims the corner where the two meet: for a vertical
+  // chart the value gutter runs the full height, for a horizontal one the
+  // value gutter runs the full width. Renderers trim it back with their
+  // `offset` prop so the corner stays empty, which is what a real chart
+  // looks like.
+  //
+  // The invariant that actually holds either way is about the PLOT's edges,
+  // and it is the one CategoryAxisGutter's horizontal branch violated by
+  // offsetting with `top` instead of `bottom`.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const l = layout({ orientation });
+    const cat = l.categoryAxis!;
+    const val = l.valueAxis!;
+    if (orientation === "vertical") {
+      // Value axis down the left, category axis along the bottom.
+      assert.ok(near(l.plot.x, val.x + val.width), "vertical: plot starts after the value gutter");
+      assert.ok(near(l.plot.y + l.plot.height, cat.y), "vertical: plot ends where the category gutter begins");
+    } else {
+      // The transpose: category axis down the left, value axis along the bottom.
+      assert.ok(near(l.plot.x, cat.x + cat.width), "horizontal: plot starts after the category gutter");
+      assert.ok(near(l.plot.y + l.plot.height, val.y), "horizontal: plot ends where the value gutter begins");
+    }
+  }
+});
