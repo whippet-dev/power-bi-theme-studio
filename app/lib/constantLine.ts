@@ -190,45 +190,97 @@ export function constantLineLabelText(
 }
 
 /**
- * The SVG dash pattern for a line, in pixels.
+ * The built-in patterns for the named line styles, in pixels.
  *
- * Returns undefined for a solid line, which is what `stroke-dasharray`
- * wants for "no dashes" — an empty string would also work but undefined
- * keeps the attribute off the element entirely.
+ * Representative rather than measured: Power BI documents Solid, Dashed,
+ * Dotted and Custom as four distinct styles but does not publish the exact
+ * pattern behind the named three. These read correctly as dashed and dotted
+ * at preview scale, which is what a formatting preview needs; the
+ * relationship to Power BI's own pattern is approximate.
+ */
+const NAMED_DASH_PATTERNS: Readonly<Record<string, readonly number[]>> = {
+  dashed: [6, 4],
+  dotted: [1.5, 3],
+};
+
+/**
+ * A user-supplied dash array, or null when it is not a pattern we can draw.
  *
- * A custom `dashArray` is honoured verbatim rather than being collapsed
- * back to a generic dashed line: the schema documents it as
- * "space-separated values for dash and gap lengths in pixels", and a theme
- * author who wrote one wants to see that pattern, not an approximation of
- * it. It also wins over `style` when both are set, matching how the same
- * pair is treated elsewhere in the app.
+ * Rejects the whole list if any entry is negative or unparseable, rather than
+ * dropping the bad entries and emitting the rest. That follows SVG's own rule
+ * — a dash array containing a negative value is in error and the stroke is
+ * rendered as if none had been specified — and it is the safer reading of a
+ * half-typed value: showing a pattern the author did not write would be worse
+ * than showing none.
+ *
+ * Zeros are kept. SVG allows them and they are load-bearing: `0 6` with round
+ * caps is how a dotted run is built, and dash-dot patterns use them too. An
+ * all-zero list is the one exception, since SVG renders that as a solid line.
+ *
+ * Whitespace and commas both separate, matching what the editor's text field
+ * accepts.
+ */
+function parseDashArray(raw: string | number | undefined): number[] | null {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+  const parts = text.split(/[\s,]+/).map(Number);
+  if (parts.some((length) => !Number.isFinite(length) || length < 0)) return null;
+  return parts;
+}
+
+/**
+ * The SVG dash pattern for a line, in pixels, or undefined for a solid one.
+ *
+ * **`style` is the controlling property.** Solid, Dashed, Dotted and Custom are
+ * four distinct styles, and `dashArray` is the pattern belonging to Custom —
+ * not an override that applies to all four. A theme legitimately keeps values
+ * for properties that are not currently active, so a `dashArray` left behind
+ * from an earlier Custom setting must not turn a Solid line dashed. The
+ * preview obeys the style the user selected and reads the sibling properties
+ * only when that style is the one they belong to.
+ *
+ * A Custom style with no usable dash array has no pattern to draw, so it
+ * renders solid. It deliberately does not fall back to the named Dashed
+ * pattern: inventing a pattern the author never wrote would misrepresent the
+ * theme, and an empty custom pattern is genuinely empty.
  *
  * `autoScale` — "automatically adjust the spacing between dashes and dots
- * based on line width" — multiplies every length by the line width, so a
- * thick dashed line gets proportionally longer dashes instead of a dense
- * scribble. Without it the pattern is in absolute pixels.
+ * based on line width" — multiplies every length by the line width, so a thick
+ * patterned line gets proportionally longer dashes instead of a dense
+ * scribble. It applies to whichever pattern is active, named or custom, and
+ * has nothing to scale on a solid line.
  */
 export function constantLineDashArray(line: ConstantLineStyle): string | undefined {
-  const custom = String(line.dashArray ?? "").trim();
   const style = String(line.style).toLowerCase();
+  if (style === "solid") return undefined;
 
-  const pattern = custom
-    ? custom.split(/[\s,]+/).map(Number).filter(Number.isFinite)
-    : style === "dashed"
-      ? [6, 4]
-      : style === "dotted"
-        ? [1.5, 3]
-        : [];
+  const pattern = style === "custom" ? parseDashArray(line.dashArray) : NAMED_DASH_PATTERNS[style];
+  // An unrecognised style has no pattern either, so it draws solid rather
+  // than falling through to whatever a sibling property happens to hold.
+  if (!pattern || pattern.length === 0) return undefined;
+  if (pattern.every((length) => length === 0)) return undefined;
 
-  if (pattern.length === 0) return undefined;
   if (!line.autoScale) return pattern.join(" ");
-
   const scale = Math.max(1, Number(line.width) || 1);
   return pattern.map((length) => Number((length * scale).toFixed(3))).join(" ");
 }
 
-/** `dashCap` in SVG's vocabulary. "none" is a flat cap, i.e. butt. */
+/**
+ * The visible line cap.
+ *
+ * `dashCap` is a Custom-pattern option, so it is read only when Custom is the
+ * selected style — the same stale-sibling rule as `dashArray`. Letting a
+ * leftover "Round" reshape a named Dashed line would be the same defect in a
+ * different property.
+ *
+ * The named styles use a flat cap. That is a stable representative default
+ * rather than an observed one: Power BI does not document a cap for Solid,
+ * Dashed or Dotted, and this preview has no way to measure it, so recording it
+ * as approximate is more honest than pretending the Custom setting carries
+ * over.
+ */
 export function constantLineCap(line: ConstantLineStyle): "butt" | "round" | "square" {
+  if (String(line.style).toLowerCase() !== "custom") return "butt";
   const cap = String(line.dashCap).toLowerCase();
   if (cap === "round") return "round";
   if (cap === "square") return "square";

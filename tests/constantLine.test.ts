@@ -281,37 +281,85 @@ test("the label uses the chart's own formatter, so units and precision agree", (
 // Dash pattern
 // ---------------------------------------------------------------------------
 
-test("named line styles produce dash patterns, and solid produces none", () => {
+test("named line styles produce their built-in patterns, and solid produces none", () => {
   assert.equal(constantLineDashArray(line({ style: "solid" })), undefined);
   assert.equal(constantLineDashArray(line({ style: "dashed" })), "6 4");
   assert.equal(constantLineDashArray(line({ style: "dotted" })), "1.5 3");
-  // "custom" with nothing custom set has no pattern to draw.
-  assert.equal(constantLineDashArray(line({ style: "custom" })), undefined);
+  // An unrecognised style draws solid rather than falling through to a sibling.
+  assert.equal(constantLineDashArray(line({ style: "" })), undefined);
 });
 
-test("a custom dash array is honoured verbatim, not collapsed to dashed", () => {
+test("style is the controlling property: SOLID ignores stale custom state", () => {
+  // The defect this guards: a theme keeps values for properties that are not
+  // currently active. A dashArray left behind from an earlier Custom setting
+  // must not turn the selected Solid style into a dashed line.
+  const stale = line({ style: "solid", dashArray: "4 2", autoScale: true, dashCap: "round", width: 4 });
+  assert.equal(constantLineDashArray(stale), undefined, "solid must stay solid");
+  assert.equal(constantLineCap(stale), "butt", "a stale custom cap must not apply to solid");
+});
+
+test("style is the controlling property: DASHED ignores a stale dashArray", () => {
+  const stale = line({ style: "dashed", dashArray: "10 1", dashCap: "round" });
+  assert.equal(constantLineDashArray(stale), "6 4", "the built-in dashed pattern wins");
+  assert.equal(constantLineCap(stale), "butt", "a stale custom cap must not reshape named dashed");
+});
+
+test("style is the controlling property: DOTTED ignores a stale dashArray", () => {
+  const stale = line({ style: "dotted", dashArray: "10 1", dashCap: "square" });
+  assert.equal(constantLineDashArray(stale), "1.5 3", "the built-in dotted pattern wins");
+  assert.equal(constantLineCap(stale), "butt", "a stale custom cap must not reshape named dotted");
+});
+
+test("CUSTOM is the only style that reads dashArray and dashCap", () => {
   assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "4 2 1 2" })), "4 2 1 2");
-  // It wins over the named style, and tolerates commas and loose spacing.
-  assert.equal(constantLineDashArray(line({ style: "dotted", dashArray: "10 5" })), "10 5");
+  assert.equal(constantLineCap(line({ style: "custom", dashCap: "round" })), "round");
+  assert.equal(constantLineCap(line({ style: "custom", dashCap: "square" })), "square");
+  assert.equal(constantLineCap(line({ style: "custom", dashCap: "none" })), "butt");
+  // Commas and loose spacing are separators, as in the editor's text field.
   assert.equal(constantLineDashArray(line({ style: "custom", dashArray: " 4,2 , 1 " })), "4 2 1");
-  // Garbage is dropped rather than emitted as NaN into the attribute.
-  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "abc" })), undefined);
 });
 
-test("autoScale scales the pattern with the line width", () => {
+test("a custom style with no usable pattern renders solid, not generic dashed", () => {
+  // Substituting the named Dashed pattern would show the author a pattern they
+  // never wrote. An empty custom pattern is genuinely empty.
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "" })), undefined);
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "   " })), undefined);
+});
+
+test("an invalid dash array is rejected whole, never emitted as invalid SVG", () => {
+  // SVG's own rule: a list containing a negative value is in error and the
+  // stroke renders as if none were specified. Emitting the survivors would
+  // draw a pattern the author did not write.
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "4 -2" })), undefined);
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "-4" })), undefined);
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "4 2 -1 2" })), undefined);
+  // Unparseable entries are rejected the same way, whole rather than filtered.
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "abc" })), undefined);
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "4 abc 2" })), undefined);
+});
+
+test("zeros survive the parser, because SVG patterns use them", () => {
+  // `0 6` with round caps is how a dotted run is built, and dash-dot patterns
+  // rely on zero-length dashes too, so dropping them would break real input.
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "0 6" })), "0 6");
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "6 3 0 3" })), "6 3 0 3");
+  // All-zero is the exception: SVG renders that as a solid line.
+  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "0 0" })), undefined);
+});
+
+test("autoScale scales whichever pattern is active, and solid has none to scale", () => {
   assert.equal(constantLineDashArray(line({ style: "dashed", width: 3, autoScale: true })), "18 12");
-  assert.equal(constantLineDashArray(line({ style: "custom", dashArray: "4 2", width: 2, autoScale: true })), "8 4");
+  assert.equal(constantLineDashArray(line({ style: "dotted", width: 2, autoScale: true })), "3 6");
+  assert.equal(
+    constantLineDashArray(line({ style: "custom", dashArray: "4 2 1 2", width: 4, autoScale: true })),
+    "16 8 4 8",
+  );
   // Off, the pattern is the absolute pixel lengths the schema describes.
   assert.equal(constantLineDashArray(line({ style: "dashed", width: 3, autoScale: false })), "6 4");
   // A hairline must not shrink the pattern to nothing.
   assert.equal(constantLineDashArray(line({ style: "dashed", width: 0, autoScale: true })), "6 4");
-});
-
-test("dashCap maps onto SVG's caps, with flat as the default", () => {
-  assert.equal(constantLineCap(line({ dashCap: "none" })), "butt");
-  assert.equal(constantLineCap(line({ dashCap: "round" })), "round");
-  assert.equal(constantLineCap(line({ dashCap: "square" })), "square");
-  assert.equal(constantLineCap(line({ dashCap: "" })), "butt");
+  // And there is nothing to scale on a solid line, stale autoScale or not.
+  assert.equal(constantLineDashArray(line({ style: "solid", width: 4, autoScale: true })), undefined);
 });
 
 // ---------------------------------------------------------------------------

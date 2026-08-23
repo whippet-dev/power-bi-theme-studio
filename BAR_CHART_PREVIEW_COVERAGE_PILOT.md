@@ -160,15 +160,34 @@ so it moved from gap to represented and the 65% lie is already gone:
 
 `autoScale` was reclassified from non-previewable to represented. "Automatically
 adjust the spacing between dashes and dots based on line width" is a visible
-difference, not an engine behaviour: the dash pattern is multiplied by the line
-width, so a thick dashed line gets proportionally longer dashes instead of a dense
-scribble. Verified at width 4 — `4 2 1 2` becomes `16 8 4 8`.
+difference, not an engine behaviour: whichever pattern is active is multiplied by
+the line width, so a thick patterned line gets proportionally longer dashes
+instead of a dense scribble. Verified at width 4 — Custom `4 2 1 2` becomes
+`16 8 4 8`, and named Dashed `6 4` becomes `24 16`. It has nothing to scale on a
+Solid line.
+
+**Some of these 23 are conditional, which is normal Power BI formatting
+behaviour and not a weaker result.** `style` is the controlling property, and
+Solid / Dashed / Dotted / Custom are four distinct styles rather than one style
+plus overrides. `dashArray` and `dashCap` belong to Custom and are read only when
+Custom is selected. A theme legitimately retains values for properties that are
+not currently active, so a `dashArray` left behind from an earlier Custom setting
+must not turn a Solid line dashed — the preview obeys the selected style rather
+than letting a stale sibling win. `autoScale` applies to Dashed, Dotted and
+Custom. Conditional activation is still representation: each property visibly
+does what it does, under the conditions where Power BI exposes it.
+
+One relationship is recorded as **approximate**: the cap used for the named
+Dashed and Dotted styles. Power BI does not document a cap for them and this
+preview cannot measure it, so they use a stable flat cap. Carrying the Custom
+`dashCap` over to them would have been a guess dressed as fidelity.
 
 Geometry comes from `layout.scale.value` alone. Shading, the label and the line
 share one coordinate, `position` selects a real DOM paint slot rather than an
-opacity trick, and `dashArray`/`dashCap` are honoured exactly because the line is
-drawn as SVG rather than a CSS border. See `app/lib/constantLine.ts` for the pure
-half and `ConstantLine` in `ChartParts.tsx` for the drawing half.
+opacity trick, and `dashArray`/`dashCap` are honoured exactly — when Custom is
+active — because the line is drawn as SVG rather than a CSS border. See
+`app/lib/constantLine.ts` for the pure half and `ConstantLine` in `ChartParts.tsx`
+for the drawing half.
 
 **Still open.** `xAxisReferenceLine` (23) and `y1AxisReferenceLine` (23) remain at
 **zero** references, so constant lines still account for **46 of the 111** gap
