@@ -1545,6 +1545,26 @@ button { color: inherit; }
   font-size: 9px;
 }
 
+/* Grid placement must not depend on which children happen to exist. Two of
+   the three are conditional: the category label is omitted when
+   categoryAxis.show is false, and the value label when label density thins
+   it out (or, on the stacked chart, when totals are off). Without explicit
+   placement the survivors auto-flow into columns 1 and 2, so hiding the
+   category axis moves the bar track into the 68px label gutter — measured
+   at 369px -> 102px — while the gridlines and BAR_VALUE_AXIS_INSET stay
+   where they were, leaving bars and axis with no overlap at all.
+   RENDERER_AUDIT.md §2.2.
+
+   Because the track column is unchanged in both states, BAR_VALUE_AXIS_INSET
+   stays correct as-is and needs no stopgap.
+
+   Interim fix — removed by ChartLayout, see RENDERER_IMPLEMENTATION_PLAN.md T8,
+   which deletes this block along with the hardcoded three-column template
+   above it. */
+.bar-row__label { grid-column: 1; }
+.bar-row__track-wrap { grid-column: 2; }
+.bar-row__value { grid-column: 3; }
+
 .bar-row__track-wrap {
   position: relative;
   display: block;
