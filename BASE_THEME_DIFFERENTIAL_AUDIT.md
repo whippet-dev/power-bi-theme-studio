@@ -497,6 +497,13 @@ fallbacks overall, and **72 `fontFamily` properties falling back to `""`**.
 54 of the 66 are in the five cartesian charts. **This is a general
 generated-registry issue**, not one bad value.
 
+> **Update — phase 2 tasks 3 and 4.** 30 of the 66 now resolve through a
+> text class instead of the literal. The 36 that remain are 24 in the
+> cartesian registries (data-label titles and details, error-bar labels,
+> small-multiple sub-headers, stacked totals, Line's secondary axis) and 12
+> in Matrix, Pie, Slicer and Card. None of the 36 has an established Power
+> BI text role, so none was guessed — see `PHASE_2_BACKLOG.md`.
+
 ---
 
 ## 12. Classification table
