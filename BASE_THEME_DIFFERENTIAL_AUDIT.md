@@ -184,6 +184,93 @@ The private fixture happens to declare several secondary classes explicitly, so
 it does not exercise the derivation path on its own — which is precisely why
 the implementation cannot be validated against this fixture alone.
 
+### 4.2 The derivation rules, from Power BI's own implementation
+
+**Confirmed by phase 2 task 3**, and no longer inferred. The installed
+Power BI Desktop carries the function its own assertion string names
+`visualStyle > applyTextClassDefaults`, in
+`bin/WebView2Resources/minerva/scripts/desktop.min.js` — the same install
+the base themes in `themes/base/` came from. Its table:
+
+| Class | Derives from | Size scale | Colour | Weight |
+|---|---|---|---|---|
+| `lightLabel` | `label` | — | `foregroundNeutralSecondary` | — |
+| `smallLabel` | `label` | **× 0.9** | primary's | — |
+| `smallLightLabel` | `label` | **× 0.9** | `foregroundNeutralSecondary` | — |
+| `largeLabel` | `label` | × 1.2 | primary's | — |
+| `largeLightLabel` | `label` | × 1.2 | `foregroundNeutralSecondary` | — |
+| `boldLabel` | `label` | — | primary's | bold |
+| `semiboldLabel` | `label` | — | primary's | semibold |
+| `smallDataLabel` | `label` | × 0.9 | first data colour | — |
+| `largeTitle` | `title` | **× 7/6** | primary's | — |
+| `dataTitle` | `title` | — | first data colour | — |
+
+Four details that a reasonable guess would have got wrong:
+
+1. **The scale is a factor applied to whatever the primary is**, not a
+   fixed size. A theme with `label.fontSize = 14` gets `smallLabel` 12.6,
+   not 9. Power BI rounds to one decimal:
+   `Math.round(size * scale * 10) / 10`.
+2. **A light class's colour is `foregroundNeutralSecondary`, not a
+   transformation of the primary's colour** — and it wins over the
+   primary, because Power BI passes it as the argument checked first.
+3. **`lightLabel` has no size scale at all.** Only the small/large classes
+   scale.
+4. **Derivation is per field, not per object.** A secondary declaring only
+   a colour still takes its size and face from the primary.
+
+Independently corroborated by the private theme, authored against Classic 2026
+and hard-coding the values this table produces: `largeLabel` 12 = label 10
+× 1.2, `largeTitle` 14 = title 12 × 7/6, and `lightLabel.color` `#605E5C`
+= Classic 2026's `foregroundNeutralSecondary` exactly.
+
+The same bundle also expands a primary's `fontFace` through an alias table
+(`Segoe UI` → `'Segoe UI', wf_segoe-ui_normal, helvetica, arial,
+sans-serif`, which is what Fluent 2's `visualStyles` carries). Only the
+four primaries are expanded; secondaries inherit the expanded string. The
+pilot does **not** implement this — the full table was not extracted, and a
+partial one would be a guess. Recorded as an open detail.
+
+### 4.3 Pilot result — Clustered Bar, private theme + Classic 2026
+
+Typography, before and after wiring text classes into the Clustered Bar
+resolver only:
+
+| | Before | After |
+|---|---|---|
+| Category axis label | 6px, no family, `#0B0C0C` | **10px Arial `#605E5C`** |
+| Value axis label | 6px, no family | **10px Arial `#605E5C`** |
+| Axis titles | 6px, no family | **12px Arial `#252423`** |
+| Legend | 6px, no family | **10px Arial `#605E5C`** |
+| Data labels | 6px, no family | **10px Arial** |
+
+The geometry consequence the audit predicted, measured. Nothing was
+resized to compensate:
+
+| | Before | After | Δ |
+|---|---:|---:|---:|
+| Category gutter width | 67.64 | 112.78 | **+45.14** |
+| Plot width | 487.36 | 442.22 | **−45.14** |
+| Value gutter height | 30.28 | 50.53 | **+20.25** |
+| Plot height | 95.72 | 75.47 | **−20.25** |
+| Category slot | 22.5% | 22.5% | unchanged |
+| Bar fill height | 19.3594 | 15.2578 | −4.10 |
+
+Conservation is still exact in both axes. The plot shrinking is the
+correct consequence of honest typography, not a regression — and it is the
+input the natural-box task needs: `BAR_CHART_BOX.height = 84` was sized
+against 6px axis text and now has 20.25px less to give.
+
+**Rasterisation baseline after the change** (§5's defect is untouched):
+
+| Fixture | Fill CSS height | Rect height | Snapped | Spread |
+|---|---|---|---|---|
+| private theme + Classic | 10.1719px | 15.2578 | 15, 15, 15, 15 | **0** |
+| private theme + Fluent | 5.79688px | 8.6953 | 9, 9, **8**, 9 | 1 |
+
+Classic's thicker bars now absorb the 1px error; Fluent's are unchanged.
+The defect is neither fixed nor worsened.
+
 A secondary units question, flagged not resolved: Power BI theme JSON expresses
 font size in **points**, and the preview applies the number directly as CSS
 `px`. Fluent's `10.5` renders as `10.5px`, where 10.5pt is 14px. That is a

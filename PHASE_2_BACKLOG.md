@@ -29,3 +29,16 @@ renderer's clothes, and mixing them into a geometry task confounds both.
   no typed-input path, so every numeric property must invent min/max even when the
   schema has none. 51 properties currently share the generator's `-1000..1000`
   fallback, several of them nonsensically.
+
+
+## Text-class inheritance (task 3)
+
+| Item | Status |
+|---|---|
+| Text-class resolver (`app/lib/textClasses.ts`) | **Done.** Derivation transcribed from Power BI's own `applyTextClassDefaults`; see `BASE_THEME_DIFFERENTIAL_AUDIT.md` §4.2 |
+| Clustered Bar pilot | **Done.** 13 typography properties now fall back to a text class instead of `6` / `""` |
+| Remaining registries | **Open.** Stacked Bar, Clustered Column, Stacked Column, Line, Table, Matrix, Slicer, Pie, Card still use literals — 53 of the 66 `fontSize → 6` fallbacks. Migrate once the pilot is accepted |
+| Font-face alias expansion | **Open.** Power BI expands a primary's `fontFace` through an alias table; the table was not extracted, so the pilot passes the name through verbatim |
+| pt → px conversion | **Open, still separate.** Theme font sizes are points; the renderer uses the number as CSS px. Deliberately untouched so this task isolated inheritance from units |
+| Natural-box sizing | **Open, now unblocked.** Fixing typography cost the Bar plot 20.25px of height. `BAR_CHART_BOX` needs revisiting *after* inheritance, not before |
+| Rasterisation remediation | **Open, unresolved.** Diagnosed in task 2, no solution selected. Untouched by the pilot |

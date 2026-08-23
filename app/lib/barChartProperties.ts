@@ -9,6 +9,7 @@ import {
   textProp,
   isGroupSetBy,
 } from "./properties";
+import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -753,6 +754,27 @@ export type ResolvedBarChartStyle = {
  */
 export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedBarChartStyle {
   const p = BAR_CHART_PROPERTIES;
+  /**
+   * Power BI's text-class defaults for the roles this visual has.
+   *
+   * These stand in for the literal fallbacks (`6`, `""`) that
+   * BASE_THEME_DIFFERENTIAL_AUDIT.md found in every typography property.
+   * They are the LAST resort, not an override: `resolvePropertyValue`
+   * still walks custom-visual, custom-wildcard, base-visual, base-wildcard
+   * first, so an explicit `visualStyles` value — Fluent 2's
+   * `categoryAxis.fontSize: 10.5`, say — continues to win exactly as
+   * before. Only a property no layer declares reaches a text class.
+   *
+   * Clustered Bar is the pilot; the other registries still use literals
+   * until this is accepted (PHASE_2_BACKLOG.md).
+   */
+  const categoryAxisLabelText = resolveTextRole(theme, "categoryAxisLabel");
+  const categoryAxisTitleText = resolveTextRole(theme, "categoryAxisTitle");
+  const valueAxisLabelText = resolveTextRole(theme, "valueAxisLabel");
+  const valueAxisTitleText = resolveTextRole(theme, "valueAxisTitle");
+  const legendText = resolveTextRole(theme, "legendText");
+  const dataLabelText = resolveTextRole(theme, "dataLabel");
+  const referenceLineLabelText = resolveTextRole(theme, "referenceLineLabel");
   return {
     usesSmallMultiples: isGroupSetBy(theme, "clusteredBarChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
@@ -772,8 +794,8 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       bold: resolvePropertyValue(theme, p.categoryAxis.bold, false),
       concatenateLabels: resolvePropertyValue(theme, p.categoryAxis.concatenateLabels, false),
       end: resolvePropertyValue(theme, p.categoryAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.categoryAxis.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.categoryAxis.fontFamily, categoryAxisLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, categoryAxisLabelText.fontSize),
       gridlineAutoScale: resolvePropertyValue(theme, p.categoryAxis.gridlineAutoScale, false),
       gridlineColor: resolvePropertyValue(theme, p.categoryAxis.gridlineColor, "#E3E3E3"),
       gridlineDashArray: resolvePropertyValue(theme, p.categoryAxis.gridlineDashArray, ""),
@@ -785,7 +807,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       innerPadding: resolvePropertyValue(theme, p.categoryAxis.innerPadding, 10),
       invertAxis: resolvePropertyValue(theme, p.categoryAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.categoryAxis.italic, false),
-      labelColor: resolvePropertyValue(theme, p.categoryAxis.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.categoryAxis.labelColor, categoryAxisLabelText.color),
       labelDisplayUnits: resolvePropertyValue(theme, p.categoryAxis.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.categoryAxis.labelPrecision, 0),
       logAxisScale: resolvePropertyValue(theme, p.categoryAxis.logAxisScale, false),
@@ -797,9 +819,9 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       start: resolvePropertyValue(theme, p.categoryAxis.start, ""),
       switchAxisPosition: resolvePropertyValue(theme, p.categoryAxis.switchAxisPosition, false),
       titleBold: resolvePropertyValue(theme, p.categoryAxis.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.categoryAxis.titleColor, base.foreground),
-      titleFontFamily: resolvePropertyValue(theme, p.categoryAxis.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.categoryAxis.titleFontSize, 6),
+      titleColor: resolvePropertyValue(theme, p.categoryAxis.titleColor, categoryAxisTitleText.color),
+      titleFontFamily: resolvePropertyValue(theme, p.categoryAxis.titleFontFamily, categoryAxisTitleText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.categoryAxis.titleFontSize, categoryAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.categoryAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.categoryAxis.titleText, ""),
       titleUnderline: resolvePropertyValue(theme, p.categoryAxis.titleUnderline, false),
@@ -809,8 +831,8 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       axisStyle: resolvePropertyValue(theme, p.valueAxis.axisStyle, "showTitleOnly"),
       bold: resolvePropertyValue(theme, p.valueAxis.bold, false),
       end: resolvePropertyValue(theme, p.valueAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.valueAxis.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.valueAxis.fontFamily, valueAxisLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
       gridlineAutoScale: resolvePropertyValue(theme, p.valueAxis.gridlineAutoScale, false),
       gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
       gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
@@ -823,7 +845,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
       invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.valueAxis.italic, false),
-      labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, valueAxisLabelText.color),
       labelDisplayUnits: resolvePropertyValue(theme, p.valueAxis.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.valueAxis.labelPrecision, 0),
       logAxisScale: resolvePropertyValue(theme, p.valueAxis.logAxisScale, false),
@@ -835,9 +857,9 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       start: resolvePropertyValue(theme, p.valueAxis.start, ""),
       switchAxisPosition: resolvePropertyValue(theme, p.valueAxis.switchAxisPosition, false),
       titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, base.foreground),
-      titleFontFamily: resolvePropertyValue(theme, p.valueAxis.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, 6),
+      titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, valueAxisTitleText.color),
+      titleFontFamily: resolvePropertyValue(theme, p.valueAxis.titleFontFamily, valueAxisTitleText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, valueAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.valueAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.valueAxis.titleText, ""),
       titleUnderline: resolvePropertyValue(theme, p.valueAxis.titleUnderline, false),
@@ -845,10 +867,10 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
     },
     legend: {
       bold: resolvePropertyValue(theme, p.legend.bold, false),
-      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.legend.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, legendText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.legend.fontSize, legendText.fontSize),
       italic: resolvePropertyValue(theme, p.legend.italic, false),
-      labelColor: resolvePropertyValue(theme, p.legend.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.legend.labelColor, legendText.color),
       position: resolvePropertyValue(theme, p.legend.position, "Top"),
       show: resolvePropertyValue(theme, p.legend.show, true),
       // Verified against themes/base/classic2026.json's clusteredBarChart override.
@@ -881,8 +903,8 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       // The value is a data label's default content; title and detail are
       // additions to it, not replacements for it.
       enableValueDataLabel: resolvePropertyValue(theme, p.labels.enableValueDataLabel, true),
-      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.labels.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, dataLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.labels.fontSize, dataLabelText.fontSize),
       horizontalAlignment: resolvePropertyValue(theme, p.labels.horizontalAlignment, "left"),
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelContainerMaxWidth: resolvePropertyValue(theme, p.labels.labelContainerMaxWidth, 0),
@@ -967,7 +989,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       autoScale: resolvePropertyValue(theme, p.referenceLine.autoScale, false),
       dashArray: resolvePropertyValue(theme, p.referenceLine.dashArray, ""),
       dashCap: resolvePropertyValue(theme, p.referenceLine.dashCap, "none"),
-      dataLabelColor: resolvePropertyValue(theme, p.referenceLine.dataLabelColor, base.foreground),
+      dataLabelColor: resolvePropertyValue(theme, p.referenceLine.dataLabelColor, referenceLineLabelText.color),
       dataLabelDecimalPoints: resolvePropertyValue(theme, p.referenceLine.dataLabelDecimalPoints, 0),
       dataLabelDisplayUnits: resolvePropertyValue(theme, p.referenceLine.dataLabelDisplayUnits, 0),
       dataLabelHorizontalPosition: resolvePropertyValue(theme, p.referenceLine.dataLabelHorizontalPosition, "left"),
