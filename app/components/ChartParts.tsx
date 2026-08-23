@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
+import { categoryPercent, valueFraction, type ChartLayout } from "../lib/chartLayout";
 
 /**
  * Shared chart furniture — legend, axis ticks, gridlines, label
@@ -649,4 +650,180 @@ export function dataLabelStyle(labels: {
     padding: labels.enableBackground ? "1px 4px" : undefined,
     borderRadius: labels.enableBackground ? 3 : undefined,
   };
+}
+
+/* ---------------------------------------------------------------------------
+ * Layout-aware furniture
+ *
+ * These are the ChartLayout equivalents of `Gridlines` and `AxisTickLabels`
+ * above. They take a computed layout and read every position from
+ * `valueFraction` / `categoryPercent`, so a chart cannot end up with one
+ * scale for its axis and another for its marks.
+ *
+ * They live here, beside the legacy pair, for the reason ChartParts exists:
+ * a fix to chart furniture should land once and reach every family. The
+ * legacy pair stays until its last consumer migrates (Bar in T8, Line in
+ * T10), at which point it and `insetOffset`/`AxisInset` can go.
+ *
+ * Written orientation-generally: the positioning branches on
+ * `layout.orientation`, so the Bar pair can adopt them in T8 without a
+ * column-specific API. Only the vertical branch has a consumer today, and
+ * only the vertical CSS exists — T8 adds the horizontal styles.
+ * ------------------------------------------------------------------------ */
+
+/** Where a tick or gridline sits, as the CSS offset for its orientation. */
+function scaledOffset(layout: ChartLayout, value: number): CSSProperties {
+  const fraction = `${valueFraction(layout, value) * 100}%`;
+  return layout.orientation === "vertical" ? { bottom: fraction } : { left: fraction };
+}
+
+/**
+ * Value-axis gridlines drawn from a computed layout: one per tick, at the
+ * coordinate `scale.value` gives that tick. Replaces the inset-and-count
+ * arithmetic the legacy `Gridlines` needs.
+ */
+export function ScaledGridlines({ axis, layout }: { axis: AxisStyle; layout: ChartLayout }): ReactNode {
+  if (!axis.gridlineShow) return null;
+  // An explicit dash array wins over the named style, as elsewhere.
+  const dashed = String(axis.gridlineDashArray ?? "") !== "";
+  const style = dashed ? "dashed" : mapLineStyle(axis.gridlineStyle);
+  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
+  const vertical = layout.orientation === "vertical";
+
+  return (
+    <>
+      {layout.scale.ticks.map((tick, index) => (
+        <span
+          className="chart-gridline"
+          key={index}
+          aria-hidden="true"
+          // Declaration order is deliberate: span-the-plot first, then the
+          // scaled offset, then the border. It has no rendering effect, but
+          // keeping it stable makes a byte-level before/after diff of the
+          // migrated charts meaningful rather than noisy.
+          style={
+            vertical
+              ? {
+                  left: 0,
+                  right: 0,
+                  ...scaledOffset(layout, tick),
+                  borderTopWidth: axis.gridlineThickness,
+                  borderTopStyle: style,
+                  borderTopColor: color,
+                }
+              : {
+                  top: 0,
+                  bottom: 0,
+                  ...scaledOffset(layout, tick),
+                  borderLeftWidth: axis.gridlineThickness,
+                  borderLeftStyle: style,
+                  borderLeftColor: color,
+                }
+          }
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * The value-axis gutter: its axis title against the gutter's outer edge,
+ * and one tick label per tick, positioned on the same scale as the
+ * gridlines. The gutter's extent comes from the layout, so unlike the
+ * legacy zero-width tick container the plot actually pays for it.
+ */
+export function ValueAxisGutter({
+  axis,
+  layout,
+  offset,
+  titleFallback = "",
+}: {
+  axis: AxisStyle;
+  layout: ChartLayout;
+  /** The other axis's gutter, which this one stops short of. */
+  offset: number;
+  titleFallback?: string;
+}): ReactNode {
+  if (!layout.valueAxis) return null;
+  const vertical = layout.orientation === "vertical";
+
+  return (
+    <span
+      className={`chart-axis-gutter chart-axis-gutter--value${vertical ? "" : " chart-axis-gutter--horizontal"}`}
+      style={vertical ? { width: layout.valueAxis.width, bottom: offset } : { height: layout.valueAxis.height, left: offset }}
+    >
+      {axis.showAxisTitle && (
+        <span
+          className={`chart-preview__axis-title${vertical ? " chart-preview__axis-title--rotated" : ""}`}
+          style={axisTitleStyle(axis)}
+        >
+          {String(axis.titleText) || titleFallback}
+        </span>
+      )}
+      <span className="chart-axis-gutter__ticks">
+        {layout.scale.ticks.map((tick, index) => (
+          <span key={index} style={{ ...textStyle(axis), ...scaledOffset(layout, tick) }}>
+            {formatValue(tick, axis.labelDisplayUnits, axis.labelPrecision)}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The category-axis gutter: one label per category, sitting on the slot
+ * `scale.category` gives it, plus the axis title. Because labels and marks
+ * read the same slots, a label cannot drift from the mark it names.
+ */
+export function CategoryAxisGutter({
+  axis,
+  layout,
+  categories,
+  offset,
+  titleFallback = "",
+}: {
+  axis: AxisStyle;
+  layout: ChartLayout;
+  categories: readonly string[];
+  /** The value axis's gutter, which this one starts after. */
+  offset: number;
+  titleFallback?: string;
+}): ReactNode {
+  if (!layout.categoryAxis) return null;
+  const vertical = layout.orientation === "vertical";
+
+  return (
+    <span
+      className={`chart-axis-gutter chart-axis-gutter--category${vertical ? "" : " chart-axis-gutter--vertical"}`}
+      style={
+        vertical
+          ? { height: layout.categoryAxis.height, left: offset }
+          : { width: layout.categoryAxis.width, top: offset }
+      }
+    >
+      {categories.map((label, index) => {
+        const slot = categoryPercent(layout, index, categories.length);
+        return (
+          <span
+            className="column-item__label"
+            key={label}
+            style={{
+              ...textStyle(axis),
+              ...(vertical
+                ? { left: `${slot.offset}%`, width: `${slot.size}%` }
+                : { top: `${slot.offset}%`, height: `${slot.size}%` }),
+            }}
+          >
+            {label}
+          </span>
+        );
+      })}
+      {axis.showAxisTitle && (
+        <span className="chart-preview__axis-title chart-axis-gutter__title" style={axisTitleStyle(axis)}>
+          {String(axis.titleText) || titleFallback}
+        </span>
+      )}
+    </span>
+  );
 }

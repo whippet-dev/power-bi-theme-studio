@@ -1,18 +1,18 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
 import {
-  axisTitleStyle,
+  CategoryAxisGutter,
   ChartLegend,
   DataLabel,
-  formatValue,
   labelVisibleAt,
   legendIsAfterPlot,
   legendIsVertical,
   mapLineStyle,
-  textStyle,
+  ScaledGridlines,
+  ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
 import { BAR_DATA_MAX, barCategories } from "../../lib/previewSampleData";
-import { categoryPercent, COLUMN_CHART_BOX, useCartesianLayout, valueFraction } from "./cartesianLayout";
+import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
 type Props = { columnChartStyle: ResolvedColumnChartStyle };
@@ -28,7 +28,7 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
   // from it — gutters, gridlines, columns, labels, reference line — so the
   // chart cannot end up with two disagreeing coordinate systems the way
   // the CSS-derived version did (RENDERER_AUDIT §2.4, §3).
-  const layout = useCartesianLayout({
+  const layout = computePreviewCartesianLayout({
     box: COLUMN_CHART_BOX,
     orientation: "vertical",
     categoryAxis: columnChartStyle.categoryAxis,
@@ -56,52 +56,16 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
           <span className="column-preview__plot" style={{ height: COLUMN_CHART_BOX.height }}>
-            {/* The value-axis gutter: rotated title against its outer edge,
-                tick labels right-aligned to the plot. Its width is measured
-                text, not a literal, and the plot pays for exactly it. */}
-            {layout.valueAxis && (
-              <span className="chart-axis-gutter chart-axis-gutter--value" style={{ width: valueGutter, bottom: categoryGutter }}>
-                {columnChartStyle.valueAxis.showAxisTitle && (
-                  <span className="chart-preview__axis-title chart-preview__axis-title--rotated" style={axisTitleStyle(columnChartStyle.valueAxis)}>
-                    {String(columnChartStyle.valueAxis.titleText) || "Applications"}
-                  </span>
-                )}
-                <span className="chart-axis-gutter__ticks">
-                  {layout.scale.ticks.map((tick, index) => (
-                    <span
-                      key={index}
-                      style={{ ...textStyle(columnChartStyle.valueAxis), bottom: `${valueFraction(layout, tick) * 100}%` }}
-                    >
-                      {formatValue(tick, columnChartStyle.valueAxis.labelDisplayUnits, columnChartStyle.valueAxis.labelPrecision)}
-                    </span>
-                  ))}
-                </span>
-              </span>
-            )}
+            <ValueAxisGutter
+              axis={columnChartStyle.valueAxis}
+              layout={layout}
+              offset={categoryGutter}
+              titleFallback="Applications"
+            />
 
             {/* THE plot rectangle. */}
             <span className="chart-plot" style={{ left: valueGutter, bottom: categoryGutter }}>
-              {columnChartStyle.valueAxis.gridlineShow &&
-                layout.scale.ticks.map((tick, index) => (
-                  <span
-                    className="chart-gridline"
-                    key={index}
-                    aria-hidden="true"
-                    style={{
-                      left: 0,
-                      right: 0,
-                      bottom: `${valueFraction(layout, tick) * 100}%`,
-                      borderTopWidth: columnChartStyle.valueAxis.gridlineThickness,
-                      borderTopStyle: String(columnChartStyle.valueAxis.gridlineDashArray ?? "") !== ""
-                        ? "dashed"
-                        : mapLineStyle(columnChartStyle.valueAxis.gridlineStyle),
-                      borderTopColor: hexWithAlpha(
-                        columnChartStyle.valueAxis.gridlineColor,
-                        columnChartStyle.valueAxis.gridlineTransparency ?? 0,
-                      ),
-                    }}
-                  />
-                ))}
+              <ScaledGridlines axis={columnChartStyle.valueAxis} layout={layout} />
 
               <ZoomSliders zoom={columnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
 
@@ -181,30 +145,13 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
               })}
             </span>
 
-            {/* The category gutter: labels centred on their own slots, title
-                below them. Outside the plot, so it can no longer eat into
-                the space the value axis measures against. */}
-            {layout.categoryAxis && (
-              <span className="chart-axis-gutter chart-axis-gutter--category" style={{ height: categoryGutter, left: valueGutter }}>
-                {barCategories.map(([label], index) => {
-                  const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
-                  return (
-                    <span
-                      className="column-item__label"
-                      key={label}
-                      style={{ ...textStyle(columnChartStyle.categoryAxis), left: `${left}%`, width: `${width}%` }}
-                    >
-                      {label}
-                    </span>
-                  );
-                })}
-                {columnChartStyle.categoryAxis.showAxisTitle && (
-                  <span className="chart-preview__axis-title chart-axis-gutter__title" style={axisTitleStyle(columnChartStyle.categoryAxis)}>
-                    {String(columnChartStyle.categoryAxis.titleText) || "Region"}
-                  </span>
-                )}
-              </span>
-            )}
+            <CategoryAxisGutter
+              axis={columnChartStyle.categoryAxis}
+              layout={layout}
+              categories={barCategories.map(([label]) => label)}
+              offset={valueGutter}
+              titleFallback="Region"
+            />
           </span>
         </span>
       </span>

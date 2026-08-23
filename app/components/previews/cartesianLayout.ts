@@ -53,11 +53,11 @@ export type CartesianLayoutInput = {
 };
 
 /**
- * Computes one layout for one visual instance. Not a React hook despite
- * reading like one at the call site — it holds no state and may be called
- * freely during render.
+ * Computes one layout for one visual instance. Named for what it does:
+ * an earlier `useCartesianLayout` read as a React hook while holding no
+ * state and obeying none of the rules of hooks.
  */
-export function useCartesianLayout(input: CartesianLayoutInput): ChartLayout {
+export function computePreviewCartesianLayout(input: CartesianLayoutInput): ChartLayout {
   const {
     box,
     orientation,
@@ -87,32 +87,8 @@ export function useCartesianLayout(input: CartesianLayoutInput): ChartLayout {
 }
 
 /**
- * A value's position as a 0..1 fraction of the plot, measured from the
- * plot's origin edge — the bottom for a vertical chart, the left for a
- * horizontal one. This is the single conversion from engine coordinates to
- * the CSS percentages gridlines, marks and labels all use, so they cannot
- * drift from one another.
+ * Coordinate conversions live with the engine (they are pure functions of a
+ * ChartLayout, and ChartParts' layout-aware furniture needs them too).
+ * Re-exported here so a preview has one import for its layout concerns.
  */
-export function valueFraction(layout: ChartLayout, value: number): number {
-  const coordinate = layout.scale.value(value);
-  const { plot } = layout;
-  if (plot.height <= 0 || plot.width <= 0) return 0;
-  // A vertical chart's CSS `bottom` grows upward while its y grows downward.
-  return layout.orientation === "vertical"
-    ? (plot.y + plot.height - coordinate) / plot.height
-    : (coordinate - plot.x) / plot.width;
-}
-
-/** A category slot as left/width percentages of the plot, for the DOM. */
-export function categoryPercent(
-  layout: ChartLayout,
-  index: number,
-  count: number,
-): { offset: number; size: number } {
-  const slot = layout.scale.category(index, count);
-  const { plot } = layout;
-  const total = layout.orientation === "vertical" ? plot.width : plot.height;
-  const origin = layout.orientation === "vertical" ? plot.x : plot.y;
-  if (total <= 0) return { offset: 0, size: 0 };
-  return { offset: ((slot.start - origin) / total) * 100, size: (slot.size / total) * 100 };
-}
+export { categoryPercent, valueFraction } from "../../lib/chartLayout";

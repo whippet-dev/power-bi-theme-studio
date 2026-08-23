@@ -179,6 +179,40 @@ export type ChartLayoutInput = {
   subtitleFontFamily?: string;
 };
 
+/**
+ * A value's position as a 0..1 fraction of the plot, measured from the
+ * plot's origin edge — the bottom for a vertical chart, the left for a
+ * horizontal one.
+ *
+ * Lives with the engine rather than in a renderer helper because it is a
+ * pure function of a ChartLayout, and because it is the single conversion
+ * from engine coordinates to the CSS percentages that gridlines, marks and
+ * labels all use. One conversion, shared, is what stops them drifting.
+ */
+export function valueFraction(layout: ChartLayout, value: number): number {
+  const coordinate = layout.scale.value(value);
+  const { plot } = layout;
+  if (plot.height <= 0 || plot.width <= 0) return 0;
+  // A vertical chart's CSS `bottom` grows upward while its y grows downward.
+  return layout.orientation === "vertical"
+    ? (plot.y + plot.height - coordinate) / plot.height
+    : (coordinate - plot.x) / plot.width;
+}
+
+/** A category slot as offset/size percentages along the category axis. */
+export function categoryPercent(
+  layout: ChartLayout,
+  index: number,
+  count: number,
+): { offset: number; size: number } {
+  const slot = layout.scale.category(index, count);
+  const { plot } = layout;
+  const total = layout.orientation === "vertical" ? plot.width : plot.height;
+  const origin = layout.orientation === "vertical" ? plot.x : plot.y;
+  if (total <= 0) return { offset: 0, size: 0 };
+  return { offset: ((slot.start - origin) / total) * 100, size: (slot.size / total) * 100 };
+}
+
 const DEFAULT_TICK_COUNT = 4;
 const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */

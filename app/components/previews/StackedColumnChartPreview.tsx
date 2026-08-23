@@ -1,17 +1,18 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
 import {
-  axisTitleStyle,
+  CategoryAxisGutter,
   ChartLegend,
   dataLabelStyle,
   formatValue,
   legendIsAfterPlot,
   legendIsVertical,
   mapLineStyle,
-  textStyle,
+  ScaledGridlines,
+  ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
 import { BAR_DATA_MAX, barCategories, stackedSegmentColor, stackedSegmentShare } from "../../lib/previewSampleData";
-import { categoryPercent, COLUMN_CHART_BOX, useCartesianLayout, valueFraction } from "./cartesianLayout";
+import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
 type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[] };
@@ -34,9 +35,10 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
   const stackedColumnLegendAtBottom = legendIsAfterPlot(stackedColumnChartStyle.legend.position);
   const stackedColumnLegendVertical = legendIsVertical(stackedColumnChartStyle.legend.position);
 
-  // Same engine, same box as the clustered column chart — the two share the
-  // CSS and must share the coordinate system too, or they drift apart.
-  const layout = useCartesianLayout({
+  // Same engine, same box and the same shared furniture as the clustered
+  // column chart — the two share the CSS and must share the coordinate
+  // system too, or they drift apart.
+  const layout = computePreviewCartesianLayout({
     box: COLUMN_CHART_BOX,
     orientation: "vertical",
     categoryAxis: stackedColumnChartStyle.categoryAxis,
@@ -61,59 +63,15 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
           <span className="column-preview__plot" style={{ height: COLUMN_CHART_BOX.height }}>
-            {layout.valueAxis && (
-              <span className="chart-axis-gutter chart-axis-gutter--value" style={{ width: valueGutter, bottom: categoryGutter }}>
-                {stackedColumnChartStyle.valueAxis.showAxisTitle && (
-                  <span
-                    className="chart-preview__axis-title chart-preview__axis-title--rotated"
-                    style={axisTitleStyle(stackedColumnChartStyle.valueAxis)}
-                  >
-                    {String(stackedColumnChartStyle.valueAxis.titleText) || "Applications"}
-                  </span>
-                )}
-                <span className="chart-axis-gutter__ticks">
-                  {layout.scale.ticks.map((tick, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        ...textStyle(stackedColumnChartStyle.valueAxis),
-                        bottom: `${valueFraction(layout, tick) * 100}%`,
-                      }}
-                    >
-                      {formatValue(
-                        tick,
-                        stackedColumnChartStyle.valueAxis.labelDisplayUnits,
-                        stackedColumnChartStyle.valueAxis.labelPrecision,
-                      )}
-                    </span>
-                  ))}
-                </span>
-              </span>
-            )}
+            <ValueAxisGutter
+              axis={stackedColumnChartStyle.valueAxis}
+              layout={layout}
+              offset={categoryGutter}
+              titleFallback="Applications"
+            />
 
             <span className="chart-plot" style={{ left: valueGutter, bottom: categoryGutter }}>
-              {stackedColumnChartStyle.valueAxis.gridlineShow &&
-                layout.scale.ticks.map((tick, index) => (
-                  <span
-                    className="chart-gridline"
-                    key={index}
-                    aria-hidden="true"
-                    style={{
-                      left: 0,
-                      right: 0,
-                      bottom: `${valueFraction(layout, tick) * 100}%`,
-                      borderTopWidth: stackedColumnChartStyle.valueAxis.gridlineThickness,
-                      borderTopStyle:
-                        String(stackedColumnChartStyle.valueAxis.gridlineDashArray ?? "") !== ""
-                          ? "dashed"
-                          : mapLineStyle(stackedColumnChartStyle.valueAxis.gridlineStyle),
-                      borderTopColor: hexWithAlpha(
-                        stackedColumnChartStyle.valueAxis.gridlineColor,
-                        stackedColumnChartStyle.valueAxis.gridlineTransparency ?? 0,
-                      ),
-                    }}
-                  />
-                ))}
+              <ScaledGridlines axis={stackedColumnChartStyle.valueAxis} layout={layout} />
 
               <ZoomSliders zoom={stackedColumnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
 
@@ -198,37 +156,13 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
               })}
             </span>
 
-            {layout.categoryAxis && (
-              <span className="chart-axis-gutter chart-axis-gutter--category" style={{ height: categoryGutter, left: valueGutter }}>
-                {barCategories.map(([label], index) => {
-                  const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
-                  return (
-                    <span
-                      className="column-item__label"
-                      key={label}
-                      style={{ ...textStyle(stackedColumnChartStyle.categoryAxis), left: `${left}%`, width: `${width}%` }}
-                    >
-                      {label}
-                    </span>
-                  );
-                })}
-                {stackedColumnChartStyle.categoryAxis.showAxisTitle && (
-                  <span
-                    className="chart-preview__axis-title chart-axis-gutter__title"
-                    style={{
-                      color: stackedColumnChartStyle.categoryAxis.titleColor,
-                      fontFamily: stackedColumnChartStyle.categoryAxis.titleFontFamily,
-                      fontSize: stackedColumnChartStyle.categoryAxis.titleFontSize,
-                      fontWeight: stackedColumnChartStyle.categoryAxis.titleBold ? 700 : 400,
-                      fontStyle: stackedColumnChartStyle.categoryAxis.titleItalic ? "italic" : "normal",
-                      textDecoration: stackedColumnChartStyle.categoryAxis.titleUnderline ? "underline" : "none",
-                    }}
-                  >
-                    {String(stackedColumnChartStyle.categoryAxis.titleText) || "Region"}
-                  </span>
-                )}
-              </span>
-            )}
+            <CategoryAxisGutter
+              axis={stackedColumnChartStyle.categoryAxis}
+              layout={layout}
+              categories={barCategories.map(([label]) => label)}
+              offset={valueGutter}
+              titleFallback="Region"
+            />
           </span>
         </span>
       </span>
