@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   axisRange,
   axisTickValues,
+  categoryCentre,
   categoryPercent,
+  clampedValueCoordinate,
   computeChartLayout,
   estimateText,
   type AxisLayoutStyle,
@@ -13,14 +15,13 @@ import {
   type Rect,
   type TextMeasure,
 } from "../app/lib/chartLayout";
-import { axisTicks } from "../app/components/ChartParts";
 
 /**
  * Tests for the layout engine. Several of these encode defects from
- * RENDERER_AUDIT.md: they pass here because the engine is correct, while
- * the application still shows the defect, because nothing consumes the
- * engine yet (RENDERER_IMPLEMENTATION_PLAN.md T6). T7/T8/T10 are what make
- * them visible in the app.
+ * RENDERER_AUDIT.md. They were written in T6 against an engine no renderer
+ * consumed yet, so they asserted a fix the application did not show;
+ * T7/T8/T10 migrated the column pair, the bar pair and the line chart onto
+ * it, so what they assert is now what the app renders.
  */
 
 const OUTER: Rect = { x: 0, y: 0, width: 400, height: 300 };
@@ -334,24 +335,27 @@ test("every tick maps inside the plot, evenly spaced in index order, inverted or
   }
 });
 
-test("the engine's ticks match ChartParts.axisTicks exactly, so the two models cannot drift", () => {
-  const cases: Array<Partial<AxisLayoutStyle>> = [
-    {},
-    { start: "20", end: "60" },
-    { start: "", end: "" },
-    { start: "50", end: "10" },
-    { invertAxis: true },
-    { start: "0", end: "100000", invertAxis: true },
+test("the tick model is pinned to its original semantics", () => {
+  // This began as an equivalence check against ChartParts.axisTicks while
+  // both models were live. T10 deleted that one with its last consumer, so
+  // the semantics it guarded are pinned here as data instead: start falls
+  // back to 0, a pinned end is honoured only when it exceeds start, there
+  // are count+1 evenly spaced values, and invertAxis reverses the array.
+  const cases: Array<[Partial<AxisLayoutStyle>, number, number[]]> = [
+    [{}, 4, [0, 20500, 41000, 61500, 82000]],
+    [{ start: "20", end: "60" }, 4, [20, 30, 40, 50, 60]],
+    [{ start: "", end: "" }, 2, [0, 41000, 82000]],
+    // A pinned end below start is ignored, falling back to dataMax.
+    [{ start: "50", end: "10" }, 2, [50, 41025, 82000]],
+    [{ invertAxis: true }, 4, [82000, 61500, 41000, 20500, 0]],
+    [{ start: "0", end: "100000", invertAxis: true }, 4, [100000, 75000, 50000, 25000, 0]],
   ];
-  for (const over of cases) {
-    for (const count of [2, 4, 5]) {
-      const a = axis(over);
-      const mine = axisTickValues(a, DATA_MAX, count);
-      // axisTicks takes the fuller AxisStyle; the layout subset satisfies
-      // the fields it actually reads.
-      const theirs = axisTicks(a as unknown as Parameters<typeof axisTicks>[0], DATA_MAX, count);
-      assert.deepEqual(mine, theirs, `tick mismatch for ${JSON.stringify(over)} count=${count}`);
-    }
+  for (const [over, count, expected] of cases) {
+    assert.deepEqual(
+      axisTickValues(axis(over), DATA_MAX, count),
+      expected,
+      `ticks for ${JSON.stringify(over)} count=${count}`,
+    );
   }
 });
 
@@ -731,5 +735,108 @@ test("categoryPercent reflects the reversed scale without the caller reversing a
       categoryPercent(inverted, 0, n).offset > categoryPercent(inverted, n - 1, n).offset,
       `${orientation}: index 0 must sit after index ${n - 1} once inverted`,
     );
+  }
+});
+
+test("categoryCentre is the slot midpoint, in the plot's own coordinates", () => {
+  // The line chart plots one point per category rather than a band, so it
+  // needs the slot's centre. Deriving it here rather than in the renderer is
+  // what stops "where category i sits" from having two definitions.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const l = layout({ orientation });
+    const n = CATEGORIES.length;
+    const axisStart = orientation === "vertical" ? l.plot.x : l.plot.y;
+    const axisSize = orientation === "vertical" ? l.plot.width : l.plot.height;
+
+    for (let i = 0; i < n; i++) {
+      const slot = l.scale.category(i, n);
+      assert.ok(
+        near(categoryCentre(l, i, n), slot.start + slot.size / 2, 1e-9),
+        `${orientation}: centre ${i} is not the slot midpoint`,
+      );
+      // Never on the plot edge — that was exactly the old model's bug, where
+      // the first and last points sat hard against the axis.
+      assert.ok(
+        categoryCentre(l, i, n) > axisStart + 1e-9 && categoryCentre(l, i, n) < axisStart + axisSize - 1e-9,
+        `${orientation}: centre ${i} landed on the plot edge`,
+      );
+    }
+
+    // Evenly spaced, and in ascending order along the axis.
+    const gaps = Array.from({ length: n - 1 }, (_, i) => categoryCentre(l, i + 1, n) - categoryCentre(l, i, n));
+    for (const gap of gaps) {
+      assert.ok(gap > 0, `${orientation}: centres must ascend`);
+      assert.ok(near(gap, gaps[0], 1e-9), `${orientation}: centres are not evenly spaced`);
+    }
+  }
+});
+
+test("categoryCentre follows an inverted category axis", () => {
+  // Same guarantee as categoryPercent: the renderer never reverses anything.
+  const n = CATEGORIES.length;
+  const normal = layout({ orientation: "vertical" });
+  const inverted = layout({ orientation: "vertical", categoryAxis: axis({ invertAxis: true }) });
+  for (let i = 0; i < n; i++) {
+    assert.ok(
+      near(categoryCentre(normal, i, n), categoryCentre(inverted, n - 1 - i, n), 1e-9),
+      `centre ${i} did not mirror`,
+    );
+  }
+});
+
+test("clampedValueCoordinate is plot-local, and clamps a value outside the displayed range", () => {
+  // A line chart's area fill closes to zero. Pin an axis above zero and
+  // zero is off the plot — and the line SVG is overflow: visible, so an
+  // unclamped baseline would spill the fill into the axis gutters rather
+  // than simply drawing out of sight.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const vertical = orientation === "vertical";
+    const extentOf = (l: ChartLayout) => (vertical ? l.plot.height : l.plot.width);
+    const originOf = (l: ChartLayout) => (vertical ? l.plot.y : l.plot.x);
+
+    // Zero inside the range: no clamping, just the plot-local coordinate.
+    const inRange = layout({ orientation, valueAxis: axis({ start: "0", end: "100000" }) });
+    assert.ok(
+      near(clampedValueCoordinate(inRange, 0), inRange.scale.value(0) - originOf(inRange), 1e-9),
+      `${orientation}: an in-range value must pass through unclamped`,
+    );
+    // And it really is the far edge, since the range starts at zero.
+    assert.ok(
+      near(clampedValueCoordinate(inRange, 0), vertical ? extentOf(inRange) : 0, 1e-9),
+      `${orientation}: zero at the range start belongs on the origin edge`,
+    );
+
+    // Zero below the range: the raw coordinate escapes, the clamped one does not.
+    const above = layout({ orientation, valueAxis: axis({ start: "20000", end: "100000" }) });
+    const rawAbove = above.scale.value(0) - originOf(above);
+    assert.ok(
+      rawAbove < 0 || rawAbove > extentOf(above),
+      `${orientation}: the unclamped coordinate should be off the plot, or this proves nothing`,
+    );
+    assert.ok(
+      near(clampedValueCoordinate(above, 0), vertical ? extentOf(above) : 0, 1e-9),
+      `${orientation}: an out-of-range zero must land on the nearest edge`,
+    );
+
+    // Inverting flips which edge is nearest, with no second branch in the helper.
+    const inverted = layout({
+      orientation,
+      valueAxis: axis({ start: "20000", end: "100000", invertAxis: true }),
+    });
+    assert.ok(
+      near(clampedValueCoordinate(inverted, 0), vertical ? 0 : extentOf(inverted), 1e-9),
+      `${orientation}: inverting must clamp to the opposite edge`,
+    );
+
+    // Nothing, at any value, may leave the plot.
+    for (const l of [inRange, above, inverted]) {
+      for (const value of [-1e9, -50000, 0, 1, 42000, 100000, 1e9]) {
+        const c = clampedValueCoordinate(l, value);
+        assert.ok(
+          c >= 0 && c <= extentOf(l),
+          `${orientation}: ${value} produced ${c}, outside 0..${extentOf(l)}`,
+        );
+      }
+    }
   }
 });

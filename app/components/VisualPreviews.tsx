@@ -12,7 +12,6 @@ import type { ResolvedLineChartStyle } from "../lib/lineChartProperties";
 import type { ResolvedMatrixStyle } from "../lib/matrixProperties";
 import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
-import type { InteractionState } from "../lib/properties";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import { BarChartPreview } from "./previews/BarChartPreview";
 import { chartMarker } from "./previews/chartPrimitives";
@@ -20,7 +19,6 @@ import { ColumnChartPreview } from "./previews/ColumnChartPreview";
 import { LineChartPreview } from "./previews/LineChartPreview";
 import { StackedBarChartPreview } from "./previews/StackedBarChartPreview";
 import { StackedColumnChartPreview } from "./previews/StackedColumnChartPreview";
-import { StateSelector } from "./PropertyEditor";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -84,9 +82,6 @@ type VisualGalleryProps = {
   imageStyle: ResolvedImageStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   visibleVisuals: VisualKind[];
-  /** The state the hero's stateful styles above were resolved at. Owned by ThemeStudio; this component only reports the selector's changes back. */
-  previewInteractionState: InteractionState;
-  onPreviewInteractionStateChange: (state: InteractionState) => void;
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -101,8 +96,6 @@ type PreviewShellProps = {
   chrome: ResolvedChromeStyle;
   onSelect: (visual: VisualKind) => void;
   children: ReactNode;
-  /** Extra controls shown below the hero tile only (e.g. the interaction-state selector for buttons/navigators). */
-  extraControls?: ReactNode;
 };
 
 function mapLineStyle(value: string | number): "solid" | "dashed" | "dotted" {
@@ -386,14 +379,7 @@ function PreviewShell({
   chrome,
   onSelect,
   children,
-  extraControls,
 }: PreviewShellProps) {
-  // The data tooltip preview used to float below the tile permanently,
-  // which read as a stray, unlabelled box rather than something that
-  // belongs to the visual. Power BI's own tooltip only appears on hover,
-  // so this reveals it the same way — via a small labelled trigger below
-  // the tile — rather than showing it all the time.
-  const [showTooltipPreview, setShowTooltipPreview] = useState(false);
   const [showHeaderTooltipPreview, setShowHeaderTooltipPreview] = useState(false);
   const heroWrapRef = useRef<HTMLSpanElement>(null);
   const heroScaleRef = useRef<HTMLSpanElement>(null);
@@ -549,64 +535,11 @@ function PreviewShell({
     [chrome.visualHeader.showOptionsMenu, "⋯", "More options"],
   ];
 
-  // A sample tooltip, drawn only on the hero tile — 35 tooltip properties
-  // are otherwise unobservable, but repeating this on every thumbnail
-  // would bury the visuals themselves.
-  const tooltip = chrome.visualTooltip;
-  const tooltipIsReportPage = String(tooltip.type) === "Canvas";
-  const tooltipNode = variant === "hero" && tooltip.show && showTooltipPreview && (
-    <span
-      className="preview-tooltip"
-      style={{
-        backgroundColor: hexWithAlpha(tooltip.themedBackground || tooltip.background, tooltip.transparency),
-        fontFamily: tooltip.fontFamily || undefined,
-        fontSize: tooltip.fontSize,
-        fontWeight: tooltip.bold ? 700 : 400,
-        fontStyle: tooltip.italic ? "italic" : "normal",
-        textDecoration: tooltip.underline ? "underline" : "none",
-      }}
-    >
-      {tooltipIsReportPage ? (
-        <span className="preview-tooltip__page" style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>
-          Report page tooltip{tooltip.section ? `: ${tooltip.section}` : ""}
-        </span>
-      ) : tooltip.showSentenceFormat && tooltip.sentenceTemplate ? (
-        <span style={{ color: tooltip.themedValueFontColor || tooltip.valueFontColor }}>{tooltip.sentenceTemplate}</span>
-      ) : (
-        <>
-          <span className="preview-tooltip__row">
-            <span style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>London</span>
-            <span
-              style={{
-                color: tooltip.themedValueFontColor || tooltip.valueFontColor,
-                fontWeight: tooltip.showValuesInBold ? 700 : undefined,
-              }}
-            >
-              2,480
-            </span>
-          </span>
-          {!tooltip.showTooltipFieldsOnly && tooltip.showChartSpecificTooltips && (
-            <span className="preview-tooltip__row">
-              <span style={{ color: tooltip.themedTitleFontColor || tooltip.titleFontColor }}>Share</span>
-              <span
-                style={{
-                  color: tooltip.themedValueFontColor || tooltip.valueFontColor,
-                  fontWeight: tooltip.showValuesInBold ? 700 : undefined,
-                }}
-              >
-                34%
-              </span>
-            </span>
-          )}
-          {tooltip.showActionsInTooltips && (
-            <span className="preview-tooltip__action" style={{ color: tooltip.actionFontColor }}>
-              ⤓ Drill through
-            </span>
-          )}
-        </>
-      )}
-    </span>
-  );
+  // The data tooltip's specimen and its reveal control moved to
+  // PreviewInspector in T9: a hover-only callout and a Studio toggle are
+  // not report-page content. The visual header's own tooltip below stays,
+  // because it is bound to the header icon inside the visual and is a
+  // hover affordance on real report chrome rather than Studio UI.
 
   // The visual header's own tooltip — shown next to the header when its
   // icon is enabled, so visualHeaderTooltip's 13 properties are visible.
@@ -816,18 +749,6 @@ function PreviewShell({
           {tile}
         </span>
       </span>
-      {extraControls}
-      {tooltip.show && (
-        <button
-          type="button"
-          className="tooltip-preview-trigger"
-          onClick={() => setShowTooltipPreview((value) => !value)}
-          aria-expanded={showTooltipPreview}
-        >
-          {showTooltipPreview ? "Hide" : "Show"} tooltip preview
-        </button>
-      )}
-      {tooltipNode}
     </span>
   );
 }
@@ -852,8 +773,6 @@ export function VisualGallery({
   imageStyle,
   chromeStyles,
   visibleVisuals,
-  previewInteractionState,
-  onPreviewInteractionStateChange,
   selected,
   onSelect,
 }: VisualGalleryProps) {
@@ -869,18 +788,11 @@ export function VisualGallery({
   // collapsed control whose colours you can't judge.
   const [slicerDropdownOpen, setSlicerDropdownOpen] = useState(false);
 
-  // Action button, Bookmark navigator, and Page navigator style differently
-  // per interaction state. The styles below arrive already resolved at the
-  // selected state — ThemeStudio owns both the state and the resolution, so
-  // nothing here reads theme JSON. Only the hero responds to the selector;
-  // thumbnails stay on the default state, which ThemeStudio enforces by
-  // resolving per-state only for the currently selected visual.
-  const isStatefulHero = selected === "actionButton" || selected === "bookmarkNavigator" || selected === "pageNavigator";
-  const stateSelectorNode = isStatefulHero ? (
-    <span className="preview-state-selector">
-      <StateSelector state={previewInteractionState} onSelect={onPreviewInteractionStateChange} />
-    </span>
-  ) : undefined;
+  // Action button, Bookmark navigator and Page navigator arrive already
+  // resolved at the selected interaction state — ThemeStudio owns both the
+  // state and the resolution, so nothing here reads theme JSON. The
+  // selector that drives it lives in PreviewInspector (T9); this component
+  // only renders whichever state it was handed.
 
 
   const cardContent = (
@@ -1967,7 +1879,6 @@ export function VisualGallery({
           theme={theme}
           chrome={hero.chrome}
           onSelect={onSelect}
-          extraControls={stateSelectorNode}
         >
           {hero.content}
         </PreviewShell>

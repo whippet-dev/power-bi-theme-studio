@@ -23,18 +23,21 @@ export function svgDashArray(style: "solid" | "dashed" | "dotted"): string | und
 /**
  * Chart markers must render as true circles/squares regardless of the
  * plot's aspect ratio — but the line/area path they sit alongside is drawn
- * in an SVG whose 100x100 viewBox is stretched non-uniformly
- * (preserveAspectRatio="none") to fill whatever actual width/height the
- * plot has. `vector-effect="non-scaling-stroke"` keeps a path's *stroke
- * width* constant against that stretch, but it does nothing for a shape's
+ * in an SVG that is stretched non-uniformly (preserveAspectRatio="none")
+ * to fill whatever actual width/height the plot has.
+ * `vector-effect="non-scaling-stroke"` keeps a path's *stroke width*
+ * constant against that stretch, but it does nothing for a shape's
  * *geometry* — a `<circle r={4}>` drawn inside that same stretched
  * coordinate space still comes out as a squashed ellipse, exactly the
  * "stretched markers" bug this fixes. Rendering markers as plain
- * absolutely-positioned HTML elements sidesteps the whole problem:
- * `point.x`/`point.y` are already percentages of the plot area (see
- * linePointCoords), so percentage position still lines up with the data
- * point, while pixel width/height/border-radius are never touched by any
- * SVG transform at all.
+ * absolutely-positioned HTML elements sidesteps the whole problem: pixel
+ * width/height/border-radius are never touched by any SVG transform.
+ *
+ * `point` is therefore in PERCENTAGES OF THE PLOT, not plot coordinates.
+ * Until T10 the line chart's SVG had its own 0..100 space, which made
+ * those two the same number and let the distinction go unnoticed. The SVG
+ * now draws in ChartLayout's plot coordinates, so callers must convert —
+ * see pointMarkerPoint in LineChartPreview.
  */
 export function chartMarker(
   key: string | number,

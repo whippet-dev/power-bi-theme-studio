@@ -13,9 +13,10 @@
  * everything that draws is meant to consume them rather than re-deriving
  * position from CSS.
  *
- * **Nothing imports this yet.** It lands with its tests first, so the
- * geometry can be argued about before any renderer depends on it — see
- * RENDERER_IMPLEMENTATION_PLAN.md T6, then T7/T8/T10 for adoption.
+ * It landed with its tests first (T6) so the geometry could be argued
+ * about before any renderer depended on it. Every cartesian preview now
+ * consumes it: the column pair in T7, the bar pair in T8 and the line
+ * chart in T10 — see RENDERER_IMPLEMENTATION_PLAN.md.
  *
  * Deliberately pure: no React, no DOM, no CSS, no theme JSON, no module
  * state. Text measurement is injected (see `TextMeasure`) so the default
@@ -199,6 +200,44 @@ export function valueFraction(layout: ChartLayout, value: number): number {
     : (coordinate - plot.x) / plot.width;
 }
 
+/**
+ * The centre of a category's slot, in the layout's own coordinate space.
+ *
+ * A line chart plots one point per category rather than filling the slot,
+ * and that point belongs in the middle of it. Derived from `scale.category`
+ * so a line's points, a column's bars and the shared category labels all
+ * come from the same slots — and so category inversion reverses all three
+ * without anyone reversing an array.
+ */
+export function categoryCentre(layout: ChartLayout, index: number, count: number): number {
+  const slot = layout.scale.category(index, count);
+  return slot.start + slot.size / 2;
+}
+
+/**
+ * A data value as a coordinate along the value axis, expressed relative to
+ * the plot's own origin and clamped to stay inside it.
+ *
+ * Anything drawing in plot-local coordinates — an SVG whose viewBox is the
+ * plot, most obviously — needs the value's position measured from the
+ * plot's corner rather than the visual's. And a value can legitimately sit
+ * outside the displayed range: pin an axis to start at 20000 and zero is
+ * off the plot entirely. A line chart's area fill closes to zero, so an
+ * unclamped coordinate would let the fill escape into the axis gutters.
+ * Clamping resolves that to the nearest visible edge.
+ *
+ * Orientation-agnostic, because `scale.value` already returns an x for a
+ * horizontal chart and a y for a vertical one, and already honours
+ * `invertAxis` — so an inverted axis clamps to the opposite edge on its
+ * own, with no second branch here.
+ */
+export function clampedValueCoordinate(layout: ChartLayout, value: number): number {
+  const vertical = layout.orientation === "vertical";
+  const origin = vertical ? layout.plot.y : layout.plot.x;
+  const extent = vertical ? layout.plot.height : layout.plot.width;
+  return Math.max(0, Math.min(extent, layout.scale.value(value) - origin));
+}
+
 /** A category slot as offset/size percentages along the category axis. */
 export function categoryPercent(
   layout: ChartLayout,
@@ -225,11 +264,14 @@ function parseBound(value: string | number | undefined): number | null {
 }
 
 /**
- * The axis range, matching `axisTicks` in ChartParts exactly: start falls
- * back to 0, and a pinned end is only honoured when it exceeds start.
- * Reimplemented rather than imported because ChartParts is a component
- * module and this one must not depend on React; `chartLayout.test.ts`
- * asserts the two agree so they cannot drift apart silently.
+ * The axis range: start falls back to 0, and a pinned end is only honoured
+ * when it exceeds start.
+ *
+ * These semantics began in `axisTicks` in ChartParts, which this was
+ * written to match while both models were live. T10 deleted that one with
+ * its last consumer, so this is now the only definition — and
+ * `chartLayout.test.ts` pins the semantics as an explicit table rather
+ * than by comparison, since there is nothing left to compare against.
  */
 export function axisRange(axis: AxisLayoutStyle, dataMax: number): { start: number; end: number } {
   const start = parseBound(axis.start) ?? 0;

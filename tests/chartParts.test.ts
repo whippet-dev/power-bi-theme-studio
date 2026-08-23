@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { axisTicks, formatValue, insetOffset, labelIsInside, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle } from "../app/components/ChartParts";
+import { formatValue, labelIsInside, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle } from "../app/components/ChartParts";
 
 test("formatValue abbreviates by display unit and honours precision", () => {
   assert.equal(formatValue(82_000, "1000", 0), "82K");
@@ -13,58 +13,6 @@ test("formatValue abbreviates by display unit and honours precision", () => {
 test("formatValue picks a sensible unit when none is specified", () => {
   assert.equal(formatValue(500, undefined, 0), "500");
   assert.ok(formatValue(82_000, undefined, 0).endsWith("K"));
-});
-
-test("axisTicks spans 0..dataMax unless the axis pins a range", () => {
-  const base = {
-    show: true,
-    gridlineShow: false,
-    gridlineColor: "#000",
-    gridlineThickness: 1,
-    gridlineStyle: "solid",
-  } as Parameters<typeof axisTicks>[0];
-
-  const auto = axisTicks(base, 100, 4);
-  assert.deepEqual(auto, [0, 25, 50, 75, 100]);
-
-  // Start/end arrive as strings from the schema and must still be honoured.
-  const pinned = axisTicks({ ...base, start: "20", end: "60" }, 100, 4);
-  assert.deepEqual(pinned, [20, 30, 40, 50, 60]);
-
-  // A blank or nonsensical range falls back rather than producing NaN.
-  const blank = axisTicks({ ...base, start: "", end: "" }, 80, 4);
-  assert.deepEqual(blank, [0, 20, 40, 60, 80]);
-  const inverted = axisTicks({ ...base, start: "50", end: "10" }, 90, 2);
-  assert.ok(inverted.every((t) => Number.isFinite(t)));
-});
-
-// Regression: a horizontal bar chart's value axis doesn't span the whole
-// row — the category-label and value-label columns sit either side of the
-// track — so gridlines/ticks need an inset or they land over those label
-// gutters instead of the bars they measure (found from a real Power BI
-// screenshot where "0" and the max tick sat outside the actual bars).
-test("insetOffset spans the full width with no inset, and is bounded by the inset otherwise", () => {
-  assert.equal(insetOffset(0, 4, { start: 0, end: 0 }), "0%");
-  assert.equal(insetOffset(4, 4, { start: 0, end: 0 }), "100%");
-
-  // With an inset, i=0 must land exactly on `start` and i=count exactly
-  // on `calc(100% - end)` — the two points AxisTickLabels' translateX(-50%)
-  // needs to line up with Gridlines at 0% and 100% of the track itself.
-  assert.equal(insetOffset(0, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 0)");
-  assert.equal(insetOffset(4, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 1)");
-  assert.equal(insetOffset(2, 4, { start: 76, end: 36 }), "calc(76px + (100% - 112px) * 0.5)");
-});
-
-test("an inverted axis reverses its ticks", () => {
-  const base = {
-    show: true,
-    invertAxis: true,
-    gridlineShow: false,
-    gridlineColor: "#000",
-    gridlineThickness: 1,
-    gridlineStyle: "solid",
-  } as Parameters<typeof axisTicks>[0];
-  assert.deepEqual(axisTicks(base, 100, 4), [100, 75, 50, 25, 0]);
 });
 
 test("legend position maps to placement, covering all four sides", () => {

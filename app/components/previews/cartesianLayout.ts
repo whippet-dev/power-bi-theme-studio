@@ -52,6 +52,25 @@ export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
  */
 export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 84 };
 
+/**
+ * The line chart's natural chart box. Replaces `.line-preview__plot`'s
+ * `height: 120px` plus an SVG that carried its own abstract 100x100
+ * coordinate space — a space in which a point's y was `100 - value`, so a
+ * value of 68 sat 68% up the plot while its own axis said 68000/70000 =
+ * 97%. The engine now owns both axes and the SVG draws in the plot's
+ * coordinates (RENDERER_AUDIT §4.5).
+ *
+ * 150 rather than the column chart's 128 because the line's plot used to
+ * be 120 with its tick labels overlaying the space to its left; giving the
+ * value axis a real gutter needs that space back.
+ *
+ * Width is nominal, as above: the rendered box is CSS-fluid (measured at
+ * 370 natural units), and every consumer of it — slot centres, gridline
+ * offsets, the SVG viewBox — takes a ratio of the plot, so the nominal
+ * figure cancels out.
+ */
+export const LINE_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 150 };
+
 export type CartesianLayoutInput = {
   box: Rect;
   orientation: CartesianOrientation;
@@ -104,4 +123,4 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
  * ChartLayout, and ChartParts' layout-aware furniture needs them too).
  * Re-exported here so a preview has one import for its layout concerns.
  */
-export { categoryPercent, valueFraction } from "../../lib/chartLayout";
+export { categoryCentre, categoryPercent, clampedValueCoordinate, valueFraction } from "../../lib/chartLayout";

@@ -36,7 +36,8 @@ import { resolveTextClasses, resolveThemeColors } from "../lib/themeGlobalsPrope
 import { FilterPanePreview, PaletteLegend } from "./GlobalPreviews";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery, type VisualKind } from "./VisualPreviews";
-import { VisualRail } from "./VisualRail";
+import { PreviewInspector } from "./PreviewInspector";
+import { VISUAL_LABEL, VisualRail } from "./VisualRail";
 
 // Maps this app's UI visual identifiers to the schema's real visual-type
 // keys, so chrome (title/subtitle/background/border) resolves per visual.
@@ -399,14 +400,25 @@ export function ThemeStudio() {
             imageStyle={imageStyle}
                 chromeStyles={chromeStyles}
                 visibleVisuals={visibleVisuals}
-                previewInteractionState={previewInteractionState}
-                onPreviewInteractionStateChange={setPreviewInteractionState}
                 selected={selectedVisual}
                 onSelect={setSelectedVisual}
               />
             </div>
             {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} theme={resolved} />}
           </div>
+
+          {/* Theme Studio's own supporting region for the selected visual —
+              a sibling of the report surface, never inside it. Keyed by the
+              selection so its local view state resets with the visual, the
+              way it did when it lived on the (remounting) hero tile. */}
+          <PreviewInspector
+            key={selectedVisual}
+            selected={selectedVisual}
+            label={VISUAL_LABEL[selectedVisual]}
+            chrome={chromeStyles[selectedVisual]}
+            previewInteractionState={previewInteractionState}
+            onPreviewInteractionStateChange={setPreviewInteractionState}
+          />
 
           {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} textClasses={textClasses} />}
         </section>

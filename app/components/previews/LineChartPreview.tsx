@@ -1,7 +1,28 @@
 import { Fragment, type CSSProperties } from "react";
 import { hexWithAlpha } from "../../lib/colorUtils";
-import { AxisTickLabels, axisTitleStyle, ChartLegend, DataLabel, formatValue, Gridlines, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle, textStyle, ZoomSliders } from "../ChartParts";
+import {
+  CategoryAxisGutter,
+  CategoryGridlines,
+  ChartLegend,
+  DataLabel,
+  formatValue,
+  labelVisibleAt,
+  legendIsAfterPlot,
+  legendIsVertical,
+  mapLineStyle,
+  ScaledGridlines,
+  ValueAxisGutter,
+  ZoomSliders,
+} from "../ChartParts";
 import { areaPath, linePath, markerShape } from "../../lib/lineGeometry";
+import {
+  categoryCentre,
+  categoryPercent,
+  clampedValueCoordinate,
+  computePreviewCartesianLayout,
+  LINE_CHART_BOX,
+  valueFraction,
+} from "./cartesianLayout";
 import { LINE_DATA_MAX, lineCategoryLabels, linePointValues } from "../../lib/previewSampleData";
 import { chartMarker, svgDashArray } from "./chartPrimitives";
 import type { ResolvedLineChartStyle } from "../../lib/lineChartProperties";
@@ -41,10 +62,69 @@ export function LineChartPreview({ lineChartStyle }: Props) {
   );
   const lineLegendAtBottom = legendIsAfterPlot(lineChartStyle.legend.position);
   const lineLegendVertical = legendIsVertical(lineChartStyle.legend.position);
+  // One layout, and one set of point coordinates derived from it. Every
+  // other position on this chart — path, markers, labels, bands, constant
+  // lines — is computed from these, so nothing can end up on a second
+  // scale. Before T10 a point's y was `100 - value`, which put a value of
+  // 68 at 68% of the plot while its own axis said 68000/70000 = 97%.
+  const layout = computePreviewCartesianLayout({
+    box: LINE_CHART_BOX,
+    orientation: "vertical",
+    categoryAxis: lineChartStyle.categoryAxis,
+    valueAxis: lineChartStyle.valueAxis,
+    categories: lineCategoryLabels,
+    dataMax: LINE_DATA_MAX,
+    innerPadding: 0,
+    valueAxisTitleFallback: "Applications",
+    categoryAxisTitleFallback: "Month",
+  });
+  const plot = layout.plot;
+  const pointCount = linePointValues.length;
+  const categoryGutter = layout.categoryAxis?.height ?? 0;
+  const valueGutter = layout.valueAxis?.width ?? 0;
+
+  /**
+   * Points in the SVG's coordinate system, which IS the plot's own natural
+   * box translated to its origin — not an abstract normalised space. The
+   * viewBox below is the plot's width and height, so these numbers are the
+   * engine's numbers.
+   */
   const linePointCoords = linePointValues.map((value, index) => ({
-    x: (index / (linePointValues.length - 1)) * 100,
-    y: 100 - value,
+    x: categoryCentre(layout, index, pointCount) - plot.x,
+    y: layout.scale.value(value * 1000) - plot.y,
   }));
+  /** The same points as percentages, for the HTML overlays. One conversion. */
+  const pointPercent = (index: number) => {
+    const slot = categoryPercent(layout, index, pointCount);
+    return {
+      left: slot.offset + slot.size / 2,
+      top: (1 - valueFraction(layout, linePointValues[index] * 1000)) * 100,
+    };
+  };
+
+  /**
+   * The same point, as the {x,y} percentages chartMarker positions with.
+   * Markers are HTML overlays on the plot, not SVG children, so they take
+   * percentages of the plot — not the plot-pixel coordinates the path uses.
+   * The old 0..100 SVG space made those two identical by accident; they are
+   * not identical any more, so the conversion is explicit here.
+   */
+  const pointMarkerPoint = (index: number) => {
+    const { left, top } = pointPercent(index);
+    return { x: left, y: top };
+  };
+  /**
+   * Where an area fill closes to. Zero when zero is on the plot; the
+   * nearest visible edge when a pinned range puts it off. The SVG is
+   * `overflow: visible` so the markers' HTML siblings can sit proud of it,
+   * which means an unclamped baseline would spill the fill into the axis
+   * gutters rather than simply drawing off-screen.
+   */
+  const areaBaseline = clampedValueCoordinate(layout, 0);
+
+  /** A fraction of the plot, in SVG (plot-space) units. */
+  const fx = (fraction: number) => fraction * plot.width;
+  const fy = (fraction: number) => fraction * plot.height;
   const lineStyles = lineChartStyle.lineStyles;
   // `lineChartType` is the interpolation mode (linear/smooth/step);
   // `interpolationSmooth`/`interpolationStep` name *which* algorithm to
@@ -190,14 +270,56 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     </span>
   );
 
-  // A series label sits at the end of its line, optionally with a leader
+  // A series label sits at one side of the plot, optionally with a leader
   // line back to the series and its own background chip.
   const sl = lineChartStyle.seriesLabels;
+  /**
+   * `seriesPosition` is SPATIAL: Power BI puts series labels on the right
+   * of the chart by default, and "Left" moves them to the left side, with
+   * the leader line running to the nearest point. It does not name an end
+   * of the data.
+   *
+   * So the side is fixed and the *point* is looked up — by rendered
+   * position, asking the category scale where each point actually is
+   * rather than assuming the data's first and last are the outermost.
+   * Inverting the category axis then changes which index occupies each
+   * side while the label stays on the side that was asked for; no array
+   * is reversed here (T8).
+   *
+   * Two earlier readings were wrong. Before T10 this anchored to the plot
+   * edge (`right: 0` / `left: 0`), which only worked while categories ran
+   * 0..100% and the outer points sat on the edges. The T10 follow-up then
+   * anchored to index 0 / pointCount - 1, which is right until the axis is
+   * inverted and the data's last point is on the physical left.
+   */
+  const seriesLabelOnLeft = String(sl.seriesPosition).toLowerCase() === "left";
+  const seriesLabelIndex = linePointValues.reduce((chosen, _, index) => {
+    const candidate = pointPercent(index).left;
+    const incumbent = pointPercent(chosen).left;
+    return (seriesLabelOnLeft ? candidate < incumbent : candidate > incumbent) ? index : chosen;
+  }, 0);
+  const seriesLabelPoint = pointPercent(seriesLabelIndex);
+  /** Natural units, like every other pre-transform number here. */
+  const seriesLabelOffset = Number(sl.maximumOffset) || 0;
   const seriesLabelNode = sl.show && (
     <span
       className="line-preview__series-label"
       style={{
-        top: `${linePointCoords[linePointCoords.length - 1].y}%`,
+        left: `${seriesLabelPoint.left}%`,
+        top: `${seriesLabelPoint.top}%`,
+        // The box hangs off the anchor away from the plot, so its inner
+        // edge — and the leader line, the flex item nearest it — lands on
+        // the chosen point. `maximumOffset` (the gap between series and
+        // label) rides in the same transform rather than as a margin: a
+        // margin on the inner side is inert for a left-side label, which is
+        // positioned by `left` with its `right` auto, so the two sides
+        // would displace by different amounts.
+        transform: seriesLabelOnLeft
+          ? `translate(calc(-100% - ${seriesLabelOffset}px), -50%)`
+          : `translate(${seriesLabelOffset}px, -50%)`,
+        // The leader faces the series: rightward from a left-side label,
+        // leftward from a right-side one.
+        flexDirection: seriesLabelOnLeft ? "row-reverse" : "row",
         color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
         fontFamily: sl.seriesFontFamily || undefined,
         fontSize: sl.textSize,
@@ -206,14 +328,11 @@ export function LineChartPreview({ lineChartStyle }: Props) {
         textDecoration: sl.underline ? "underline" : "none",
         maxWidth: sl.seriesMaximumWidth || undefined,
         whiteSpace: sl.seriesWordWrap ? "normal" : "nowrap",
-        marginLeft: sl.maximumOffset || undefined,
         backgroundColor: sl.enableBackground
           ? hexWithAlpha(sl.backgroundMatchColor ? lineChartStyle.dataPoint.fill : sl.backgroundColor, sl.backgroundTransparency)
           : undefined,
         padding: sl.enableBackground ? "1px 4px" : undefined,
         borderRadius: sl.enableBackground ? 3 : undefined,
-        // "Left" puts the label at the start of the line instead.
-        ...(String(sl.seriesPosition).toLowerCase() === "left" ? { left: 0, right: "auto" } : {}),
       }}
     >
       {sl.leaderLines && (
@@ -238,7 +357,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
   const err = lineChartStyle.error;
   const errorShade = err.enabled && err.shadeShow && (
     <polygon
-      points={`${linePointCoords.map((p) => `${p.x},${p.y - 7}`).join(" ")} ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 7}`).join(" ")}`}
+      points={`${linePointCoords.map((p) => `${p.x},${p.y - fy(0.07)}`).join(" ")} ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + fy(0.07)}`).join(" ")}`}
       fill={hexWithAlpha(err.shadeMatchSeriesColor ? lineChartStyle.dataPoint.fill : err.shadeColor, err.shadeTransparency)}
       stroke="none"
     />
@@ -247,8 +366,8 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     <span
       className="line-preview__error-label"
       style={{
-        left: `${linePointCoords[3].x}%`,
-        top: `${linePointCoords[3].y}%`,
+        left: `${pointPercent(3).left}%`,
+        top: `${pointPercent(3).top}%`,
         color: err.labelMatchSeriesColor ? lineChartStyle.dataPoint.fill : err.labelColor,
         fontFamily: err.labelFontFamily || undefined,
         fontSize: err.labelFontSize,
@@ -268,9 +387,18 @@ export function LineChartPreview({ lineChartStyle }: Props) {
 
   const lineConstantLines = (
     <>
-      {constantLine(lineChartStyle.referenceLine, "vertical", 70, "ref")}
+      {/* The two value-axis constant lines now sit where their own value
+          puts them, through the same scale as the series and the
+          gridlines. Both are horizontal because the value axis is
+          vertical — the reference line used to be drawn vertically at a
+          hardcoded 70%, which was on no scale and on the wrong axis.
+
+          xAxisReferenceLine stays at a fixed position: it belongs to the
+          CATEGORY axis, which has no numeric value model here, and giving
+          it one is Phase 2 constant-line work rather than T10 geometry. */}
+      {constantLine(lineChartStyle.referenceLine, "horizontal", valueFraction(layout, lineChartStyle.referenceLine.value) * 100, "ref")}
+      {constantLine(lineChartStyle.y1AxisReferenceLine, "horizontal", valueFraction(layout, lineChartStyle.y1AxisReferenceLine.value) * 100, "y1")}
       {constantLine(lineChartStyle.xAxisReferenceLine, "vertical", 45, "x")}
-      {constantLine(lineChartStyle.y1AxisReferenceLine, "horizontal", 55, "y1")}
     </>
   );
 
@@ -281,7 +409,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     <>
       {forecast.bandAreaShow && (
         <polygon
-          points="72,28 100,8 100,52 72,40"
+          points={`${fx(0.72)},${fy(0.28)} ${fx(1)},${fy(0.08)} ${fx(1)},${fy(0.52)} ${fx(0.72)},${fy(0.4)}`}
           fill={hexWithAlpha(forecast.bandAreaMatchColor ? forecast.lineColor : forecast.bandAreaColor, forecast.bandAreaTransparency)}
           stroke={forecast.bandLineShow ? hexWithAlpha(forecast.bandLineMatchColor ? forecast.lineColor : forecast.bandLineColor, forecast.bandLineTransparency) : "none"}
           strokeWidth={forecast.bandLineWidth}
@@ -290,7 +418,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
         />
       )}
       <path
-        d="M 72 34 L 100 30"
+        d={`M ${fx(0.72)} ${fy(0.34)} L ${fx(1)} ${fy(0.3)}`}
         fill="none"
         stroke={hexWithAlpha(forecast.lineColor, forecast.strokeTransparency)}
         strokeWidth={forecast.width}
@@ -311,9 +439,9 @@ export function LineChartPreview({ lineChartStyle }: Props) {
   const anomalyMarker = markerShape(String(anomaly.markerShape), anomaly.markerShapeSize || 7);
   const anomalyBandNode = anomaly.show && anomaly.confidenceBandShow && (
     <polygon
-      points={`0,${linePointCoords[0].y - 9} ${linePointCoords.map((p) => `${p.x},${p.y - 9}`).join(" ")} 100,${
-        linePointCoords[linePointCoords.length - 1].y + 9
-      } ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + 9}`).join(" ")}`}
+      points={`0,${linePointCoords[0].y - fy(0.09)} ${linePointCoords.map((p) => `${p.x},${p.y - fy(0.09)}`).join(" ")} ${plot.width},${
+        linePointCoords[pointCount - 1].y + fy(0.09)
+      } ${[...linePointCoords].reverse().map((p) => `${p.x},${p.y + fy(0.09)}`).join(" ")}`}
       fill={hexWithAlpha(anomaly.confidenceBandColor, anomaly.transparency)}
       stroke="none"
     />
@@ -324,7 +452,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     chartMarker(
       "anomaly",
       anomalyMarker,
-      linePointCoords[2],
+      pointMarkerPoint(2),
       hexWithAlpha(anomaly.markerColor, anomaly.markerTransparency),
       anomaly.markerBorderShow
         ? hexWithAlpha(
@@ -346,127 +474,135 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     >
       {!lineLegendAtBottom && lineLegendNode}
       <span className="chart-preview__body">
-        {/* Power BI draws a line/column chart's value-axis title rotated
-            along the left edge, beside the plot — not as a horizontal
-            banner above it (that treatment belongs to a horizontal
-            category axis, which this chart doesn't have). */}
-        {lineChartStyle.valueAxis.showAxisTitle && (
-          <span className="chart-preview__axis-title chart-preview__axis-title--rotated" style={axisTitleStyle(lineChartStyle.valueAxis)}>
-            {String(lineChartStyle.valueAxis.titleText) || "Applications"}
-          </span>
-        )}
         <span className="chart-preview__body-main">
           {y2TitleNode}
-          <span className="line-preview__plot" style={{ position: "relative" }}>
-        <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
-        <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
-        <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={LINE_DATA_MAX} orientation="vertical" />
-        {y2Node}
-        {seriesLabelNode}
-        {zoomNodes}
-        {errorLabel}
-        {lineConstantLines}
-        <svg className="line-preview__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {anomalyBandNode}
-          {errorShade}
-          {lineIsArea && (
-            <path
-              d={areaPath(linePointCoords, linePathD)}
-              fill={hexWithAlpha(lineAreaColor, lineStyles.segmentGradient ? 60 : 78)}
-              stroke="none"
+          <span className="line-preview__plot" style={{ height: LINE_CHART_BOX.height }}>
+            <ValueAxisGutter
+              axis={lineChartStyle.valueAxis}
+              layout={layout}
+              offset={categoryGutter}
+              titleFallback="Applications"
             />
-          )}
-          {lineStyles.strokeShow && (
-            <path
-              d={linePathD}
-              fill="none"
-              stroke={hexWithAlpha(lineStrokeColor, lineStyles.strokeTransparency)}
-              strokeWidth={lineStyles.strokeWidth}
-              // An explicit dash array wins over the named line style,
-              // matching how Power BI treats the advanced setting.
-              strokeDasharray={String(lineStyles.strokeDashArray) || svgDashArray(lineDashStyle)}
-              strokeLinejoin={
-                ["round", "bevel", "miter"].includes(String(lineStyles.strokeLineJoin).toLowerCase())
-                  ? (String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter")
-                  : "round"
-              }
-              strokeLinecap={String(lineStyles.strokeDashCap).toLowerCase() === "flat" ? "butt" : "round"}
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {lineChartStyle.error.enabled && lineChartStyle.error.barShow && (
-            <line
-              x1={linePointCoords[3].x}
-              x2={linePointCoords[3].x}
-              y1={linePointCoords[3].y - 12}
-              y2={linePointCoords[3].y + 12}
-              stroke={lineChartStyle.error.barColor}
-              strokeWidth={lineChartStyle.error.barWidth}
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {forecastNode}
-        </svg>
-        {anomalyMarkerNode}
-        {lineShowMarkers &&
-          linePointCoords.map((point, index) => {
-            const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
-            const markerStroke = lineChartStyle.markers.borderShow
-              ? hexWithAlpha(
-                  lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
-                  lineChartStyle.markers.borderTransparency,
-                )
-              : "none";
-            return chartMarker(
-              index,
-              lineMarker,
-              point,
-              markerFill,
-              markerStroke,
-              lineChartStyle.markers.borderWidth,
-              lineChartStyle.markers.rotation,
-            );
-          })}
-        {lineChartStyle.trend.show && (
-          <span
-            className="chart-preview__trend-line"
-            aria-hidden="true"
-            style={{
-              borderTopWidth: lineChartStyle.trend.width,
-              borderTopColor: lineChartStyle.trend.lineColor,
-              borderTopStyle: mapLineStyle(lineChartStyle.trend.style),
-              opacity: 1 - lineChartStyle.trend.transparency / 100,
-            }}
-          />
-        )}
-        {/* One label per point, thinned by label density like Power BI. */}
-        {linePointCoords.map((point, index) =>
-          labelVisibleAt(index, linePointCoords.length, lineChartStyle.labels.labelDensity) ? (
-            <span key={index} className="line-preview__label" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
-              <DataLabel
-                labels={lineChartStyle.labels}
-                category={lineCategoryLabels[index] ?? ""}
-                value={linePointValues[index] * 1000}
-                detail={linePointValues[index] * 8}
-              />
+            <span className="chart-plot" style={{ left: valueGutter, bottom: categoryGutter }}>
+              <CategoryGridlines axis={lineChartStyle.categoryAxis} layout={layout} count={pointCount} />
+              <ScaledGridlines axis={lineChartStyle.valueAxis} layout={layout} />
+              {y2Node}
+              {seriesLabelNode}
+              {zoomNodes}
+              {errorLabel}
+              {lineConstantLines}
+              {/* The viewBox IS the engine's plot box, so every number inside is
+                  a ChartLayout coordinate rather than a normalised 0..100 one.
+                  preserveAspectRatio stays "none" because the rendered plot is
+                  fluid and must fill it; what changed is that the space is no
+                  longer separate from the axes' — see the T10 report. */}
+              <svg
+                className="line-preview__svg"
+                viewBox={`0 0 ${plot.width} ${plot.height}`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {anomalyBandNode}
+                {errorShade}
+                {lineIsArea && (
+                  <path
+                    d={areaPath(linePointCoords, linePathD, areaBaseline)}
+                    fill={hexWithAlpha(lineAreaColor, lineStyles.segmentGradient ? 60 : 78)}
+                    stroke="none"
+                  />
+                )}
+                {lineStyles.strokeShow && (
+                  <path
+                    d={linePathD}
+                    fill="none"
+                    stroke={hexWithAlpha(lineStrokeColor, lineStyles.strokeTransparency)}
+                    strokeWidth={lineStyles.strokeWidth}
+                    // An explicit dash array wins over the named line style,
+                    // matching how Power BI treats the advanced setting.
+                    strokeDasharray={String(lineStyles.strokeDashArray) || svgDashArray(lineDashStyle)}
+                    strokeLinejoin={
+                      ["round", "bevel", "miter"].includes(String(lineStyles.strokeLineJoin).toLowerCase())
+                        ? (String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter")
+                        : "round"
+                    }
+                    strokeLinecap={String(lineStyles.strokeDashCap).toLowerCase() === "flat" ? "butt" : "round"}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                {lineChartStyle.error.enabled && lineChartStyle.error.barShow && (
+                  <line
+                    x1={linePointCoords[3].x}
+                    x2={linePointCoords[3].x}
+                    y1={linePointCoords[3].y - fy(0.12)}
+                    y2={linePointCoords[3].y + fy(0.12)}
+                    stroke={lineChartStyle.error.barColor}
+                    strokeWidth={lineChartStyle.error.barWidth}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                {forecastNode}
+              </svg>
+              {anomalyMarkerNode}
+              {lineShowMarkers &&
+                linePointValues.map((_, index) => {
+                  const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
+                  const markerStroke = lineChartStyle.markers.borderShow
+                    ? hexWithAlpha(
+                        lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
+                        lineChartStyle.markers.borderTransparency,
+                      )
+                    : "none";
+                  return chartMarker(
+                    index,
+                    lineMarker,
+                    pointMarkerPoint(index),
+                    markerFill,
+                    markerStroke,
+                    lineChartStyle.markers.borderWidth,
+                    lineChartStyle.markers.rotation,
+                  );
+                })}
+              {lineChartStyle.trend.show && (
+                <span
+                  className="chart-preview__trend-line"
+                  aria-hidden="true"
+                  style={{
+                    borderTopWidth: lineChartStyle.trend.width,
+                    borderTopColor: lineChartStyle.trend.lineColor,
+                    borderTopStyle: mapLineStyle(lineChartStyle.trend.style),
+                    opacity: 1 - lineChartStyle.trend.transparency / 100,
+                  }}
+                />
+              )}
+              {/* One label per point, thinned by label density like Power BI.
+                  Anchored to the same point geometry as the path and markers. */}
+              {linePointValues.map((_, index) =>
+                labelVisibleAt(index, pointCount, lineChartStyle.labels.labelDensity) ? (
+                  <span
+                    key={index}
+                    className="line-preview__label"
+                    style={{ left: `${pointPercent(index).left}%`, top: `${pointPercent(index).top}%` }}
+                  >
+                    <DataLabel
+                      labels={lineChartStyle.labels}
+                      category={lineCategoryLabels[index] ?? ""}
+                      value={linePointValues[index] * 1000}
+                      detail={linePointValues[index] * 8}
+                    />
+                  </span>
+                ) : null,
+              )}
             </span>
-          ) : null,
-        )}
-      </span>
-      {lineChartStyle.categoryAxis.show && (
-        <span className="line-preview__axis-labels">
-          {lineCategoryLabels.map((label) => (
-            <span key={label} style={textStyle(lineChartStyle.categoryAxis)}>
-              {label}
-            </span>
-          ))}
-        </span>
-      )}
-      {lineChartStyle.categoryAxis.showAxisTitle && (
-        <span className="chart-preview__axis-title" style={axisTitleStyle(lineChartStyle.categoryAxis)}>
-          {String(lineChartStyle.categoryAxis.titleText) || "Month"}
-        </span>
-      )}
+            {/* Labels sit on the same category slots the points are centred in,
+                so inverting the category axis moves both together. */}
+            <CategoryAxisGutter
+              axis={lineChartStyle.categoryAxis}
+              layout={layout}
+              categories={lineCategoryLabels}
+              offset={valueGutter}
+              titleFallback="Month"
+            />
+          </span>
         </span>
       </span>
       {lineLegendAtBottom && lineLegendNode}
