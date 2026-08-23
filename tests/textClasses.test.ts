@@ -23,13 +23,20 @@ import {
  */
 
 /**
- * The real private theme. It lives in the user's Downloads rather than the repo
- * — it is a real customer theme, deliberately not vendored — so the tests
- * that need it skip when it is absent instead of failing on another machine.
+ * An optional private real-world theme, used to check the resolver against
+ * something a person actually shipped rather than only against fixtures we
+ * wrote ourselves.
+ *
+ * It is deliberately NOT in the repository — it belongs to someone else — so
+ * the tests that use it skip when it is absent. Point PBI_PRIVATE_THEME at a
+ * theme JSON file to run them.
  */
-const PRIVATE_THEME_PATH = `${process.env.USERPROFILE ?? ""}/Downloads/private-theme-fixture.json`;
+const PRIVATE_THEME_PATH =
+  process.env.PBI_PRIVATE_THEME ??
+  `${process.env.USERPROFILE ?? process.env.HOME ?? ""}/Downloads/private-theme-fixture.json`;
 const hasPrivateTheme = existsSync(PRIVATE_THEME_PATH);
-const privateTheme = (): PowerBITheme => JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
+const privateTheme = (): PowerBITheme =>
+  JSON.parse(readFileSync(PRIVATE_THEME_PATH, "utf8")) as PowerBITheme;
 
 const EMPTY: PowerBITheme = { name: "none", visualStyles: {} };
 
@@ -295,9 +302,9 @@ test("PILOT: a custom explicit visualStyles value beats both", () => {
   assert.equal(s.legend.fontSize, 14, "PRIMARY_ONLY's label size, via lightLabel");
 });
 
-test("PILOT: private theme + Classic uses the theme's own Arial typography", { skip: hasPrivateTheme ? false : "private fixture not present" }, () => {
-  const privateThemeFixture = privateTheme();
-  const s = barStyle(privateThemeFixture, "classic2026");
+test("PILOT: the private theme + Classic uses that theme's own Arial typography", { skip: hasPrivateTheme ? false : "private theme fixture not present" }, () => {
+  const theme = privateTheme();
+  const s = barStyle(theme, "classic2026");
   for (const family of [
     s.categoryAxis.fontFamily,
     s.categoryAxis.titleFontFamily,
@@ -309,7 +316,7 @@ test("PILOT: private theme + Classic uses the theme's own Arial typography", { s
   }
   assert.equal(s.categoryAxis.fontSize, 10);
   assert.equal(s.categoryAxis.titleFontSize, 12);
-  // the private theme declares smallLightLabel explicitly at 10, so the 0.9 scale does not
+  // It declares smallLightLabel explicitly at 10, so the 0.9 scale does not
   // apply — an explicit secondary outranks the derivation.
   assert.equal(s.valueAxis.fontSize, 10);
 });
@@ -337,14 +344,14 @@ test("PILOT: a text-class-derived value is never an explicit override", () => {
   assert.equal(hasThemeValueAtPath(PRIMARY_ONLY, path), false, "resolving must not have set anything");
 });
 
-test("resolution does not mutate the theme it reads", { skip: hasPrivateTheme ? false : "private fixture not present" }, () => {
-  const privateThemeFixture = privateTheme();
-  const before = JSON.stringify(privateThemeFixture);
-  barStyle(privateThemeFixture, "classic2026");
-  barStyle(privateThemeFixture, "fluent2");
-  resolveTextClass(withClassic(privateThemeFixture), "smallLightLabel");
-  resolveTextClass(withFluent(privateThemeFixture), "lightLabel");
-  assert.equal(JSON.stringify(privateThemeFixture), before, "the imported theme must round-trip untouched");
+test("resolution does not mutate the theme it reads", { skip: hasPrivateTheme ? false : "private theme fixture not present" }, () => {
+  const theme = privateTheme();
+  const before = JSON.stringify(theme);
+  barStyle(theme, "classic2026");
+  barStyle(theme, "fluent2");
+  resolveTextClass(withClassic(theme), "smallLightLabel");
+  resolveTextClass(withFluent(theme), "lightLabel");
+  assert.equal(JSON.stringify(theme), before, "the imported theme must round-trip untouched");
 
   // Power BI's own implementation mutates the object it is handed; ours must
   // not, because the same object is what the user exports.

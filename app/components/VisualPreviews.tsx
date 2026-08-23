@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
+import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
@@ -239,7 +240,7 @@ function shapeTile(
           style={{
             color: style.text.fontColor,
             fontFamily: style.text.fontFamily || undefined,
-            fontSize: style.text.fontSize,
+            fontSize: themeFontSizeToCssPx(style.text.fontSize),
             fontWeight: style.text.bold ? 700 : 400,
             fontStyle: style.text.italic ? "italic" : "normal",
             textDecoration: style.text.underline ? "underline" : "none",
@@ -555,7 +556,7 @@ function PreviewShell({
         backgroundColor: hexWithAlpha(headerTooltip.themedBackground || headerTooltip.background, headerTooltip.transparency),
         color: headerTooltip.themedTitleFontColor || headerTooltip.titleFontColor,
         fontFamily: headerTooltip.fontFamily || undefined,
-        fontSize: headerTooltip.fontSize,
+        fontSize: themeFontSizeToCssPx(headerTooltip.fontSize),
         fontWeight: headerTooltip.bold ? 700 : 400,
         fontStyle: headerTooltip.italic ? "italic" : "normal",
         textDecoration: headerTooltip.underline ? "underline" : "none",
@@ -636,7 +637,7 @@ function PreviewShell({
               backgroundColor: chrome.title.background,
               color: chrome.title.fontColor,
               fontFamily: chrome.title.fontFamily,
-              fontSize: chrome.title.fontSize,
+              fontSize: themeFontSizeToCssPx(chrome.title.fontSize),
               fontWeight: chrome.title.bold ? 700 : 400,
               fontStyle: chrome.title.italic ? "italic" : "normal",
               textDecoration: chrome.title.underline ? "underline" : "none",
@@ -660,7 +661,7 @@ function PreviewShell({
               backgroundColor: chrome.title.background,
               color: chrome.subTitle.fontColor,
               fontFamily: chrome.subTitle.fontFamily,
-              fontSize: chrome.subTitle.fontSize,
+              fontSize: themeFontSizeToCssPx(chrome.subTitle.fontSize),
               fontWeight: chrome.subTitle.bold ? 700 : 400,
               fontStyle: chrome.subTitle.italic ? "italic" : "normal",
               textDecoration: chrome.subTitle.underline ? "underline" : "none",
@@ -800,7 +801,7 @@ export function VisualGallery({
       <span
         className="card-preview__value"
         style={{
-          fontSize: cardStyle.labels.fontSize,
+          fontSize: themeFontSizeToCssPx(cardStyle.labels.fontSize),
           color: cardStyle.labels.color,
           fontFamily: cardStyle.labels.fontFamily || undefined,
           fontWeight: cardStyle.labels.bold ? 700 : 400,
@@ -815,7 +816,7 @@ export function VisualGallery({
         <span
           className="card-preview__category"
           style={{
-            fontSize: cardStyle.categoryLabels.fontSize,
+            fontSize: themeFontSizeToCssPx(cardStyle.categoryLabels.fontSize),
             color: cardStyle.categoryLabels.color,
             fontFamily: cardStyle.categoryLabels.fontFamily || undefined,
             fontWeight: cardStyle.categoryLabels.bold ? 700 : 400,
@@ -874,7 +875,7 @@ export function VisualGallery({
           backgroundColor: tableStyle.columnHeaders.backColor,
           color: tableStyle.columnHeaders.fontColor,
           fontFamily: tableStyle.columnHeaders.fontFamily,
-          fontSize: tableStyle.columnHeaders.fontSize,
+          fontSize: themeFontSizeToCssPx(tableStyle.columnHeaders.fontSize),
           fontWeight: tableStyle.columnHeaders.bold ? 700 : 400,
           fontStyle: tableStyle.columnHeaders.italic ? "italic" : "normal",
           textDecoration: tableStyle.columnHeaders.underline ? "underline" : "none",
@@ -902,7 +903,7 @@ export function VisualGallery({
               backgroundColor: banded ? tableStyle.values.backColorSecondary : tableStyle.values.backColorPrimary,
               color: banded ? tableStyle.values.fontColorSecondary : tableStyle.values.fontColorPrimary,
               fontFamily: tableStyle.values.fontFamily,
-              fontSize: tableStyle.values.fontSize,
+              fontSize: themeFontSizeToCssPx(tableStyle.values.fontSize),
               fontWeight: tableStyle.values.bold ? 700 : 400,
               fontStyle: tableStyle.values.italic ? "italic" : "normal",
               textDecoration: tableStyle.values.underline ? "underline" : "none",
@@ -927,7 +928,7 @@ export function VisualGallery({
             backgroundColor: tableStyle.total.backColor,
             color: tableStyle.total.fontColor,
             fontFamily: tableStyle.total.fontFamily,
-            fontSize: tableStyle.total.fontSize,
+            fontSize: themeFontSizeToCssPx(tableStyle.total.fontSize),
             fontWeight: tableStyle.total.bold ? 700 : 400,
             fontStyle: tableStyle.total.italic ? "italic" : "normal",
             textDecoration: tableStyle.total.underline ? "underline" : "none",
@@ -944,7 +945,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.columnHeaders.backColor,
     color: matrixStyle.columnHeaders.fontColor,
     fontFamily: matrixStyle.columnHeaders.fontFamily,
-    fontSize: matrixStyle.columnHeaders.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.columnHeaders.fontSize),
     fontWeight: matrixStyle.columnHeaders.bold ? 700 : 400,
     fontStyle: matrixStyle.columnHeaders.italic ? "italic" : "normal",
     textDecoration: matrixStyle.columnHeaders.underline ? "underline" : "none",
@@ -953,7 +954,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.rowHeaders.backColor,
     color: matrixStyle.rowHeaders.fontColor,
     fontFamily: matrixStyle.rowHeaders.fontFamily,
-    fontSize: matrixStyle.rowHeaders.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.rowHeaders.fontSize),
     fontWeight: matrixStyle.rowHeaders.bold ? 700 : 400,
     fontStyle: matrixStyle.rowHeaders.italic ? "italic" : "normal",
     textDecoration: matrixStyle.rowHeaders.underline ? "underline" : "none",
@@ -962,7 +963,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.values.backColor,
     color: matrixStyle.values.fontColor,
     fontFamily: matrixStyle.values.fontFamily,
-    fontSize: matrixStyle.values.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.values.fontSize),
     fontWeight: matrixStyle.values.bold ? 700 : 400,
     fontStyle: matrixStyle.values.italic ? "italic" : "normal",
     textDecoration: matrixStyle.values.underline ? "underline" : "none",
@@ -971,7 +972,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.columnTotal.backColor,
     color: matrixStyle.columnTotal.fontColor,
     fontFamily: matrixStyle.columnTotal.fontFamily,
-    fontSize: matrixStyle.columnTotal.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.columnTotal.fontSize),
     fontWeight: matrixStyle.columnTotal.bold ? 700 : 400,
     fontStyle: matrixStyle.columnTotal.italic ? "italic" : "normal",
     textDecoration: matrixStyle.columnTotal.underline ? "underline" : "none",
@@ -980,7 +981,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.rowTotal.backColor,
     color: matrixStyle.rowTotal.fontColor,
     fontFamily: matrixStyle.rowTotal.fontFamily,
-    fontSize: matrixStyle.rowTotal.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.rowTotal.fontSize),
     fontWeight: matrixStyle.rowTotal.bold ? 700 : 400,
     fontStyle: matrixStyle.rowTotal.italic ? "italic" : "normal",
     textDecoration: matrixStyle.rowTotal.underline ? "underline" : "none",
@@ -989,7 +990,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.total.backColor,
     color: matrixStyle.total.fontColor,
     fontFamily: matrixStyle.total.fontFamily,
-    fontSize: matrixStyle.total.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.total.fontSize),
     fontWeight: matrixStyle.total.bold ? 700 : 400,
     fontStyle: matrixStyle.total.italic ? "italic" : "normal",
     textDecoration: matrixStyle.total.underline ? "underline" : "none",
@@ -1001,7 +1002,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.subTotals.backColor,
     color: matrixStyle.subTotals.fontColor,
     fontFamily: matrixStyle.subTotals.fontFamily,
-    fontSize: matrixStyle.subTotals.fontSize,
+    fontSize: themeFontSizeToCssPx(matrixStyle.subTotals.fontSize),
     fontWeight: matrixStyle.subTotals.bold ? 700 : 400,
     fontStyle: matrixStyle.subTotals.italic ? "italic" : "normal",
     textDecoration: matrixStyle.subTotals.underline ? "underline" : "none",
@@ -1091,7 +1092,7 @@ export function VisualGallery({
       className="matrix-preview"
       style={{
         border: `${matrixStyle.grid.outlineWeight}px solid ${matrixStyle.grid.outlineColor}`,
-        fontSize: matrixStyle.grid.textSize,
+        fontSize: themeFontSizeToCssPx(matrixStyle.grid.textSize),
       }}
     >
       <span className="matrix-preview__cell matrix-preview__cell--corner" style={matrixHeaderCellStyle} />
@@ -1325,7 +1326,7 @@ export function VisualGallery({
               style={{
                 color: pieChartStyle.labels.color,
                 fontFamily: pieChartStyle.labels.fontFamily,
-                fontSize: pieChartStyle.labels.fontSize,
+                fontSize: themeFontSizeToCssPx(pieChartStyle.labels.fontSize),
                 fontWeight: pieChartStyle.labels.bold ? 700 : 400,
                 fontStyle: pieChartStyle.labels.italic ? "italic" : "normal",
                 textDecoration: pieChartStyle.labels.underline ? "underline" : "none",
@@ -1350,7 +1351,7 @@ export function VisualGallery({
                   style={{
                     color: pieChartStyle.legend.labelColor,
                     fontFamily: pieChartStyle.legend.fontFamily,
-                    fontSize: pieChartStyle.legend.fontSize,
+                    fontSize: themeFontSizeToCssPx(pieChartStyle.legend.fontSize),
                     fontWeight: pieChartStyle.legend.bold ? 700 : 400,
                     fontStyle: pieChartStyle.legend.italic ? "italic" : "normal",
                     textDecoration: pieChartStyle.legend.underline ? "underline" : "none",
@@ -1370,7 +1371,7 @@ export function VisualGallery({
     backgroundColor: slicerStyle.items.background,
     color: slicerStyle.items.fontColor,
     fontFamily: slicerStyle.items.fontFamily || undefined,
-    fontSize: slicerStyle.items.textSize,
+    fontSize: themeFontSizeToCssPx(slicerStyle.items.textSize),
     fontWeight: slicerStyle.items.bold ? 700 : 400,
     fontStyle: slicerStyle.items.italic ? "italic" : "normal",
     textDecoration: slicerStyle.items.underline ? "underline" : "none",
@@ -1383,7 +1384,7 @@ export function VisualGallery({
     backgroundColor: slicerStyle.date.background,
     color: slicerStyle.date.fontColor,
     fontFamily: slicerStyle.date.fontFamily || undefined,
-    fontSize: slicerStyle.date.textSize,
+    fontSize: themeFontSizeToCssPx(slicerStyle.date.textSize),
     fontWeight: slicerStyle.date.bold ? 700 : 400,
     fontStyle: slicerStyle.date.italic ? "italic" : "normal",
     textDecoration: slicerStyle.date.underline ? "underline" : "none",
@@ -1393,7 +1394,7 @@ export function VisualGallery({
     backgroundColor: slicerStyle.numericInputStyle.background,
     color: slicerStyle.numericInputStyle.fontColor,
     fontFamily: slicerStyle.numericInputStyle.fontFamily || undefined,
-    fontSize: slicerStyle.numericInputStyle.textSize,
+    fontSize: themeFontSizeToCssPx(slicerStyle.numericInputStyle.textSize),
     fontWeight: slicerStyle.numericInputStyle.bold ? 700 : 400,
     fontStyle: slicerStyle.numericInputStyle.italic ? "italic" : "normal",
     textDecoration: slicerStyle.numericInputStyle.underline ? "underline" : "none",
@@ -1473,7 +1474,7 @@ export function VisualGallery({
             backgroundColor: slicerStyle.header.background,
             color: slicerStyle.header.fontColor,
             fontFamily: slicerStyle.header.fontFamily || undefined,
-            fontSize: slicerStyle.header.textSize,
+            fontSize: themeFontSizeToCssPx(slicerStyle.header.textSize),
             fontWeight: slicerStyle.header.bold ? 700 : 400,
             fontStyle: slicerStyle.header.italic ? "italic" : "normal",
             textDecoration: slicerStyle.header.underline ? "underline" : "none",
@@ -1577,7 +1578,7 @@ export function VisualGallery({
             style={{
               color: hexWithAlpha(slicerStyle.dateRangeText.color, slicerStyle.dateRangeText.transparency),
               fontFamily: slicerStyle.dateRangeText.fontFamily || undefined,
-              fontSize: slicerStyle.dateRangeText.fontSize,
+              fontSize: themeFontSizeToCssPx(slicerStyle.dateRangeText.fontSize),
               fontWeight: slicerStyle.dateRangeText.bold ? 700 : 400,
               fontStyle: slicerStyle.dateRangeText.italic ? "italic" : "normal",
               textDecoration: slicerStyle.dateRangeText.underline ? "underline" : "none",
@@ -1624,7 +1625,7 @@ export function VisualGallery({
               style={{
                 color: hexWithAlpha(slicerStyle.relativeText.color, slicerStyle.relativeText.transparency),
                 fontFamily: slicerStyle.relativeText.fontFamily || undefined,
-                fontSize: slicerStyle.relativeText.fontSize,
+                fontSize: themeFontSizeToCssPx(slicerStyle.relativeText.fontSize),
                 fontWeight: slicerStyle.relativeText.bold ? 700 : 400,
                 fontStyle: slicerStyle.relativeText.italic ? "italic" : "normal",
                 textDecoration: slicerStyle.relativeText.underline ? "underline" : "none",
@@ -1751,7 +1752,7 @@ export function VisualGallery({
       style={{
         color: textboxStyle.text.color,
         fontFamily: textboxStyle.text.fontFamily || undefined,
-        fontSize: textboxStyle.text.fontSize,
+        fontSize: themeFontSizeToCssPx(textboxStyle.text.fontSize),
       }}
     >
       Add a text box to annotate your report with headings, notes, or instructions.

@@ -16,7 +16,7 @@ was changed by this task.**
 
 | | |
 |---|---|
-| Theme | `%USERPROFILE%\Downloads\private-theme-fixture.json` — "a private real-world theme", 44,209 bytes, unmodified |
+| Theme | A private real-world theme, 44,209 bytes, unmodified. Deliberately not vendored into the repository — it belongs to someone else — so it lives outside the tree and the tests that use it skip when it is absent |
 | Working copy | Copied to `themes/local/` **only** so the dev server could serve it to the browser for a genuine file-input import. That directory is gitignored (`.gitignore:44`), so nothing entered the repository. Deleted after the audit |
 | Visual | Clustered Bar, hero |
 | Viewport | 1440×900, `devicePixelRatio = 1` |
@@ -306,11 +306,56 @@ against 6px axis text and now has 20.25px less to give.
 Classic's thicker bars now absorb the 1px error; Fluent's are unchanged.
 The defect is neither fixed nor worsened.
 
-A secondary units question, flagged not resolved: Power BI theme JSON expresses
-font size in **points**, and the preview applies the number directly as CSS
-`px`. Fluent's `10.5` renders as `10.5px`, where 10.5pt is 14px. That is a
-separate ~33% typography discrepancy affecting *every* chart, independent of
-the fallback problem.
+### 4.4 Font units — **PROVEN and fixed (phase 2 task 5)**
+
+This was flagged here as unresolved. It is now settled from the runtime.
+Power BI Desktop's bundle carries the conversion with its names intact
+(`desktop.min.js`, module 290100):
+
+```js
+class PixelConverter {
+  static PxPtRatio = 4 / 3;
+  static fromPointToPixel(e) { return PixelConverter.PxPtRatio * e; }
+  static toPoint(e)          { return e / PixelConverter.PxPtRatio; }
+  static fromPoint(e)        { return PixelConverter.toString(PixelConverter.fromPointToPixel(e)); }
+}
+```
+
+Two independent paths feed a theme number into it:
+
+- **text classes** (module 480549) read
+  `theme.textClasses[name].fontSize` and pass it to
+  `FontSize.createFromPt(+fontSize)`, which stores `{ pt, px: pt * 4/3 }`;
+- **visualStyles properties** (module 4393285) resolve a font size as
+  `sizeInPixels ? createFromPx(v) : createFromPt(v)`. The pixel flag occurs
+  once in the entire bundle, so points is the rule.
+
+CSS strings are then built with `PixelConverter.fromPoint(pt)`.
+
+Running Power BI's own extracted converter gives:
+
+| Theme value | CSS px |
+|---:|---:|
+| 6 | 8 |
+| 9 | 12 |
+| 10 | 13.333… |
+| 10.5 | **14** |
+| 12 | 16 |
+| 14 | 18.666… |
+| 24 | 32 |
+
+4/3 is also exactly the CSS ratio (96/72), and the base themes corroborate
+it: Fluent 2 stores `label.fontSize` as **10.5** precisely because that is
+14px on the nose in a system designed in pixels; Classic 2026's `callout`
+24 is 32px and its `title` 12 is 16px. The bundled report-theme schema
+names "pixels" explicitly where it means pixels (outline thickness, dash
+lengths) but leaves font sizes unit-less with an 8..60 bound — a point
+range.
+
+Theme Studio now converts at a single rendering/measurement boundary
+(`app/lib/fontUnits.ts`). Raw point values stay raw everywhere else: the
+property editor shows 10 and the exporter writes 10, while the preview
+draws 13.333px.
 
 ---
 
@@ -621,7 +666,7 @@ Fixes 1 and 2 are independent and can land in either order. Fix 4 depends on 1.
 
 ## 15. Acceptance questions
 
-1. **Why does private theme + Fluent differ from private theme + Classic?** 40 of 432 resolved
+1. **Why does the private theme + Fluent differ from the private theme + Classic?** 40 of 432 resolved
    properties differ; 38 are Classic falling back where Fluent declares a
    value. The visible consequences are typography (6px vs 10.5px), legend
    placement, and `innerPadding` 10 vs 50 — with all geometry changes
@@ -652,6 +697,6 @@ Fixes 1 and 2 are independent and can land in either order. Fix 4 depends on 1.
 
 **Scope statement.** Diagnosis only. No resolver fallback, base theme,
 `ChartLayout`, renderer, sample data or CSS was modified. All browser overrides
-were temporary, reverted in-session, and are not in the repository. The private theme
+were temporary, reverted in-session, and are not in the repository. The private
 theme file was not modified, and its working copy lived only in the gitignored
 `themes/local/`.

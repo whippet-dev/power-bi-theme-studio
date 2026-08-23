@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
+import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { InteractionState } from "../lib/properties";
 import { StateSelector } from "./PropertyEditor";
@@ -110,7 +111,7 @@ export function PreviewInspector({
               style={{
                 backgroundColor: hexWithAlpha(tooltip.themedBackground || tooltip.background, tooltip.transparency),
                 fontFamily: tooltip.fontFamily || undefined,
-                fontSize: tooltip.fontSize,
+                fontSize: themeFontSizeToCssPx(tooltip.fontSize),
                 fontWeight: tooltip.bold ? 700 : 400,
                 fontStyle: tooltip.italic ? "italic" : "normal",
                 textDecoration: tooltip.underline ? "underline" : "none",
