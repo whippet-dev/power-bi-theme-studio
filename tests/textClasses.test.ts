@@ -67,13 +67,15 @@ test("a primary class resolves straight from the theme that declares it", () => 
   assert.equal(r.fontFamily, "Comic Sans MS");
   assert.equal(r.fontSize, 14);
   assert.equal(r.color, "#0000FF");
-  assert.equal(r.source.fontSize, "custom-primary");
+  // For a primary the class IS the primary, so the two provenance labels
+  // describe the same declaration; the more precise one is reported.
+  assert.equal(r.source.fontSize, "custom-class");
 
   // And from the base when the custom theme is silent.
   const b = resolveTextClass(withClassic(EMPTY), "label");
   assert.equal(b.fontFamily, "Segoe UI");
   assert.equal(b.fontSize, 10);
-  assert.equal(b.source.fontSize, "base-primary");
+  assert.equal(b.source.fontSize, "base-class");
 });
 
 // ---------------------------------------------------------------------------
@@ -120,8 +122,8 @@ test("the other derived classes follow the same table", () => {
   assert.equal(resolveTextClass(l, "largeTitle").fontSize, 25.7);
   assert.equal(resolveTextClass(l, "largeTitle").fontFamily, "Courier New", "derives from title");
   // Weight-bearing classes get their weight by derivation.
-  assert.equal(resolveTextClass(l, "boldLabel").fontWeight, "bold");
-  assert.equal(resolveTextClass(l, "semiboldLabel").fontWeight, "semibold");
+  assert.equal(resolveTextClass(l, "boldLabel").fontWeight, "700");
+  assert.equal(resolveTextClass(l, "semiboldLabel").fontWeight, "600");
   assert.equal(resolveTextClass(l, "lightLabel").fontWeight, undefined, "no weight unless the class has one");
   // The data classes take the first data colour.
   assert.equal(resolveTextClass(l, "dataTitle").color, "#123456");
@@ -353,3 +355,173 @@ test("resolution does not mutate the theme it reads", { skip: hasPrivateTheme ? 
   assert.equal(JSON.stringify(primaryOnly), snapshot);
 });
 
+// ---------------------------------------------------------------------------
+// Font weight
+// ---------------------------------------------------------------------------
+
+test("a primary class resolves its own explicit fontWeight", () => {
+  // Primaries bypass applyTextClassDefaults entirely — Power BI passes them
+  // through verbatim — so a declared weight must simply resolve.
+  const custom: PowerBITheme = {
+    name: "c",
+    textClasses: {
+      ...PRIMARY_ONLY.textClasses,
+      label: { fontFace: "F", fontSize: 11, color: "#010203", fontWeight: "bold" },
+    },
+    visualStyles: {},
+  };
+  const r = resolveTextClass(withClassic(custom), "label");
+  assert.equal(r.fontWeight, "bold", "the theme's own word is kept verbatim");
+  assert.equal(r.source.fontWeight, "custom-class");
+});
+
+test("primary fontWeight precedence is custom, then base, then unset", () => {
+  const base: PowerBITheme = {
+    name: "b",
+    textClasses: {
+      callout: { fontFace: "A", fontSize: 40, color: "#111111" },
+      header: { fontFace: "A", fontSize: 20, color: "#111111" },
+      title: { fontFace: "A", fontSize: 12, color: "#111111" },
+      label: { fontFace: "A", fontSize: 10, color: "#111111", fontWeight: "300" },
+    },
+    visualStyles: {},
+  };
+  const bare: PowerBITheme = { name: "c", visualStyles: {} };
+  assert.equal(resolveTextClass(themeLayers(bare, base), "label").fontWeight, "300");
+  assert.equal(resolveTextClass(themeLayers(bare, base), "label").source.fontWeight, "base-class");
+
+  // Custom wins, and the two values are deliberately different.
+  const custom: PowerBITheme = { name: "c", textClasses: { label: { fontWeight: "800" } }, visualStyles: {} };
+  const r = resolveTextClass(themeLayers(custom, base), "label");
+  assert.equal(r.fontWeight, "800");
+  assert.equal(r.source.fontWeight, "custom-class");
+
+  // Neither declares one for `title`, so it stays unset.
+  assert.equal(resolveTextClass(themeLayers(custom, base), "title").fontWeight, undefined);
+});
+
+test("an ordinary secondary does NOT inherit the primary's fontWeight", () => {
+  // The guard is `if (e.fontWeight == null && r != null)`. For lightLabel,
+  // smallLabel and largeLabel there is no `r`, so the block is skipped and the
+  // weight is never filled in from the primary.
+  const custom: PowerBITheme = {
+    name: "c",
+    textClasses: {
+      ...PRIMARY_ONLY.textClasses,
+      label: { fontFace: "F", fontSize: 10, color: "#010203", fontWeight: "bold" },
+    },
+    visualStyles: {},
+  };
+  const l = withClassic(custom);
+  assert.equal(resolveTextClass(l, "label").fontWeight, "bold", "the primary has it");
+  for (const name of ["lightLabel", "smallLabel", "smallLightLabel", "largeLabel"] as const) {
+    assert.equal(resolveTextClass(l, name).fontWeight, undefined, `${name} must not inherit it`);
+  }
+});
+
+test("boldLabel and semiboldLabel derive CSS numeric weights", () => {
+  // The enum beside applyTextClassDefaults reads Bold="700", Semibold="600".
+  const l = withClassic(PRIMARY_ONLY);
+  assert.equal(resolveTextClass(l, "boldLabel").fontWeight, "700");
+  assert.equal(resolveTextClass(l, "semiboldLabel").fontWeight, "600");
+  assert.equal(resolveTextClass(l, "boldLabel").source.fontWeight, "derived-default");
+});
+
+test("an explicit secondary fontWeight beats the class's own derived weight", () => {
+  // Deliberately conflicting: the class wants 700, the theme says 200.
+  const custom: PowerBITheme = {
+    ...PRIMARY_ONLY,
+    textClasses: { ...PRIMARY_ONLY.textClasses, boldLabel: { fontWeight: "200" } },
+  };
+  const r = resolveTextClass(withClassic(custom), "boldLabel");
+  assert.equal(r.fontWeight, "200");
+  assert.equal(r.source.fontWeight, "custom-class");
+  assert.equal(r.fontSize, 14, "its other fields still derive from label");
+});
+
+// ---------------------------------------------------------------------------
+// Colour tokens resolve against the merged roots
+// ---------------------------------------------------------------------------
+
+test("a BASE class's colour token resolves against the CUSTOM root value", () => {
+  // Where a declaration lives and what its tokens mean are separate axes. The
+  // base class survives, but its token must see the custom theme's override.
+  const base: PowerBITheme = {
+    name: "b",
+    foregroundNeutralSecondary: "#111111",
+    textClasses: {
+      callout: { fontFace: "A", fontSize: 40, color: "#111111" },
+      header: { fontFace: "A", fontSize: 20, color: "#111111" },
+      title: { fontFace: "A", fontSize: 12, color: "#111111" },
+      label: { fontFace: "A", fontSize: 10, color: "#111111" },
+      lightLabel: { color: "foregroundNeutralSecondary" },
+    },
+    visualStyles: {},
+  };
+  const custom: PowerBITheme = { name: "c", foregroundNeutralSecondary: "#FF00FF", visualStyles: {} };
+
+  const r = resolveTextClass(themeLayers(custom, base), "lightLabel");
+  assert.equal(r.color, "#FF00FF", "not the base's stale #111111");
+  // Provenance describes the DECLARATION — still the base's class — not where
+  // the token's value came from.
+  assert.equal(r.source.color, "base-class");
+});
+
+test("a CUSTOM class may name a token only the base defines", () => {
+  const base: PowerBITheme = {
+    name: "b",
+    tableAccent: "#ABCDEF",
+    textClasses: {
+      callout: { fontFace: "A", fontSize: 40, color: "#111111" },
+      header: { fontFace: "A", fontSize: 20, color: "#111111" },
+      title: { fontFace: "A", fontSize: 12, color: "#111111" },
+      label: { fontFace: "A", fontSize: 10, color: "#111111" },
+    },
+    visualStyles: {},
+  };
+  const custom: PowerBITheme = { name: "c", textClasses: { label: { color: "tableAccent" } }, visualStyles: {} };
+  const r = resolveTextClass(themeLayers(custom, base), "label");
+  assert.equal(r.color, "#ABCDEF", "the custom layer must not have to duplicate the token");
+  assert.equal(r.source.color, "custom-class");
+});
+
+test("a literal hex in a class is unaffected by token merging", () => {
+  const custom: PowerBITheme = {
+    ...PRIMARY_ONLY,
+    foregroundNeutralSecondary: "#FF00FF",
+    textClasses: { ...PRIMARY_ONLY.textClasses, lightLabel: { color: "#00FF00" } },
+  };
+  assert.equal(resolveTextClass(withClassic(custom), "lightLabel").color, "#00FF00");
+});
+
+test("the derived light colour follows the merged root token", () => {
+  const custom: PowerBITheme = { name: "c", foregroundNeutralSecondary: "#FF00FF", visualStyles: {} };
+  assert.equal(resolveTextClass(withClassic(custom), "lightLabel").color, "#FF00FF");
+  assert.equal(resolveTextClass(withClassic({ name: "c", visualStyles: {} }), "lightLabel").color, "#605E5C");
+});
+
+// ---------------------------------------------------------------------------
+// Main data-label colour
+// ---------------------------------------------------------------------------
+
+test("PILOT: the main data-label colour follows smallLightLabel, not the palette", () => {
+  // The first data colour is deliberately nothing like the light label colour,
+  // so the old `base.palette[0]` fallback cannot pass by coincidence.
+  const custom: PowerBITheme = {
+    ...PRIMARY_ONLY,
+    dataColors: ["#FF0000"],
+    foregroundNeutralSecondary: "#00FF00",
+  };
+  const s = barStyle(custom, "classic2026");
+  assert.equal(s.labels.color, "#00FF00", "smallLightLabel's colour");
+  assert.notEqual(s.labels.color, "#FF0000", "not the first data colour");
+
+  // An explicit visualStyles value still wins.
+  const overridden = updateThemeValue(custom, ["visualStyles", "clusteredBarChart", "*", "labels", 0, "color"], {
+    solid: { color: "#0000FF" },
+  });
+  assert.equal(barStyle(overridden, "classic2026").labels.color, "#0000FF");
+
+  // detailColor is deliberately NOT migrated: its Power BI role is unproven.
+  assert.equal(s.labels.detailColor, "#FF0000", "still the first data colour");
+});

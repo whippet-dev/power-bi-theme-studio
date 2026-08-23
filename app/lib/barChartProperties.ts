@@ -883,7 +883,11 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       backgroundColor: resolvePropertyValue(theme, p.labels.backgroundColor, base.background),
       backgroundTransparency: resolvePropertyValue(theme, p.labels.backgroundTransparency, 0),
       bold: resolvePropertyValue(theme, p.labels.bold, false),
-      color: resolvePropertyValue(theme, p.labels.color, base.palette[0] ?? base.foreground),
+      // The main data-label value, whose Power BI role is smallLightLabel.
+      // `detailColor` and the title fields keep the old fallback: their roles
+      // are not established, and guessing them is the registry-completion
+      // task's job, not this one's.
+      color: resolvePropertyValue(theme, p.labels.color, dataLabelText.color),
       detailBold: resolvePropertyValue(theme, p.labels.detailBold, false),
       detailColor: resolvePropertyValue(theme, p.labels.detailColor, base.palette[0] ?? base.foreground),
       detailContentType: resolvePropertyValue(theme, p.labels.detailContentType, "Percent of total"),

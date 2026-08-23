@@ -224,6 +224,32 @@ and hard-coding the values this table produces: `largeLabel` 12 = label 10
 × 1.2, `largeTitle` 14 = title 12 × 7/6, and `lightLabel.color` `#605E5C`
 = Classic 2026's `foregroundNeutralSecondary` exactly.
 
+**Font weight**, from the same helper's guard
+`if (e.fontWeight == null && r != null)`:
+
+- an explicitly declared weight always wins, on any class;
+- otherwise a weight is supplied **only** for the two classes that exist to
+  carry one — `boldLabel` and `semiboldLabel`;
+- an ordinary secondary (`lightLabel`, `smallLabel`, `smallLightLabel`,
+  `largeLabel`) therefore does **not** inherit its primary's weight: `r` is
+  undefined for those and the block is skipped entirely;
+- a primary carries whatever it declares, because primaries are passed
+  through verbatim and never reach the helper at all.
+
+The derived weights are **CSS numerics, not words**: the enum in the same
+bundle module reads `e.Bold="700", e.Semibold="600"`. A theme that writes
+`"fontWeight": "bold"` itself keeps that string verbatim — only the derived
+value is normalised.
+
+**Colour tokens** are resolved against the *merged* root theme, not the
+layer the class field was declared in. Where a declaration lives and what
+its tokens mean are separate axes: a base class saying
+`"color": "foregroundNeutralSecondary"` must pick up a custom theme's
+override of that token, and a custom class may name a token only the base
+defines. `readVisualStyleValue` already resolves `visualStyles` colours this
+way. Provenance continues to describe where the *declaration* was found,
+which is deliberately not the same as where the token's value came from.
+
 The same bundle also expands a primary's `fontFace` through an alias table
 (`Segoe UI` → `'Segoe UI', wf_segoe-ui_normal, helvetica, arial,
 sans-serif`, which is what Fluent 2's `visualStyles` carries). Only the
@@ -242,7 +268,16 @@ resolver only:
 | Value axis label | 6px, no family | **10px Arial `#605E5C`** |
 | Axis titles | 6px, no family | **12px Arial `#252423`** |
 | Legend | 6px, no family | **10px Arial `#605E5C`** |
-| Data labels | 6px, no family | **10px Arial** |
+| Data labels | 6px, no family, palette colour | **10px Arial `#605E5C`** |
+
+**19 property definitions** were migrated — the counting unit is one
+resolver call site, i.e. one `PropertyDefinition`, with none counted twice:
+three each for category axis label, category axis title, value axis label,
+value axis title, legend and data labels, plus the reference-line label
+colour. (An earlier report said 13; that was miscounted.) `labels.detailColor`
+and the data-label title fields are deliberately **not** migrated — their
+Power BI text roles are not established, and belong to the
+registry-completion task.
 
 The geometry consequence the audit predicted, measured. Nothing was
 resized to compensate:

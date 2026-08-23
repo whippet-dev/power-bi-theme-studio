@@ -36,7 +36,7 @@ renderer's clothes, and mixing them into a geometry task confounds both.
 | Item | Status |
 |---|---|
 | Text-class resolver (`app/lib/textClasses.ts`) | **Done.** Derivation transcribed from Power BI's own `applyTextClassDefaults`; see `BASE_THEME_DIFFERENTIAL_AUDIT.md` §4.2 |
-| Clustered Bar pilot | **Done.** 13 typography properties now fall back to a text class instead of `6` / `""` |
+| Clustered Bar pilot | **Done.** 19 property definitions now fall back to a text class instead of `6` / `""` / the palette. Excludes `labels.detailColor` and the data-label title fields, whose roles are unproven |
 | Remaining registries | **Open.** Stacked Bar, Clustered Column, Stacked Column, Line, Table, Matrix, Slicer, Pie, Card still use literals — 53 of the 66 `fontSize → 6` fallbacks. Migrate once the pilot is accepted |
 | Font-face alias expansion | **Open.** Power BI expands a primary's `fontFace` through an alias table; the table was not extracted, so the pilot passes the name through verbatim |
 | pt → px conversion | **Open, still separate.** Theme font sizes are points; the renderer uses the number as CSS px. Deliberately untouched so this task isolated inheritance from units |

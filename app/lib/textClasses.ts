@@ -116,6 +116,17 @@ const BUILT_IN_PRIMARIES: Record<PrimaryTextClassName, { fontFace: string; fontS
   label: { fontFace: "Segoe UI", fontSize: 10, color: "#252423" },
 };
 
+/**
+ * The weights the two weight-bearing classes derive.
+ *
+ * CSS numerics, not the words: the enum beside `applyTextClassDefaults` in
+ * the same bundle module reads `e.Bold="700", e.Semibold="600"`. A theme
+ * that declares `"fontWeight": "bold"` itself keeps that string verbatim —
+ * only the derived value is normalised.
+ */
+const BOLD = "700";
+const SEMIBOLD = "600";
+
 /** Power BI's fallback when a theme declares no `foregroundNeutralSecondary`. */
 const BUILT_IN_NEUTRAL_SECONDARY = "#605E5C";
 
@@ -148,11 +159,11 @@ const SECONDARY_CLASSES: Record<
 > = {
   largeTitle: { from: "title", scale: 7 / 6 },
   dataTitle: { from: "title", dataColor: true },
-  boldLabel: { from: "label", weight: "bold" },
+  boldLabel: { from: "label", weight: BOLD },
   largeLabel: { from: "label", scale: 1.2 },
   largeLightLabel: { from: "label", scale: 1.2, lightColor: true },
   lightLabel: { from: "label", lightColor: true },
-  semiboldLabel: { from: "label", weight: "semibold" },
+  semiboldLabel: { from: "label", weight: SEMIBOLD },
   smallLabel: { from: "label", scale: 0.9 },
   smallLightLabel: { from: "label", scale: 0.9, lightColor: true },
   smallDataLabel: { from: "label", scale: 0.9, dataColor: true },
@@ -181,12 +192,12 @@ function layered<T>(
   base: Record<string, unknown> | undefined,
   field: string,
   read: (raw: unknown, theme: PowerBITheme) => T | undefined,
-  customTheme: PowerBITheme,
-  baseTheme: PowerBITheme | undefined,
+  /** The MERGED roots, used to interpret whichever layer the field came from. */
+  roots: PowerBITheme,
 ): { value: T; fromCustom: boolean } | undefined {
-  const fromCustom = custom === undefined ? undefined : read(custom[field], customTheme);
+  const fromCustom = custom === undefined ? undefined : read(custom[field], roots);
   if (fromCustom !== undefined) return { value: fromCustom, fromCustom: true };
-  const fromBase = base === undefined || baseTheme === undefined ? undefined : read(base[field], baseTheme);
+  const fromBase = base === undefined ? undefined : read(base[field], roots);
   if (fromBase !== undefined) return { value: fromBase, fromCustom: false };
   return undefined;
 }
@@ -202,7 +213,17 @@ const readSize = (raw: unknown): number | undefined => {
 const readWeight = (raw: unknown): string | undefined =>
   typeof raw === "string" && raw.trim() ? raw : undefined;
 
-/** A text-class colour is a bare hex string or a root-token reference. */
+/**
+ * A text-class colour: a bare hex string, or the name of one of the theme's
+ * root colours.
+ *
+ * `theme` here is always the MERGED root view, never the layer the field was
+ * found in. Where a declaration lives and what its tokens mean are separate
+ * axes: a base class saying `"color": "foregroundNeutralSecondary"` must
+ * pick up a custom theme's override of that token, and a custom class may
+ * name a token only the base defines. `readVisualStyleValue` already
+ * resolves `visualStyles` colours this way; text classes now match.
+ */
 const readColor = (raw: unknown, theme: PowerBITheme): string | undefined => {
   if (typeof raw === "string") {
     if (HEX_COLOR.test(raw)) return raw;
@@ -213,17 +234,11 @@ const readColor = (raw: unknown, theme: PowerBITheme): string | undefined => {
 };
 
 /** `foregroundNeutralSecondary`, custom over base, over Power BI's own. */
-function neutralSecondary(source: ThemeSource): { value: string; fromCustom: boolean } {
-  const { custom, base } = layersOf(source);
-  const read = (t: PowerBITheme | undefined) => {
-    const raw = t?.foregroundNeutralSecondary;
-    return typeof raw === "string" && HEX_COLOR.test(raw) ? raw : undefined;
-  };
-  const c = read(custom);
-  if (c) return { value: c, fromCustom: true };
-  const b = read(base);
-  if (b) return { value: b, fromCustom: false };
-  return { value: BUILT_IN_NEUTRAL_SECONDARY, fromCustom: false };
+function neutralSecondary(source: ThemeSource): string {
+  // Root tokens are exactly what `roots` merges custom-over-base, so there
+  // is no second precedence rule to get wrong here.
+  const raw = themeRoots(source).foregroundNeutralSecondary;
+  return typeof raw === "string" && HEX_COLOR.test(raw) ? raw : BUILT_IN_NEUTRAL_SECONDARY;
 }
 
 function layersOf(source: ThemeSource): { custom: PowerBITheme; base: PowerBITheme | undefined } {
@@ -245,18 +260,24 @@ function layersOf(source: ThemeSource): { custom: PowerBITheme; base: PowerBIThe
  */
 export function resolveTextClass(source: ThemeSource, name: TextClassName): ResolvedTextClass {
   const { custom, base } = layersOf(source);
+  // Layers decide WHERE a field is declared; roots decide what its tokens
+  // mean. Keeping them separate is the whole point — see readColor.
+  const roots = themeRoots(source);
   const rule = SECONDARY_CLASSES[name as Exclude<TextClassName, PrimaryTextClassName>];
   const primaryName: PrimaryTextClassName = rule ? rule.from : (name as PrimaryTextClassName);
 
-  const ownCustom = rule ? classIn(custom, name) : undefined;
-  const ownBase = rule ? classIn(base, name) : undefined;
+  // Read the class's own declaration whether or not it is a secondary: a
+  // primary declaring `fontWeight` must resolve too, and for a primary these
+  // are simply the same object as the primary lookup below.
+  const ownCustom = classIn(custom, name);
+  const ownBase = classIn(base, name);
   const primaryCustom = classIn(custom, primaryName);
   const primaryBase = classIn(base, primaryName);
   const builtIn = BUILT_IN_PRIMARIES[primaryName];
 
   // --- font family -------------------------------------------------------
-  const ownFace = layered(ownCustom, ownBase, "fontFace", readFace, custom, base);
-  const primaryFace = layered(primaryCustom, primaryBase, "fontFace", readFace, custom, base);
+  const ownFace = layered(ownCustom, ownBase, "fontFace", readFace, roots);
+  const primaryFace = layered(primaryCustom, primaryBase, "fontFace", readFace, roots);
   const fontFamily = ownFace?.value ?? primaryFace?.value ?? builtIn.fontFace;
   const fontFamilySource: TextClassSource = ownFace
     ? ownFace.fromCustom
@@ -269,8 +290,8 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
       : "derived-default";
 
   // --- font size ---------------------------------------------------------
-  const ownSize = layered(ownCustom, ownBase, "fontSize", readSize, custom, base);
-  const primarySize = layered(primaryCustom, primaryBase, "fontSize", readSize, custom, base);
+  const ownSize = layered(ownCustom, ownBase, "fontSize", readSize, roots);
+  const primarySize = layered(primaryCustom, primaryBase, "fontSize", readSize, roots);
   const basisSize = primarySize?.value ?? builtIn.fontSize;
   // Power BI rounds the scaled size to one decimal place.
   const scaled = rule?.scale === undefined ? basisSize : Math.round(basisSize * rule.scale * 10) / 10;
@@ -286,9 +307,14 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
       : "derived-default";
 
   // --- font weight -------------------------------------------------------
-  // Only the bold/semibold classes get one by derivation; every other class
-  // leaves it unset unless the theme declares it.
-  const ownWeight = layered(ownCustom, ownBase, "fontWeight", readWeight, custom, base);
+  // Power BI's rule, from the guard `if (e.fontWeight == null && r != null)`
+  // in applyTextClassDefaults: an explicitly declared weight always wins,
+  // and otherwise a weight is only supplied for the two classes that exist
+  // to carry one. An ordinary secondary — lightLabel, smallLabel,
+  // largeLabel — does NOT inherit its primary's weight, because `r` is
+  // undefined for those and the whole block is skipped. A primary carries
+  // whatever it declares, since primaries bypass the helper entirely.
+  const ownWeight = layered(ownCustom, ownBase, "fontWeight", readWeight, roots);
   const fontWeight = ownWeight?.value ?? rule?.weight;
   const fontWeightSource: TextClassSource = ownWeight
     ? ownWeight.fromCustom
@@ -300,19 +326,17 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
   // The class-specific default wins over the primary's colour, not the other
   // way round: Power BI checks it first, which is what makes a light class
   // light even when `label` is near-black.
-  const ownColor = layered(ownCustom, ownBase, "color", readColor, custom, base);
-  const primaryColor = layered(primaryCustom, primaryBase, "color", readColor, custom, base);
+  const ownColor = layered(ownCustom, ownBase, "color", readColor, roots);
+  const primaryColor = layered(primaryCustom, primaryBase, "color", readColor, roots);
   let color: string;
   let colorSource: TextClassSource;
   if (ownColor) {
     color = ownColor.value;
     colorSource = ownColor.fromCustom ? "custom-class" : "base-class";
   } else if (rule?.lightColor) {
-    const neutral = neutralSecondary(source);
-    color = neutral.value;
+    color = neutralSecondary(source);
     colorSource = "derived-default";
   } else if (rule?.dataColor) {
-    const roots = themeRoots(source);
     const palette = Array.isArray(roots.dataColors) ? roots.dataColors : [];
     const first = typeof palette[0] === "string" && HEX_COLOR.test(palette[0]) ? (palette[0] as string) : undefined;
     color = first ?? primaryColor?.value ?? builtIn.color;
