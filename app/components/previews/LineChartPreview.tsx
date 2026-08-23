@@ -270,22 +270,35 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     </span>
   );
 
-  // A series label sits at the end of its line, optionally with a leader
+  // A series label sits at one side of the plot, optionally with a leader
   // line back to the series and its own background chip.
   const sl = lineChartStyle.seriesLabels;
   /**
-   * `seriesPosition` names which end of the SERIES the label belongs to,
-   * not which side of the plot it sits on — so it selects a data point,
-   * and the engine decides where that point is. Inverting the category
-   * axis therefore carries the label across with its own endpoint instead
-   * of stranding it against an edge, and no array is reversed here (T8).
+   * `seriesPosition` is SPATIAL: Power BI puts series labels on the right
+   * of the chart by default, and "Left" moves them to the left side, with
+   * the leader line running to the nearest point. It does not name an end
+   * of the data.
    *
-   * Before T10 the first and last points sat exactly on the plot's edges,
-   * so `right: 0` / `left: 0` happened to be the endpoints. Slot centres
-   * put them at 10%/90% instead and the label stayed on the edge.
+   * So the side is fixed and the *point* is looked up — by rendered
+   * position, asking the category scale where each point actually is
+   * rather than assuming the data's first and last are the outermost.
+   * Inverting the category axis then changes which index occupies each
+   * side while the label stays on the side that was asked for; no array
+   * is reversed here (T8).
+   *
+   * Two earlier readings were wrong. Before T10 this anchored to the plot
+   * edge (`right: 0` / `left: 0`), which only worked while categories ran
+   * 0..100% and the outer points sat on the edges. The T10 follow-up then
+   * anchored to index 0 / pointCount - 1, which is right until the axis is
+   * inverted and the data's last point is on the physical left.
    */
-  const seriesLabelAtStart = String(sl.seriesPosition).toLowerCase() === "left";
-  const seriesLabelPoint = pointPercent(seriesLabelAtStart ? 0 : pointCount - 1);
+  const seriesLabelOnLeft = String(sl.seriesPosition).toLowerCase() === "left";
+  const seriesLabelIndex = linePointValues.reduce((chosen, _, index) => {
+    const candidate = pointPercent(index).left;
+    const incumbent = pointPercent(chosen).left;
+    return (seriesLabelOnLeft ? candidate < incumbent : candidate > incumbent) ? index : chosen;
+  }, 0);
+  const seriesLabelPoint = pointPercent(seriesLabelIndex);
   /** Natural units, like every other pre-transform number here. */
   const seriesLabelOffset = Number(sl.maximumOffset) || 0;
   const seriesLabelNode = sl.show && (
@@ -294,19 +307,19 @@ export function LineChartPreview({ lineChartStyle }: Props) {
       style={{
         left: `${seriesLabelPoint.left}%`,
         top: `${seriesLabelPoint.top}%`,
-        // The box hangs off the anchor on the side away from the series,
-        // which puts its inner edge — and so the leader line, the flex
-        // item nearest it — on the endpoint itself. `maximumOffset` (the
-        // gap between series and label) rides in the same transform rather
-        // than as a margin: a margin on the side facing the series is inert
-        // at the start end, where the box is positioned by `left` and its
-        // `right` is auto, so the two ends would displace differently.
-        transform: seriesLabelAtStart
+        // The box hangs off the anchor away from the plot, so its inner
+        // edge — and the leader line, the flex item nearest it — lands on
+        // the chosen point. `maximumOffset` (the gap between series and
+        // label) rides in the same transform rather than as a margin: a
+        // margin on the inner side is inert for a left-side label, which is
+        // positioned by `left` with its `right` auto, so the two sides
+        // would displace by different amounts.
+        transform: seriesLabelOnLeft
           ? `translate(calc(-100% - ${seriesLabelOffset}px), -50%)`
           : `translate(${seriesLabelOffset}px, -50%)`,
-        // row-reverse keeps the leader between the text and the point when
-        // the label is on the point's left, rather than trailing away.
-        flexDirection: seriesLabelAtStart ? "row-reverse" : "row",
+        // The leader faces the series: rightward from a left-side label,
+        // leftward from a right-side one.
+        flexDirection: seriesLabelOnLeft ? "row-reverse" : "row",
         color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
         fontFamily: sl.seriesFontFamily || undefined,
         fontSize: sl.textSize,
