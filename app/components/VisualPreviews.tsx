@@ -30,6 +30,16 @@ import { resolvePageNavigatorStyle, type ResolvedPageNavigatorStyle } from "../l
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import type { InteractionState, ThemeSource } from "../lib/properties";
 import { areaPath, linePath, markerShape, type MarkerShape, type Point } from "../lib/lineGeometry";
+import {
+  BAR_DATA_MAX,
+  barCategories,
+  barPercent,
+  LINE_DATA_MAX,
+  lineCategoryLabels,
+  linePointValues,
+  stackedSegmentColor,
+  stackedSegmentShare,
+} from "../lib/previewSampleData";
 import { shapeGeometry } from "../lib/shapeGeometry";
 import { StateSelector } from "./PropertyEditor";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
@@ -1027,21 +1037,6 @@ export function VisualGallery({
     </span>
   ) : undefined;
 
-  // Shared sample data, so every cartesian chart plots the same figures
-  // and axis ticks line up with the bars they describe.
-  const barCategories: Array<[string, number]> = [
-    ["London", 82],
-    ["North West", 66],
-    ["Scotland", 51],
-    ["Wales", 38],
-  ];
-  // London (82) is the dataset's max and matches every value-axis's
-  // dataMax={82_000} — so its bar/column must reach exactly 100%, not
-  // 82%. Every fill/error-bar position below scales against this rather
-  // than treating the raw value as a literal percentage.
-  const barCategoriesMax = Math.max(...barCategories.map(([, value]) => value));
-  const barPercent = (value: number): number => (value / barCategoriesMax) * 100;
-
   // Series shown in every cartesian chart's legend. Clustered charts show
   // one series; the stacked variants show the two they actually draw.
   const singleSeries = [{ label: "Applications", color: barChartStyle.dataPoint.fill }];
@@ -1193,7 +1188,7 @@ export function VisualGallery({
               </span>
             ))}
           </span>
-          <AxisTickLabels axis={barChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
+          <AxisTickLabels axis={barChartStyle.valueAxis} dataMax={BAR_DATA_MAX} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
           {barChartStyle.valueAxis.showAxisTitle && (
             <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(barChartStyle.valueAxis)}>
               {String(barChartStyle.valueAxis.titleText) || "Applications"}
@@ -1205,13 +1200,12 @@ export function VisualGallery({
     </span>
   );
 
-  const stackedSegmentColor = palette[1] ?? palette[0];
-  const stackedSegmentShare = 62; // fixed split — this app models one series' color, not per-series stacking
+  const stackedSegment = stackedSegmentColor(palette);
 
   // Stacked charts genuinely draw two series, so their legend lists both.
   const stackedBarSeries = [
     { label: "Approved", color: stackedBarChartStyle.dataPoint.fill },
-    { label: "In review", color: stackedSegmentColor },
+    { label: "In review", color: stackedSegment },
   ];
   const stackedBarLegendNode = <ChartLegend legend={stackedBarChartStyle.legend} items={stackedBarSeries} />;
   const stackedBarLegendAtBottom = legendIsAfterPlot(stackedBarChartStyle.legend.position);
@@ -1260,7 +1254,7 @@ export function VisualGallery({
                         width: `${barPercent(value)}%`,
                         height: barThickness(stackedBarChartStyle.layout.stackedGapSize),
                         opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
-                        background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
+                        background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegment} ${stackedSegmentShare}%, ${stackedSegment} 100%)`,
                         border: stackedBarChartStyle.dataPoint.borderShow
                           ? `${stackedBarChartStyle.dataPoint.borderSize}px solid ${stackedBarChartStyle.dataPoint.borderColor}`
                           : undefined,
@@ -1292,7 +1286,7 @@ export function VisualGallery({
               </span>
             ))}
           </span>
-          <AxisTickLabels axis={stackedBarChartStyle.valueAxis} dataMax={82_000} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
+          <AxisTickLabels axis={stackedBarChartStyle.valueAxis} dataMax={BAR_DATA_MAX} orientation="horizontal" inset={BAR_VALUE_AXIS_INSET} />
           {stackedBarChartStyle.valueAxis.showAxisTitle && (
             <span className="chart-preview__axis-title chart-preview__axis-title--value" style={axisTitleStyle(stackedBarChartStyle.valueAxis)}>
               {String(stackedBarChartStyle.valueAxis.titleText) || "Applications"}
@@ -1325,7 +1319,7 @@ export function VisualGallery({
         <span className="chart-preview__body-main">
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={columnChartStyle.valueAxis} orientation="horizontal" />
-        <AxisTickLabels axis={columnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
+        <AxisTickLabels axis={columnChartStyle.valueAxis} dataMax={BAR_DATA_MAX} orientation="vertical" />
         <ZoomSliders zoom={columnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
         {columnChartStyle.referenceLine.show && (
           <span
@@ -1416,7 +1410,7 @@ export function VisualGallery({
       legend={stackedColumnChartStyle.legend}
       items={[
         { label: "Approved", color: stackedColumnChartStyle.dataPoint.fill },
-        { label: "In review", color: stackedSegmentColor },
+        { label: "In review", color: stackedSegment },
       ]}
     />
   );
@@ -1441,7 +1435,7 @@ export function VisualGallery({
         <span className="chart-preview__body-main">
       <span className="column-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={stackedColumnChartStyle.valueAxis} orientation="horizontal" />
-        <AxisTickLabels axis={stackedColumnChartStyle.valueAxis} dataMax={82_000} orientation="vertical" />
+        <AxisTickLabels axis={stackedColumnChartStyle.valueAxis} dataMax={BAR_DATA_MAX} orientation="vertical" />
         <ZoomSliders zoom={stackedColumnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
         {stackedColumnChartStyle.trend.show && (
           <span
@@ -1485,7 +1479,7 @@ export function VisualGallery({
                       height: `${barPercent(value)}%`,
                       width: barThickness(stackedColumnChartStyle.layout.stackedGapSize),
                       opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
-                      background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegmentColor} ${stackedSegmentShare}%, ${stackedSegmentColor} 100%)`,
+                      background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegment} ${stackedSegmentShare}%, ${stackedSegment} 100%)`,
                       border: stackedColumnChartStyle.dataPoint.borderShow
                         ? `${stackedColumnChartStyle.dataPoint.borderSize}px solid ${stackedColumnChartStyle.dataPoint.borderColor}`
                         : undefined,
@@ -1544,7 +1538,6 @@ export function VisualGallery({
   );
   const lineLegendAtBottom = legendIsAfterPlot(lineChartStyle.legend.position);
   const lineLegendVertical = legendIsVertical(lineChartStyle.legend.position);
-  const linePointValues = [42, 58, 30, 68, 48];
   const linePointCoords = linePointValues.map((value, index) => ({
     x: (index / (linePointValues.length - 1)) * 100,
     y: 100 - value,
@@ -1867,7 +1860,7 @@ export function VisualGallery({
           <span className="line-preview__plot" style={{ position: "relative" }}>
         <Gridlines axis={lineChartStyle.categoryAxis} orientation="vertical" count={linePointValues.length - 1} />
         <Gridlines axis={lineChartStyle.valueAxis} orientation="horizontal" />
-        <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={70_000} orientation="vertical" />
+        <AxisTickLabels axis={lineChartStyle.valueAxis} dataMax={LINE_DATA_MAX} orientation="vertical" />
         {y2Node}
         {seriesLabelNode}
         {zoomNodes}
@@ -1952,7 +1945,7 @@ export function VisualGallery({
             <span key={index} className="line-preview__label" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
               <DataLabel
                 labels={lineChartStyle.labels}
-                category={["Jan", "Feb", "Mar", "Apr", "May"][index] ?? ""}
+                category={lineCategoryLabels[index] ?? ""}
                 value={linePointValues[index] * 1000}
                 detail={linePointValues[index] * 8}
               />
@@ -1962,7 +1955,7 @@ export function VisualGallery({
       </span>
       {lineChartStyle.categoryAxis.show && (
         <span className="line-preview__axis-labels">
-          {["Jan", "Feb", "Mar", "Apr", "May"].map((label) => (
+          {lineCategoryLabels.map((label) => (
             <span key={label} style={textStyle(lineChartStyle.categoryAxis)}>
               {label}
             </span>
