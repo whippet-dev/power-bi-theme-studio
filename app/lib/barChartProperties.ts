@@ -36,6 +36,33 @@ import type { ResolvedTheme } from "./theme";
  * specific to a clustered bar chart.
  */
 
+/**
+ * How far a constant line's Value control can be dragged.
+ *
+ * NOT a schema constraint. Power BI's own Value field is a free numeric
+ * input with no documented bound, and a constant line is compared against
+ * whatever the measure happens to be. The -1000..1000 that used to sit
+ * here is the registry generator's catch-all for a numeric property whose
+ * bounds were never derived: 51 properties across these files share that
+ * exact pair, including labelDensity, preferredCategoryWidth,
+ * interpolationSmoothParam and imageHeight, none of which is genuinely
+ * a -1000..1000 quantity either.
+ *
+ * It matters here because the bound is not just cosmetic: the preview's
+ * representative data reaches 82,000, so a control stopping at 1,000 could
+ * only move the line across about 1% of the plot — the property was
+ * effectively unusable for the thing it exists to show. This spans the
+ * preview's domain and a pinned 0..100,000 axis with room either side.
+ *
+ * Widening a slider cannot corrupt a theme. `NumberControl` writes only
+ * what the user drags, and nothing on the read or write path clamps, so an
+ * imported value of any magnitude still round-trips verbatim — see
+ * `tests/constantLine.test.ts`. The real limitation is that an unbounded
+ * numeric property is being edited by a range slider at all; giving those
+ * properties a typed numeric input is a separate, wider change.
+ */
+const REFERENCE_LINE_VALUE_LIMIT = 200_000;
+
 export const BAR_CHART_PROPERTIES = {
 
   dataPoint: {
@@ -257,7 +284,7 @@ export const BAR_CHART_PROPERTIES = {
     position: enumProp("clusteredBarChart", "bar.referenceLine.position", "Position", "Arrange relative to chart data points", ["referenceLine", 0, "position"], [{"value":"back","label":"Behind"},{"value":"front","label":"In front"}] as const),
     style: enumProp("clusteredBarChart", "bar.referenceLine.style", "Line style", "Sets the constant line's line style.", ["referenceLine", 0, "style"], [{"value":"solid","label":"Solid"},{"value":"dashed","label":"Dashed"},{"value":"dotted","label":"Dotted"},{"value":"custom","label":"Custom"}] as const),
     transparency: numberProp("clusteredBarChart", "bar.referenceLine.transparency", "Transparency", "How see-through the constant line appears — 0 is solid, 100 is invisible.", ["referenceLine", 0, "transparency"], 0, 100),
-    value: numberProp("clusteredBarChart", "bar.referenceLine.value", "Value", "Set reference line numeric value", ["referenceLine", 0, "value"], -1000, 1000),
+    value: numberProp("clusteredBarChart", "bar.referenceLine.value", "Value", "Set reference line numeric value", ["referenceLine", 0, "value"], -REFERENCE_LINE_VALUE_LIMIT, REFERENCE_LINE_VALUE_LIMIT),
     width: numberProp("clusteredBarChart", "bar.referenceLine.width", "Width", "The thickness, in pixels, of the width.", ["referenceLine", 0, "width"], 0, 10),
     dataLabelColor: colorProp("clusteredBarChart", "bar.referenceLine.dataLabelColor", "Color", "Set the reference line data label color", ["referenceLine", 0, "dataLabelColor"], undefined, "Data label"),
     dataLabelDecimalPoints: numberProp("clusteredBarChart", "bar.referenceLine.dataLabelDecimalPoints", "Value decimal places", "Sets the data label decimal points's value decimal places.", ["referenceLine", 0, "dataLabelDecimalPoints"], 0, 10, undefined, "Data label"),

@@ -615,3 +615,4 @@ Hand exactly this to the coding agent once this plan is approved.
 ---
 
 **Scope statement.** Planning only. No application code was modified. Every file:line reference was verified against the working tree at commit `703ba0f`.
+
