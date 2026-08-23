@@ -121,21 +121,6 @@ export function formatValue(value: number, displayUnits?: string | number, preci
   return `${scaled.toLocaleString("en-GB", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`;
 }
 
-/** Evenly spaced tick values across the axis range. */
-export function axisTicks(axis: AxisStyle, dataMax: number, count = 4): number[] {
-  // Axis start/end arrive as strings from the schema, and are blank unless
-  // the user pins the range — fall back to 0..dataMax when unset.
-  const parse = (value: string | number | undefined): number | null => {
-    const parsed = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-  const start = parse(axis.start) ?? 0;
-  const parsedEnd = parse(axis.end);
-  const end = parsedEnd !== null && parsedEnd > start ? parsedEnd : dataMax;
-  const ticks = Array.from({ length: count + 1 }, (_, i) => start + ((end - start) * i) / count);
-  return axis.invertAxis ? ticks.reverse() : ticks;
-}
-
 /** True when the legend sits beside the plot rather than above/below it. */
 export function legendIsVertical(position: string | number): boolean {
   const p = String(position);
@@ -175,127 +160,6 @@ export function ChartLegend({
           <span style={textStyle(legend)}>{item.label}</span>
         </span>
       ))}
-    </span>
-  );
-}
-
-/**
- * The value axis's 0%/100% range doesn't always span a chart's full
- * width/height — a horizontal bar chart's category-label and value-label
- * columns sit either side of the actual track, so the axis needs to be
- * inset by exactly those columns' widths or its ticks and gridlines land
- * over the label gutters instead of the bars they're meant to measure.
- * Both `start` and `end` are pixels, on whichever edge is the axis's 0%
- * (left for horizontal, bottom for vertical).
- */
-export type AxisInset = { start: number; end: number };
-const NO_INSET: AxisInset = { start: 0, end: 0 };
-
-export function insetOffset(i: number, count: number, inset: AxisInset): string {
-  const fraction = i / count;
-  if (inset.start === 0 && inset.end === 0) return `${fraction * 100}%`;
-  return `calc(${inset.start}px + (100% - ${inset.start + inset.end}px) * ${fraction})`;
-}
-
-/**
- * Gridlines drawn as real positioned lines, one per tick, so their colour,
- * thickness, and line style are all visible. The previous implementation
- * used a repeating gradient locked to 25% intervals, which couldn't show
- * the line style at all and ignored the axis range.
- */
-export function Gridlines({
-  axis,
-  orientation,
-  count = 4,
-  inset = NO_INSET,
-}: {
-  axis: AxisStyle;
-  orientation: "vertical" | "horizontal";
-  count?: number;
-  inset?: AxisInset;
-}) {
-  if (!axis.gridlineShow) return null;
-  const style = mapLineStyle(axis.gridlineStyle);
-  // An explicit dash array wins over the named style, as elsewhere.
-  const dashed = String(axis.gridlineDashArray ?? "") !== "";
-  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
-
-  return (
-    <>
-      {Array.from({ length: count + 1 }, (_, i) => {
-        const offset = insetOffset(i, count, inset);
-        return (
-          <span
-            className="chart-gridline"
-            key={i}
-            aria-hidden="true"
-            style={
-              orientation === "vertical"
-                ? {
-                    left: offset,
-                    top: 0,
-                    bottom: 0,
-                    borderLeftWidth: axis.gridlineThickness,
-                    borderLeftStyle: dashed ? "dashed" : style,
-                    borderLeftColor: color,
-                  }
-                : {
-                    bottom: offset,
-                    left: 0,
-                    right: 0,
-                    borderTopWidth: axis.gridlineThickness,
-                    borderTopStyle: dashed ? "dashed" : style,
-                    borderTopColor: color,
-                  }
-            }
-          />
-        );
-      })}
-    </>
-  );
-}
-
-/** Tick labels along the value axis, formatted by its display units. */
-export function AxisTickLabels({
-  axis,
-  dataMax,
-  orientation,
-  count = 4,
-  inset = NO_INSET,
-}: {
-  axis: AxisStyle;
-  dataMax: number;
-  orientation: "vertical" | "horizontal";
-  count?: number;
-  inset?: AxisInset;
-}) {
-  if (!axis.show) return null;
-  const ticks = axisTicks(axis, dataMax, count);
-
-  return (
-    <span className={`chart-ticks chart-ticks--${orientation}`}>
-      {ticks.map((tick, i) => {
-        // Positioned at the exact same i/count fraction Gridlines uses,
-        // then centred on that point — `justify-content: space-between`
-        // (the previous approach) aligns box *edges*, not centres, so
-        // unequal-width labels like "0" and "82K" drift away from their
-        // gridline the further they sit from the container's own edges.
-        const offset = insetOffset(i, count, inset);
-        return (
-          <span
-            key={i}
-            style={{
-              ...textStyle(axis),
-              position: "absolute",
-              ...(orientation === "horizontal"
-                ? { left: offset, transform: "translateX(-50%)" }
-                : { bottom: offset, transform: "translateY(50%)" }),
-            }}
-          >
-            {formatValue(tick, axis.labelDisplayUnits, axis.labelPrecision)}
-          </span>
-        );
-      })}
     </span>
   );
 }
@@ -660,15 +524,15 @@ export function dataLabelStyle(labels: {
  * `valueFraction` / `categoryPercent`, so a chart cannot end up with one
  * scale for its axis and another for its marks.
  *
- * They live here, beside the legacy pair, for the reason ChartParts exists:
- * a fix to chart furniture should land once and reach every family. The
- * legacy pair stays until its last consumer migrates (Bar in T8, Line in
- * T10), at which point it and `insetOffset`/`AxisInset` can go.
+ * They live here for the reason ChartParts exists: a fix to chart furniture
+ * should land once and reach every family. T10 deleted the pair they
+ * replaced — Gridlines, AxisTickLabels, AxisInset, insetOffset and
+ * axisTicks — once the line chart, their last consumer, migrated. There is
+ * no longer a second, inset-and-count coordinate model in this file.
  *
- * Written orientation-generally: the positioning branches on
- * `layout.orientation`, so the Bar pair can adopt them in T8 without a
- * column-specific API. Only the vertical branch has a consumer today, and
- * only the vertical CSS exists — T8 adds the horizontal styles.
+ * Orientation-general throughout: the positioning branches on
+ * `layout.orientation`, so bar and column are transposes of one another
+ * rather than separate implementations.
  * ------------------------------------------------------------------------ */
 
 /** Where a tick or gridline sits, as the CSS offset for its orientation. */
@@ -839,5 +703,67 @@ export function CategoryAxisGutter({
         </span>
       )}
     </span>
+  );
+}
+
+/**
+ * Category-axis gridlines, one per category, drawn at the centre of each
+ * category's slot — the same coordinate a line chart plots its point at and
+ * a column chart centres its bar on.
+ *
+ * The previous line chart drew these with the legacy `Gridlines` and a
+ * `count` of `points - 1`, producing an evenly spaced sequence that
+ * happened to coincide with its point positions. Deriving both from
+ * `scale.category` instead means they cannot drift, and that category
+ * inversion moves the gridlines with the points.
+ */
+export function CategoryGridlines({
+  axis,
+  layout,
+  count,
+}: {
+  axis: AxisStyle;
+  layout: ChartLayout;
+  count: number;
+}): ReactNode {
+  if (!axis.gridlineShow || count <= 0) return null;
+  const dashed = String(axis.gridlineDashArray ?? "") !== "";
+  const style = dashed ? "dashed" : mapLineStyle(axis.gridlineStyle);
+  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
+  const vertical = layout.orientation === "vertical";
+
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => {
+        const slot = categoryPercent(layout, index, count);
+        const centre = `${slot.offset + slot.size / 2}%`;
+        return (
+          <span
+            className="chart-gridline"
+            key={index}
+            aria-hidden="true"
+            style={
+              vertical
+                ? {
+                    top: 0,
+                    bottom: 0,
+                    left: centre,
+                    borderLeftWidth: axis.gridlineThickness,
+                    borderLeftStyle: style,
+                    borderLeftColor: color,
+                  }
+                : {
+                    left: 0,
+                    right: 0,
+                    top: centre,
+                    borderTopWidth: axis.gridlineThickness,
+                    borderTopStyle: style,
+                    borderTopColor: color,
+                  }
+            }
+          />
+        );
+      })}
+    </>
   );
 }

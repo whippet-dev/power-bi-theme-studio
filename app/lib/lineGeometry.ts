@@ -55,8 +55,15 @@ export function linePath(points: Point[], interpolation: { smooth: boolean; step
   return d;
 }
 
-/** Closes a line path into a filled area down to the baseline. */
-export function areaPath(points: Point[], linePathD: string, baseline = 100): string {
+/**
+ * Closes a line path into a filled area down to the baseline.
+ *
+ * `baseline` is required: it used to default to 100, which only made sense
+ * inside the old normalised 0..100 SVG space. The caller now passes the
+ * plot coordinate of the axis's zero, so this module stays purely about
+ * path shape and knows nothing about where the data lives.
+ */
+export function areaPath(points: Point[], linePathD: string, baseline: number): string {
   if (points.length === 0) return "";
   const first = points[0];
   const last = points[points.length - 1];
@@ -66,9 +73,10 @@ export function areaPath(points: Point[], linePathD: string, baseline = 100): st
 /**
  * Marker shapes Power BI offers. Returned as a plain size/rotation
  * description (not SVG path data) so the preview can render each as a
- * CSS shape positioned outside the chart's stretched SVG coordinate space —
- * see the comment at chartMarker in VisualPreviews.tsx for why a marker's
- * geometry can't live inside that SVG without distorting into an ellipse.
+ * CSS shape positioned as an HTML overlay rather than inside the SVG. The
+ * SVG still maps the plot's natural box onto a rendered box of a different
+ * aspect, so a shape drawn in it would still stretch; markers stay HTML for
+ * that reason — see chartMarker in previews/chartPrimitives.tsx.
  */
 export type MarkerShape = { kind: "circle"; r: number } | { kind: "polygon"; size: number } | { kind: "rect"; size: number; rotate: number };
 

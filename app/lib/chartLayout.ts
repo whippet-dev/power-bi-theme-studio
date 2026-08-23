@@ -199,6 +199,20 @@ export function valueFraction(layout: ChartLayout, value: number): number {
     : (coordinate - plot.x) / plot.width;
 }
 
+/**
+ * The centre of a category's slot, in the layout's own coordinate space.
+ *
+ * A line chart plots one point per category rather than filling the slot,
+ * and that point belongs in the middle of it. Derived from `scale.category`
+ * so a line's points, a column's bars and the shared category labels all
+ * come from the same slots — and so category inversion reverses all three
+ * without anyone reversing an array.
+ */
+export function categoryCentre(layout: ChartLayout, index: number, count: number): number {
+  const slot = layout.scale.category(index, count);
+  return slot.start + slot.size / 2;
+}
+
 /** A category slot as offset/size percentages along the category axis. */
 export function categoryPercent(
   layout: ChartLayout,

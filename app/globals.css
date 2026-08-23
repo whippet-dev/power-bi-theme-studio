@@ -1172,6 +1172,9 @@ button { color: inherit; }
   white-space: nowrap;
 }
 
+/* Only the line chart's decorative secondary axis still uses this. The
+   primary axes are real gutters the plot pays for (.chart-axis-gutter);
+   the zero-width overlay this used to provide is gone with T10. */
 .chart-ticks {
   display: flex;
   margin-top: 3px;
@@ -1229,39 +1232,6 @@ button { color: inherit; }
 .small-multiples__title {
   display: block;
   flex-shrink: 0;
-}
-
-/* Children are absolutely positioned (see AxisTickLabels) so they can sit
-   at the exact same i/count fraction as their gridline rather than being
-   edge-aligned by flex's justify-content, which drifts with unequal-width
-   labels ("0" vs "82K"). Needs an explicit height since absolutely
-   positioned children no longer contribute to the flex box's own size. */
-.chart-ticks--horizontal {
-  position: relative;
-  height: 12px;
-}
-
-/* A vertical value axis sits in a gutter to the left of the plot. Absolute
-   so it can't change the plot's own height, which the bars are sized
-   against. */
-.chart-ticks--vertical {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  flex-direction: column-reverse;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin: 0;
-  pointer-events: none;
-}
-
-/* The zero-width tick gutter. The column chart no longer uses it — its
-   value axis is a real gutter the plot pays for (.chart-axis-gutter) — but
-   the line chart still does, until T10 migrates it. */
-.line-preview__plot .chart-ticks--vertical {
-  left: -4px;
-  transform: translateX(-100%);
 }
 
 .preview-header-tooltip {
@@ -1735,10 +1705,14 @@ button { color: inherit; }
   pointer-events: none;
 }
 
+/* The line chart's natural chart box. Its `height: 120px` is gone: the
+   height now comes from LINE_CHART_BOX (previews/cartesianLayout.ts) so
+   there is one declared box rather than a CSS rule the geometry cannot
+   see. `margin-top` stays — it is the gap below the legend, not plot
+   geometry. */
 .line-preview__plot {
-  margin-top: 22px;
-  height: 120px;
   position: relative;
+  margin-top: 22px;
 }
 
 .line-preview__svg {
@@ -1763,14 +1737,6 @@ button { color: inherit; }
   font-weight: 650;
   white-space: nowrap;
   pointer-events: none;
-}
-
-.line-preview__axis-labels {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  color: var(--preview-muted);
-  font-size: 9px;
 }
 
 .table-preview__row {

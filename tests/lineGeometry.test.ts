@@ -41,17 +41,24 @@ test("step wins over smooth when both are set, since a stepped line can't also b
   assert.ok(!both.includes("C "));
 });
 
-test("areaPath closes the line down to the baseline so it can be filled", () => {
+test("areaPath closes the line down to whatever baseline the caller gives", () => {
   const d = linePath(POINTS, { smooth: false, step: false });
-  const area = areaPath(POINTS, d);
+  // The baseline is now an argument rather than a default of 100: it is the
+  // plot coordinate of the axis's zero, which only the caller knows.
+  const area = areaPath(POINTS, d, 100);
   assert.ok(area.startsWith(d), "the area must follow the same line");
   assert.ok(area.endsWith("Z"), "the area must be a closed path");
   assert.ok(area.includes("L 100 100"), "the area must drop to the baseline");
+
+  // An arbitrary plot-space baseline works the same way, which is what lets
+  // the line chart draw its area in the engine's coordinates.
+  const shifted = areaPath(POINTS, d, 137.5);
+  assert.ok(shifted.includes("L 100 137.5"), "the baseline must be honoured, not assumed");
 });
 
 test("an empty series produces no path rather than malformed SVG", () => {
   assert.equal(linePath([], { smooth: false, step: false }), "");
-  assert.equal(areaPath([], ""), "");
+  assert.equal(areaPath([], "", 0), "");
 });
 
 test("each marker shape renders distinctly rather than always a circle", () => {
