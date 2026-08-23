@@ -21,6 +21,15 @@ const RAIL_VISUALS: RailEntry[] = [
   { id: "image", label: "Image", monogram: "Im" },
 ];
 
+/**
+ * The rail's names, keyed by visual, so anything else that needs to name a
+ * visual reads them from here rather than keeping a second list that can
+ * drift out of step with the one the user actually sees.
+ */
+export const VISUAL_LABEL: Record<VisualKind, string> = Object.fromEntries(
+  RAIL_VISUALS.map((entry) => [entry.id, entry.label]),
+) as Record<VisualKind, string>;
+
 type VisualRailProps = {
   visibility: Record<VisualKind, boolean>;
   selected: VisualKind;
