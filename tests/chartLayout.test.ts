@@ -69,7 +69,7 @@ test("every band and the plot are finite, non-negative, and inside outer", () =>
   for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
     const l = layout({
       orientation,
-      legend: { show: true, position: "Bottom" },
+      legend: { show: true, position: "Bottom", fontSize: 10, fontFamily: "Segoe UI" },
       seriesLabels: ["Applications"],
       titleText: "Applications by region",
       subtitleText: "2026",
@@ -92,7 +92,7 @@ test("every band and the plot are finite, non-negative, and inside outer", () =>
 
 test("no two bands overlap", () => {
   const l = layout({
-    legend: { show: true, position: "Left" },
+    legend: { show: true, position: "Left", fontSize: 10, fontFamily: "Segoe UI" },
     seriesLabels: ["Applications"],
     titleText: "Title",
     subtitleText: "Sub",
@@ -121,8 +121,8 @@ test("band extents plus plot extent equal outer extent on both axes, with no une
 });
 
 test("a legend consumes the correct edge and conserves with the plot", () => {
-  const withLegend = layout({ legend: { show: true, position: "Left" }, seriesLabels: ["Applications"] });
-  const without = layout({ legend: { show: false, position: "Left" }, seriesLabels: ["Applications"] });
+  const withLegend = layout({ legend: { show: true, position: "Left", fontSize: 10, fontFamily: "Segoe UI" }, seriesLabels: ["Applications"] });
+  const without = layout({ legend: { show: false, position: "Left", fontSize: 10, fontFamily: "Segoe UI" }, seriesLabels: ["Applications"] });
   assert.ok(withLegend.legend !== null);
   assert.ok(
     near(withLegend.plot.width + withLegend.legend.width, without.plot.width),
@@ -160,19 +160,19 @@ test("hiding an axis nulls its slot and returns exactly that space to the plot",
 
 test("hiding the legend, title and subtitle each return their exact extent", () => {
   const all = layout({
-    legend: { show: true, position: "Bottom" },
+    legend: { show: true, position: "Bottom", fontSize: 10, fontFamily: "Segoe UI" },
     seriesLabels: ["Applications"],
     titleText: "Title",
     subtitleText: "Sub",
   });
   const noLegend = layout({
-    legend: { show: false, position: "Bottom" },
+    legend: { show: false, position: "Bottom", fontSize: 10, fontFamily: "Segoe UI" },
     seriesLabels: ["Applications"],
     titleText: "Title",
     subtitleText: "Sub",
   });
   const noTitle = layout({
-    legend: { show: true, position: "Bottom" },
+    legend: { show: true, position: "Bottom", fontSize: 10, fontFamily: "Segoe UI" },
     seriesLabels: ["Applications"],
     subtitleText: "Sub",
   });
@@ -474,7 +474,7 @@ test("each legend position consumes the correct edge of outer", () => {
     ["RightCenter", "right"],
   ];
   for (const [position, edge] of cases) {
-    const l = layout({ ...base, legend: { show: true, position } });
+    const l = layout({ ...base, legend: { show: true, position, fontSize: 10, fontFamily: "Segoe UI" } });
     const r = l.legend!;
     switch (edge) {
       case "top":
@@ -497,9 +497,40 @@ test("each legend position consumes the correct edge of outer", () => {
   }
 });
 
+test("the legend band follows the LEGEND's typography, not the value axis's", () => {
+  // T6 sized the band with the value axis's font, which is the wrong text:
+  // a theme sets legend and axis fonts independently. Corrected in T7,
+  // before the first consumer relied on it. A per-font measurer makes the
+  // mistake detectable — the fixed measurer used elsewhere would hide it.
+  const perFont: TextMeasure = (text, fontSize) => ({ width: text.length * fontSize, height: fontSize });
+  const base = {
+    seriesLabels: ["Applications"],
+    measureText: perFont,
+    legend: { show: true, position: "Right", fontSize: 10, fontFamily: "Segoe UI" },
+  };
+  const bigLegend = layout({ ...base, legend: { ...base.legend, fontSize: 30 } });
+  const bigAxis = layout({ ...base, valueAxis: axis({ fontSize: 30 }) });
+  const plain = layout(base);
+
+  assert.ok(bigLegend.legend!.width > plain.legend!.width, "a larger legend font must widen the band");
+  assert.ok(near(bigAxis.legend!.width, plain.legend!.width), "a larger AXIS font must not touch the legend band");
+});
+
+test("a shown legend title counts as an entry in the band's size", () => {
+  const perFont: TextMeasure = (text, fontSize) => ({ width: text.length * fontSize, height: fontSize });
+  const base = {
+    seriesLabels: ["A"],
+    measureText: perFont,
+    legend: { show: true, position: "Right", fontSize: 10, fontFamily: "Segoe UI" },
+  };
+  const untitled = layout(base);
+  const titled = layout({ ...base, legend: { ...base.legend, showTitle: true, titleText: "A much longer title" } });
+  assert.ok(titled.legend!.width > untitled.legend!.width, "a shown title must be able to widen the band");
+});
+
 test("a side legend widens with its longest series name", () => {
-  const short = layout({ legend: { show: true, position: "Right" }, seriesLabels: ["A"] });
-  const long = layout({ legend: { show: true, position: "Right" }, seriesLabels: ["A very long series name"] });
+  const short = layout({ legend: { show: true, position: "Right", fontSize: 10, fontFamily: "Segoe UI" }, seriesLabels: ["A"] });
+  const long = layout({ legend: { show: true, position: "Right", fontSize: 10, fontFamily: "Segoe UI" }, seriesLabels: ["A very long series name"] });
   assert.ok(long.legend!.width > short.legend!.width);
 });
 
@@ -513,7 +544,7 @@ test("the same input always produces the same output", () => {
     orientation: "horizontal",
     categoryAxis: axis({ showAxisTitle: true, titleText: "Region" }),
     valueAxis: axis({ start: "0", end: "90000" }),
-    legend: { show: true, position: "Bottom" },
+    legend: { show: true, position: "Bottom", fontSize: 10, fontFamily: "Segoe UI" },
     seriesLabels: ["Applications"],
     categories: CATEGORIES,
     dataMax: DATA_MAX,
@@ -559,4 +590,12 @@ test("a non-zero outer origin offsets every band and the scales with it", () => 
   assert.ok(near(offset.plot.x, origin.plot.x + 50), "plot must follow outer.x");
   assert.ok(near(offset.plot.y, origin.plot.y + 30), "plot must follow outer.y");
   assert.ok(near(offset.scale.value(0), origin.scale.value(0) + 30), "the scale must follow too");
+});
+
+test("the layout reports the orientation it was computed for", () => {
+  // Added during T7: a consumer converting a coordinate must know which
+  // axis the value scale runs along, and re-deriving that from the gutter
+  // shapes was a workaround for a missing field.
+  assert.equal(layout({ orientation: "vertical" }).orientation, "vertical");
+  assert.equal(layout({ orientation: "horizontal" }).orientation, "horizontal");
 });

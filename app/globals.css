@@ -1258,7 +1258,9 @@ button { color: inherit; }
   pointer-events: none;
 }
 
-.column-preview__plot .chart-ticks--vertical,
+/* The zero-width tick gutter. The column chart no longer uses it — its
+   value axis is a real gutter the plot pays for (.chart-axis-gutter) — but
+   the line chart still does, until T10 migrates it. */
 .line-preview__plot .chart-ticks--vertical {
   left: -4px;
   transform: translateX(-100%);
@@ -1481,10 +1483,72 @@ button { color: inherit; }
   gap: 14px;
 }
 
+/* The column chart's natural chart box. Its `height: 128px` and the flex
+   stack that derived the plot from it are gone: ChartLayout now computes
+   the plot and both gutters, and the renderer applies them inline. The
+   height comes from COLUMN_CHART_BOX (previews/cartesianLayout.ts) so
+   there is one declared box rather than a CSS rule and a TS constant that
+   can disagree. `margin-top` stays — it is the gap below the legend, not
+   plot geometry. */
 .column-preview__plot {
-  margin-top: 22px;
-  height: 128px;
   position: relative;
+  margin-top: 22px;
+}
+
+/* An axis gutter. Its extent is set inline from the layout; CSS only says
+   how the text inside it sits. Replaces the zero-width absolutely
+   positioned tick container, which reserved no space at all and let its
+   labels overlay whatever was to their left (RENDERER_AUDIT §2.6). */
+.chart-axis-gutter {
+  position: absolute;
+  display: flex;
+  color: var(--preview-muted);
+  font-size: 9px;
+}
+
+.chart-axis-gutter--value {
+  top: 0;
+  left: 0;
+  align-items: stretch;
+}
+
+.chart-axis-gutter__ticks {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Each tick sits at its own fraction of the plot, right-aligned to the
+   plot edge and centred on its gridline. */
+.chart-axis-gutter__ticks span {
+  position: absolute;
+  right: 4px;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+
+.chart-axis-gutter--category {
+  right: 0;
+  bottom: 0;
+  flex-direction: column;
+}
+
+.chart-axis-gutter--category .column-item__label {
+  position: absolute;
+  top: 0;
+  text-align: center;
+}
+
+.chart-axis-gutter__title {
+  margin-top: auto;
+  text-align: center;
+}
+
+/* THE plot rectangle. Offsets come from the layout's gutters. */
+.chart-plot {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .column-preview__reference-line {
@@ -1495,52 +1559,31 @@ button { color: inherit; }
   pointer-events: none;
 }
 
-.column-preview__columns {
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-}
-
+/* A column occupies its category slot; both are positioned from
+   scale.category, so the columns cannot drift from their labels. */
 .column-item {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
   color: var(--preview-muted);
   font-size: 9px;
 }
 
 .column-item__value {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
   color: var(--preview-fg);
   font-weight: 650;
 }
 
-.column-item__track-wrap {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: flex-end;
-}
-
-.column-item__track {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  overflow: hidden;
-  border-radius: 2px 2px 0 0;
-}
-
+/* Height and baseline come from scale.value, never from a percentage of
+   the sample maximum. */
 .column-item__fill {
-  width: 100%;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: block;
   border-radius: 2px 2px 0 0;
 }

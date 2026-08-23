@@ -81,10 +81,23 @@ export type AxisLayoutStyle = {
   invertAxis?: boolean;
 };
 
-/** The subset of a resolved legend style layout needs. */
+/**
+ * The subset of a resolved legend style layout needs.
+ *
+ * `fontSize`/`fontFamily` are the legend's OWN typography. T6 shipped this
+ * type without them and sized a legend band using the value axis's font,
+ * which is simply the wrong text: a theme can set legend and axis fonts
+ * independently, and the band must follow the one it actually renders.
+ * Corrected here, before the first consumer relies on it.
+ */
 export type LegendLayoutStyle = {
   show: boolean;
   position: string | number;
+  fontSize: number;
+  fontFamily: string;
+  /** A shown legend title occupies an entry's worth of the band. */
+  showTitle?: boolean;
+  titleText?: string | number;
 };
 
 /** Data value → plot pixel. The only route from a number to a coordinate. */
@@ -111,6 +124,13 @@ export type ChartScale = {
 };
 
 export type ChartLayout = {
+  /**
+   * The orientation this layout was computed for. Carried on the result
+   * because a consumer converting a coordinate needs to know which axis
+   * the value scale runs along, and re-deriving it from the gutters is
+   * both fragile and a workaround for a missing field.
+   */
+  orientation: CartesianOrientation;
   outer: Rect;
   title: Rect | null;
   subtitle: Rect | null;
@@ -285,14 +305,17 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     const position = String(legend.position);
     const legendVertical = position.startsWith("Left") || position.startsWith("Right");
     const afterPlot = position.startsWith("Bottom") || position.startsWith("Right");
-    // A legend is sized by its entries: swatch plus the widest label for a
-    // side legend, one text line for a top/bottom one.
-    const text = widestText(seriesLabels, valueAxis.fontSize, valueAxis.fontFamily, measureText);
+    // A legend is sized by its entries, measured in the LEGEND's own font —
+    // not the axis's — and its title counts as an entry when shown.
+    const entries = legend.showTitle && String(legend.titleText ?? "")
+      ? [String(legend.titleText), ...seriesLabels]
+      : seriesLabels;
+    const text = widestText(entries, legend.fontSize, legend.fontFamily, measureText);
     if (legendVertical) {
       const extent = text.width + LEGEND_SWATCH_EXTENT + labelGap;
       legendRect = afterPlot ? takeRight(extent) : takeLeft(extent);
     } else {
-      const extent = (seriesLabels.length ? text.height : 0) + labelGap;
+      const extent = (entries.length ? text.height : 0) + labelGap;
       legendRect = afterPlot ? takeBottom(extent) : takeTop(extent);
     }
   }
@@ -358,6 +381,7 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
   };
 
   return {
+    orientation,
     outer,
     title,
     subtitle,
