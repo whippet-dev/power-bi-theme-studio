@@ -18,6 +18,7 @@ import { areaPath, linePath, markerShape } from "../../lib/lineGeometry";
 import {
   categoryCentre,
   categoryPercent,
+  clampedValueCoordinate,
   computePreviewCartesianLayout,
   LINE_CHART_BOX,
   valueFraction,
@@ -112,6 +113,15 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     const { left, top } = pointPercent(index);
     return { x: left, y: top };
   };
+  /**
+   * Where an area fill closes to. Zero when zero is on the plot; the
+   * nearest visible edge when a pinned range puts it off. The SVG is
+   * `overflow: visible` so the markers' HTML siblings can sit proud of it,
+   * which means an unclamped baseline would spill the fill into the axis
+   * gutters rather than simply drawing off-screen.
+   */
+  const areaBaseline = clampedValueCoordinate(layout, 0);
+
   /** A fraction of the plot, in SVG (plot-space) units. */
   const fx = (fraction: number) => fraction * plot.width;
   const fy = (fraction: number) => fraction * plot.height;
@@ -263,11 +273,40 @@ export function LineChartPreview({ lineChartStyle }: Props) {
   // A series label sits at the end of its line, optionally with a leader
   // line back to the series and its own background chip.
   const sl = lineChartStyle.seriesLabels;
+  /**
+   * `seriesPosition` names which end of the SERIES the label belongs to,
+   * not which side of the plot it sits on — so it selects a data point,
+   * and the engine decides where that point is. Inverting the category
+   * axis therefore carries the label across with its own endpoint instead
+   * of stranding it against an edge, and no array is reversed here (T8).
+   *
+   * Before T10 the first and last points sat exactly on the plot's edges,
+   * so `right: 0` / `left: 0` happened to be the endpoints. Slot centres
+   * put them at 10%/90% instead and the label stayed on the edge.
+   */
+  const seriesLabelAtStart = String(sl.seriesPosition).toLowerCase() === "left";
+  const seriesLabelPoint = pointPercent(seriesLabelAtStart ? 0 : pointCount - 1);
+  /** Natural units, like every other pre-transform number here. */
+  const seriesLabelOffset = Number(sl.maximumOffset) || 0;
   const seriesLabelNode = sl.show && (
     <span
       className="line-preview__series-label"
       style={{
-        top: `${pointPercent(pointCount - 1).top}%`,
+        left: `${seriesLabelPoint.left}%`,
+        top: `${seriesLabelPoint.top}%`,
+        // The box hangs off the anchor on the side away from the series,
+        // which puts its inner edge — and so the leader line, the flex
+        // item nearest it — on the endpoint itself. `maximumOffset` (the
+        // gap between series and label) rides in the same transform rather
+        // than as a margin: a margin on the side facing the series is inert
+        // at the start end, where the box is positioned by `left` and its
+        // `right` is auto, so the two ends would displace differently.
+        transform: seriesLabelAtStart
+          ? `translate(calc(-100% - ${seriesLabelOffset}px), -50%)`
+          : `translate(${seriesLabelOffset}px, -50%)`,
+        // row-reverse keeps the leader between the text and the point when
+        // the label is on the point's left, rather than trailing away.
+        flexDirection: seriesLabelAtStart ? "row-reverse" : "row",
         color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
         fontFamily: sl.seriesFontFamily || undefined,
         fontSize: sl.textSize,
@@ -276,14 +315,11 @@ export function LineChartPreview({ lineChartStyle }: Props) {
         textDecoration: sl.underline ? "underline" : "none",
         maxWidth: sl.seriesMaximumWidth || undefined,
         whiteSpace: sl.seriesWordWrap ? "normal" : "nowrap",
-        marginLeft: sl.maximumOffset || undefined,
         backgroundColor: sl.enableBackground
           ? hexWithAlpha(sl.backgroundMatchColor ? lineChartStyle.dataPoint.fill : sl.backgroundColor, sl.backgroundTransparency)
           : undefined,
         padding: sl.enableBackground ? "1px 4px" : undefined,
         borderRadius: sl.enableBackground ? 3 : undefined,
-        // "Left" puts the label at the start of the line instead.
-        ...(String(sl.seriesPosition).toLowerCase() === "left" ? { left: 0, right: "auto" } : {}),
       }}
     >
       {sl.leaderLines && (
@@ -457,7 +493,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
                 {errorShade}
                 {lineIsArea && (
                   <path
-                    d={areaPath(linePointCoords, linePathD, layout.scale.value(0) - plot.y)}
+                    d={areaPath(linePointCoords, linePathD, areaBaseline)}
                     fill={hexWithAlpha(lineAreaColor, lineStyles.segmentGradient ? 60 : 78)}
                     stroke="none"
                   />

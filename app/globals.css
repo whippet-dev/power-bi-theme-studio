@@ -1199,10 +1199,13 @@ button { color: inherit; }
   text-align: right;
 }
 
+/* Anchored to the series' own endpoint, so `left` and `transform` are
+   supplied per-render (see seriesLabelNode). They used to be `right: 0`
+   and `translate(100%, -50%)` here, which was only ever correct while the
+   last data point coincided with the plot's right edge — before T10 gave
+   categories slot centres. */
 .line-preview__series-label {
   position: absolute;
-  right: 0;
-  transform: translate(100%, -50%);
   display: inline-flex;
   align-items: center;
   gap: 4px;

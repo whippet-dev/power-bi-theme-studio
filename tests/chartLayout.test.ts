@@ -4,8 +4,8 @@ import {
   axisRange,
   axisTickValues,
   categoryCentre,
-
   categoryPercent,
+  clampedValueCoordinate,
   computeChartLayout,
   estimateText,
   type AxisLayoutStyle,
@@ -18,10 +18,10 @@ import {
 
 /**
  * Tests for the layout engine. Several of these encode defects from
- * RENDERER_AUDIT.md: they pass here because the engine is correct, while
- * the application still shows the defect, because nothing consumes the
- * engine yet (RENDERER_IMPLEMENTATION_PLAN.md T6). T7/T8/T10 are what make
- * them visible in the app.
+ * RENDERER_AUDIT.md. They were written in T6 against an engine no renderer
+ * consumed yet, so they asserted a fix the application did not show;
+ * T7/T8/T10 migrated the column pair, the bar pair and the line chart onto
+ * it, so what they assert is now what the app renders.
  */
 
 const OUTER: Rect = { x: 0, y: 0, width: 400, height: 300 };
@@ -781,5 +781,62 @@ test("categoryCentre follows an inverted category axis", () => {
       near(categoryCentre(normal, i, n), categoryCentre(inverted, n - 1 - i, n), 1e-9),
       `centre ${i} did not mirror`,
     );
+  }
+});
+
+test("clampedValueCoordinate is plot-local, and clamps a value outside the displayed range", () => {
+  // A line chart's area fill closes to zero. Pin an axis above zero and
+  // zero is off the plot — and the line SVG is overflow: visible, so an
+  // unclamped baseline would spill the fill into the axis gutters rather
+  // than simply drawing out of sight.
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    const vertical = orientation === "vertical";
+    const extentOf = (l: ChartLayout) => (vertical ? l.plot.height : l.plot.width);
+    const originOf = (l: ChartLayout) => (vertical ? l.plot.y : l.plot.x);
+
+    // Zero inside the range: no clamping, just the plot-local coordinate.
+    const inRange = layout({ orientation, valueAxis: axis({ start: "0", end: "100000" }) });
+    assert.ok(
+      near(clampedValueCoordinate(inRange, 0), inRange.scale.value(0) - originOf(inRange), 1e-9),
+      `${orientation}: an in-range value must pass through unclamped`,
+    );
+    // And it really is the far edge, since the range starts at zero.
+    assert.ok(
+      near(clampedValueCoordinate(inRange, 0), vertical ? extentOf(inRange) : 0, 1e-9),
+      `${orientation}: zero at the range start belongs on the origin edge`,
+    );
+
+    // Zero below the range: the raw coordinate escapes, the clamped one does not.
+    const above = layout({ orientation, valueAxis: axis({ start: "20000", end: "100000" }) });
+    const rawAbove = above.scale.value(0) - originOf(above);
+    assert.ok(
+      rawAbove < 0 || rawAbove > extentOf(above),
+      `${orientation}: the unclamped coordinate should be off the plot, or this proves nothing`,
+    );
+    assert.ok(
+      near(clampedValueCoordinate(above, 0), vertical ? extentOf(above) : 0, 1e-9),
+      `${orientation}: an out-of-range zero must land on the nearest edge`,
+    );
+
+    // Inverting flips which edge is nearest, with no second branch in the helper.
+    const inverted = layout({
+      orientation,
+      valueAxis: axis({ start: "20000", end: "100000", invertAxis: true }),
+    });
+    assert.ok(
+      near(clampedValueCoordinate(inverted, 0), vertical ? 0 : extentOf(inverted), 1e-9),
+      `${orientation}: inverting must clamp to the opposite edge`,
+    );
+
+    // Nothing, at any value, may leave the plot.
+    for (const l of [inRange, above, inverted]) {
+      for (const value of [-1e9, -50000, 0, 1, 42000, 100000, 1e9]) {
+        const c = clampedValueCoordinate(l, value);
+        assert.ok(
+          c >= 0 && c <= extentOf(l),
+          `${orientation}: ${value} produced ${c}, outside 0..${extentOf(l)}`,
+        );
+      }
+    }
   }
 });

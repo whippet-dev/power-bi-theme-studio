@@ -123,4 +123,4 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
  * ChartLayout, and ChartParts' layout-aware furniture needs them too).
  * Re-exported here so a preview has one import for its layout concerns.
  */
-export { categoryCentre, categoryPercent, valueFraction } from "../../lib/chartLayout";
+export { categoryCentre, categoryPercent, clampedValueCoordinate, valueFraction } from "../../lib/chartLayout";
