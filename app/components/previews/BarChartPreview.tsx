@@ -2,6 +2,7 @@ import { hexWithAlpha } from "../../lib/colorUtils";
 import {
   CategoryAxisGutter,
   ChartLegend,
+  ConstantLine,
   DataLabel,
   labelIsInside,
   labelVisibleAt,
@@ -10,8 +11,10 @@ import {
   mapLineStyle,
   ScaledGridlines,
   ValueAxisGutter,
+  formatValue,
   ZoomSliders,
 } from "../ChartParts";
+import { constantLineGeometry } from "../../lib/constantLine";
 import { BAR_DATA_MAX, barCategories } from "../../lib/previewSampleData";
 import { BAR_CHART_BOX, categoryPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import { barThickness } from "./chartPrimitives";
@@ -51,6 +54,27 @@ export function BarChartPreview({ barChartStyle }: Props) {
   // moves the bars and not just the tick labels (audit finding 4).
   const zeroPct = valueFraction(layout, 0) * 100;
 
+  /**
+   * The `referenceLine` group sits on this chart's VALUE axis, which for
+   * a bar chart is the horizontal one — so the line stands up the plot.
+   * Deciding that here is the renderer's job; ConstantLine only draws.
+   *
+   * Geometry is derived once and handed to both paint slots below, so the
+   * two mounts cannot disagree about where the line is.
+   */
+  const referenceLine = barChartStyle.referenceLine;
+  const referenceGeometry = constantLineGeometry(referenceLine, layout, barChartStyle.valueAxis, BAR_DATA_MAX);
+  const referenceLineAt = (layer: "back" | "front") => (
+    <ConstantLine
+      line={referenceLine}
+      geometry={referenceGeometry}
+      layer={layer}
+      orientation="horizontal"
+      plot={layout.plot}
+      formatValue={formatValue}
+    />
+  );
+
   return (
     <span
       className={`chart-preview${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
@@ -73,24 +97,7 @@ export function BarChartPreview({ barChartStyle }: Props) {
 
               <ZoomSliders zoom={barChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
 
-              {/* On the same x scale as the bars and gridlines, replacing a
-                  hardcoded `left: 65%` that was measured against a different
-                  box entirely. Honours the resolved value, which defaults to
-                  0 — see the T7/T8 note on the registry's -1000..1000 range
-                  against a dataMax of 82000. */}
-              {barChartStyle.referenceLine.show && (
-                <span
-                  className="chart-preview__reference-line"
-                  aria-hidden="true"
-                  style={{
-                    left: `${valueFraction(layout, barChartStyle.referenceLine.value) * 100}%`,
-                    borderLeftWidth: barChartStyle.referenceLine.width,
-                    borderLeftColor: barChartStyle.referenceLine.lineColor,
-                    borderLeftStyle: mapLineStyle(barChartStyle.referenceLine.style),
-                    opacity: 1 - barChartStyle.referenceLine.transparency / 100,
-                  }}
-                />
-              )}
+              {referenceLineAt("back")}
               {barChartStyle.trend.show && (
                 <span
                   className="chart-preview__trend-line"
@@ -157,6 +164,8 @@ export function BarChartPreview({ barChartStyle }: Props) {
                   </span>
                 );
               })}
+
+              {referenceLineAt("front")}
             </span>
 
             <CategoryAxisGutter

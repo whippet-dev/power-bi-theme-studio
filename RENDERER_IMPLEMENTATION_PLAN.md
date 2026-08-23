@@ -615,3 +615,29 @@ Hand exactly this to the coding agent once this plan is approved.
 ---
 
 **Scope statement.** Planning only. No application code was modified. Every file:line reference was verified against the working tree at commit `703ba0f`.
+
+---
+
+## 11. Phase 2 backlog (added by phase 2 task 1)
+
+Confirmed while building the constant-line foundation. Recorded here rather
+than solved, because each is a *sample-data* problem wearing a renderer's
+clothes, and mixing them into a geometry task confounds both.
+
+| # | Item | Why it is not a rendering fix |
+|---|---|---|
+| 1 | Clustered Bar/Column need representative multi-series fixtures | The clustered layout property (`clusteredGapSize`) has one series to space, so nothing it does is visible. The renderer is ready; the data is not |
+| 2 | Line likely needs multi-series data too | Series-level formatting — `customizeSeries`, per-series markers, the legend's second entry — has one series to vary |
+| 3 | Legend placement honours the side only, not start/centre/end | `legendIsVertical`/`legendIsAfterPlot` reduce eight positions to two booleans, so `TopCenter` and `TopRight` render identically. Alignment within the side is unrepresented |
+| 4 | Sample data should satisfy the conditions under which Power BI actually exposes a feature | Power BI does not offer a legend for a single-series clustered bar at all. A fixture that cannot produce the feature makes its formatting properties unreviewable, and makes coverage numbers claim more than the preview can show |
+
+Also open from task 1 itself:
+
+- `xAxisReferenceLine` and `y1AxisReferenceLine` on all five cartesian charts
+  (46 properties). The primitive is built for them; what is missing is a decision
+  about what a categorical or date-typed constant-line value means against the
+  current fixtures — see `BAR_CHART_PREVIEW_COVERAGE_PILOT.md` §3.5.
+- Unbounded numeric properties are edited by a range slider. `NumberControl` has
+  no typed-input path, so every numeric property must invent min/max even when the
+  schema has none. 51 properties currently share the generator's `-1000..1000`
+  fallback, several of them nonsensically.

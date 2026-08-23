@@ -974,6 +974,35 @@ button { color: inherit; }
 }
 
 /* Constant lines: the line itself, the region it shades, and its label. */
+/* A constant (reference) line. The wrapper spans the plot and carries no
+   geometry of its own: the SVG inside it is the plot's own coordinate box,
+   so the line, its shade and its label are all placed from one set of
+   fractions rather than from CSS that the geometry cannot see. */
+.chart-constant-line {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* overflow: visible is deliberate — the label sits proud of the plot when
+   the line is near an edge, the same way the axis gutters' own labels do. */
+.chart-constant-line__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart-constant-line__label {
+  position: absolute;
+  padding: 0 3px;
+  font-size: 8px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .chart-preview__constant {
   position: absolute;
   pointer-events: none;
@@ -1688,14 +1717,6 @@ button { color: inherit; }
   display: block;
   width: 100%;
   border-radius: 1px;
-}
-
-.chart-preview__reference-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-left-style: solid;
-  pointer-events: none;
 }
 
 .chart-preview__trend-line {

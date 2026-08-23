@@ -129,18 +129,56 @@ A user setting this to 50 sees the legend and axis labels fade and will conclude
 
 **[rev2.1] This is a target-level defect, not a relationship one.** The property faithfully drives the element it is bound to, so `plotArea.transparency → plot.background` is **exact**; the element bound to `plot.background` is simply the wrong one — `.chart-preview` is the entire visual — and that is true regardless of the value. Severity **misleading**, though less damaging than §3.1–3.3 because no data relationship is falsified.
 
-### 3.5 Constant/reference lines — **MISLEADING + the largest single gap**
+### 3.5 Constant/reference lines — **CLOSED for `referenceLine` (phase 2 task 1)**
 
-`bar.referenceLine.value` is **never read**. The line is pinned at `left: 65%` (`VisualPreviews.tsx:1029`).
-
-Worse, 65% is measured against `.chart-preview__plot`, which includes both label gutters, whereas gridlines are inset by `BAR_VALUE_AXIS_INSET`. **The reference line is not even on the same scale as the gridlines**, so it cannot be read against the axis in any state.
+**Original finding (rev1, kept for the record).** `bar.referenceLine.value` was
+never read; the line was pinned at `left: 65%` (`VisualPreviews.tsx:1029`). Worse,
+65% was measured against `.chart-preview__plot`, which includes both label gutters,
+whereas gridlines were inset by `BAR_VALUE_AXIS_INSET` — the reference line was not
+even on the same scale as the gridlines, so it could not be read against the axis in
+any state.
 
 - Represented: `show`, `lineColor`, `style`, `transparency`, `width` (5, all exact)
 - Non-previewable: `autoScale` (1)
 - **Gap: 17** — `value`, `position`, `displayName`, `dashArray`, `dashCap`, all 7 `dataLabel*`, all 5 `shade*`
 
-Plus `xAxisReferenceLine` (23) and `y1AxisReferenceLine` (23) with **zero** references. Constant lines account for **57 of the 111 gap properties (51%)**.
+**Before-state re-audit (phase 2 task 1).** Phase 1 changed this and the old count
+must not be copied forward. T7/T8 put `value` through `valueFraction(layout, value)`,
+so it moved from gap to represented and the 65% lie is already gone:
 
+- Represented: 6 — the five above plus `value`
+- Non-previewable: 1 — `autoScale`
+- **Gap: 16** — `position`, `displayName`, `dashArray`, `dashCap`, 7 `dataLabel*`, 5 `shade*`
+
+**After (phase 2 task 1).**
+
+| Classification | Count | Properties |
+|---|---:|---|
+| Represented | **23** | all of them |
+| Non-previewable | 0 | — |
+| Gap | **0** | — |
+
+`autoScale` was reclassified from non-previewable to represented. "Automatically
+adjust the spacing between dashes and dots based on line width" is a visible
+difference, not an engine behaviour: the dash pattern is multiplied by the line
+width, so a thick dashed line gets proportionally longer dashes instead of a dense
+scribble. Verified at width 4 — `4 2 1 2` becomes `16 8 4 8`.
+
+Geometry comes from `layout.scale.value` alone. Shading, the label and the line
+share one coordinate, `position` selects a real DOM paint slot rather than an
+opacity trick, and `dashArray`/`dashCap` are honoured exactly because the line is
+drawn as SVG rather than a CSS border. See `app/lib/constantLine.ts` for the pure
+half and `ConstantLine` in `ChartParts.tsx` for the drawing half.
+
+**Still open.** `xAxisReferenceLine` (23) and `y1AxisReferenceLine` (23) remain at
+**zero** references, so constant lines still account for **46 of the 111** gap
+properties. They were deliberately not implemented in the same task: the three
+groups are not interchangeable. `xAxisReferenceLine.value` is a `textProp` whose
+schema description is "numeric or date time value according to x-axis type", and on
+a clustered bar the X axis is the *value* axis while Y is the *category* axis (the
+registry's own `zoom.showOnValueAxis` is labelled "Show zoom on X axis"). Rendering
+a categorical or date-typed constant line means deciding what a date means against
+this preview's four region categories — a sample-data question, not a geometry one.
 ### 3.6 Trend line — **MISLEADING**
 
 `globals.css:1588` fixes it at `left:6%; right:6%; top:18%; transform: rotate(-6deg)`. It is a decorative diagonal with no relationship to the plotted values, and it slopes *downward* regardless of the data, which happens to ascend.

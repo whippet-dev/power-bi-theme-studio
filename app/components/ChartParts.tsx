@@ -1,6 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
 import { categoryPercent, valueFraction, type ChartLayout } from "../lib/chartLayout";
+import {
+  constantLineCap,
+  constantLineDashArray,
+  constantLineIsFront,
+  constantLineLabelText,
+  type ConstantLineGeometry,
+  type ConstantLineStyle,
+} from "../lib/constantLine";
 
 /**
  * Shared chart furniture — legend, axis ticks, gridlines, label
@@ -765,5 +773,166 @@ export function CategoryGridlines({
         );
       })}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Constant / reference lines
+// ---------------------------------------------------------------------------
+
+/**
+ * One constant line: an optional shaded region, the line itself, and an
+ * optional data label.
+ *
+ * Deliberately dumb. It takes resolved style values and geometry that has
+ * already been worked out (`constantLineGeometry`), and it neither reads
+ * theme JSON nor resolves a property nor computes a scale nor knows any
+ * sample-data maximum. The renderer owns which axis a group belongs to;
+ * this draws whatever it is handed. That is what lets the same component
+ * serve `referenceLine` on a bar chart's value axis and, later, the other
+ * groups and the other cartesian families.
+ *
+ * `layer` implements the group's `position` property honestly. A line set
+ * to "Behind" is rendered before the data marks and one set to "In front"
+ * after them, so real DOM order decides what covers what — no z-index
+ * stack to reason about and, in particular, no faking depth with opacity,
+ * which would misrepresent the transparency property sitting right next
+ * to it. A renderer mounts this twice, once in each slot, and each mount
+ * returns null unless the resolved position matches it.
+ *
+ * The line is SVG rather than a CSS border because `dashArray` and
+ * `dashCap` have no CSS-border equivalent: a border can be `dashed`, but
+ * it cannot be "4 2 1 2" with square caps. One SVG path honours every
+ * combination, so there is no second code path that could disagree with
+ * the first about what "dotted" means.
+ */
+export function ConstantLine({
+  line,
+  geometry,
+  layer,
+  orientation,
+  plot,
+  formatValue: format,
+}: {
+  line: ConstantLineStyle;
+  geometry: ConstantLineGeometry;
+  /** Which paint slot this mount is; compared against `line.position`. */
+  layer: "back" | "front";
+  /** Which way the line runs: across a vertical chart, up a horizontal one. */
+  orientation: "vertical" | "horizontal";
+  /** The plot's natural size, for the SVG's viewBox. */
+  plot: { width: number; height: number };
+  formatValue: (value: number, displayUnits?: string | number, precision?: number) => string;
+}): ReactNode {
+  if (!line.show) return null;
+  if ((layer === "front") !== constantLineIsFront(line)) return null;
+  if (!geometry.onPlot && !geometry.shade) return null;
+
+  // A vertical chart's value axis runs up the plot, so its constant line
+  // lies across it; a horizontal chart's runs across, so the line stands
+  // up it. `fraction` is measured from the origin edge either way, which
+  // for a vertical chart is the bottom — hence 1 - fraction for a y.
+  const acrossPlot = orientation === "vertical";
+  const along = acrossPlot ? (1 - geometry.fraction) * plot.height : geometry.fraction * plot.width;
+
+  const stroke = hexWithAlpha(line.lineColor, line.transparency);
+  const shadeColor = hexWithAlpha(
+    line.shadeColorMatchStroke ? line.lineColor : line.shadeColor,
+    line.shadeTransparency,
+  );
+
+  return (
+    <span className="chart-constant-line" aria-hidden="true">
+      <svg
+        className="chart-constant-line__canvas"
+        viewBox={`0 0 ${plot.width} ${plot.height}`}
+        preserveAspectRatio="none"
+      >
+        {geometry.shade && (
+          // Drawn before the line so the line always reads on top of its
+          // own shade, whichever paint slot the pair as a whole is in.
+          <rect
+            x={acrossPlot ? 0 : geometry.shade.from * plot.width}
+            y={acrossPlot ? (1 - geometry.shade.to) * plot.height : 0}
+            width={acrossPlot ? plot.width : (geometry.shade.to - geometry.shade.from) * plot.width}
+            height={acrossPlot ? (geometry.shade.to - geometry.shade.from) * plot.height : plot.height}
+            fill={shadeColor}
+          />
+        )}
+        {geometry.onPlot && (
+          <line
+            x1={acrossPlot ? 0 : along}
+            x2={acrossPlot ? plot.width : along}
+            y1={acrossPlot ? along : 0}
+            y2={acrossPlot ? along : plot.height}
+            stroke={stroke}
+            strokeWidth={line.width}
+            strokeDasharray={constantLineDashArray(line)}
+            strokeLinecap={constantLineCap(line)}
+            // The plot is stretched to fit its rendered box, so without
+            // this the line's thickness and dash lengths would distort
+            // with the aspect ratio instead of staying the pixel sizes
+            // the properties name.
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+      </svg>
+      {line.dataLabelShow && geometry.onPlot && (
+        <ConstantLineLabel line={line} geometry={geometry} orientation={orientation} format={format} />
+      )}
+    </span>
+  );
+}
+
+/**
+ * The line's data label, positioned against the line rather than against
+ * the plot.
+ *
+ * The two position properties are read relative to the line, which is what
+ * makes them meaningful on both orientations: for a line lying across the
+ * plot, "left"/"right" slide the label along it and "above"/"under" put it
+ * on one side or the other; for a line standing up the plot the two swap
+ * roles. Anchoring is by translate rather than by a second offset, so the
+ * label's inner edge sits on the line at any fraction — including 0% and
+ * 100%, where a plain percentage offset would hang the box off the plot.
+ */
+function ConstantLineLabel({
+  line,
+  geometry,
+  orientation,
+  format,
+}: {
+  line: ConstantLineStyle;
+  geometry: ConstantLineGeometry;
+  orientation: "vertical" | "horizontal";
+  format: (value: number, displayUnits?: string | number, precision?: number) => string;
+}): ReactNode {
+  const acrossPlot = orientation === "vertical";
+  const percent = `${geometry.fraction * 100}%`;
+  const toLeft = String(line.dataLabelHorizontalPosition).toLowerCase() === "left";
+  const under = String(line.dataLabelVerticalPosition).toLowerCase() === "under";
+
+  const style: CSSProperties = acrossPlot
+    ? {
+        // Lying across the plot: vertical position picks the side of the
+        // line, horizontal position picks the end of it.
+        bottom: percent,
+        left: toLeft ? 2 : "auto",
+        right: toLeft ? "auto" : 2,
+        transform: under ? "translateY(100%)" : "translateY(0)",
+      }
+    : {
+        // Standing up the plot: horizontal position picks the side of the
+        // line, vertical position picks the end of it.
+        left: percent,
+        top: under ? "auto" : 2,
+        bottom: under ? 2 : "auto",
+        transform: toLeft ? "translateX(-100%)" : "translateX(0)",
+      };
+
+  return (
+    <span className="chart-constant-line__label" style={{ ...style, color: line.dataLabelColor }}>
+      {constantLineLabelText(line, format)}
+    </span>
   );
 }
