@@ -840,3 +840,38 @@ test("clampedValueCoordinate is plot-local, and clamps a value outside the displ
     }
   }
 });
+test("every category gets an identical slot size, at every inner padding", () => {
+  // The invariant BASE_THEME_DIFFERENTIAL_AUDIT.md leans on. The audit found
+  // four bars rendering at visibly different thicknesses under Fluent 2, and
+  // needed to establish that the engine was not the source: with one series
+  // and one shared thickness setting, equal inputs must give byte-identical
+  // slot sizes, whatever the padding. (The defect turned out to be
+  // device-pixel snapping of correct fractional geometry, well downstream of
+  // here — but only a test like this makes that conclusion safe to rely on.)
+  for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
+    for (const innerPadding of [0, 10, 20, 50, 90]) {
+      const l = layout({ orientation, innerPadding });
+      const n = CATEGORIES.length;
+      const sizes = Array.from({ length: n }, (_, i) => l.scale.category(i, n).size);
+      for (const size of sizes) {
+        assert.ok(
+          near(size, sizes[0], 1e-12),
+          `${orientation} pad=${innerPadding}: slot sizes must all match, got ${sizes.join(", ")}`,
+        );
+      }
+      // The pitch between slots is equal too, so no category is nudged.
+      const pitches = Array.from({ length: n - 1 }, (_, i) =>
+        l.scale.category(i + 1, n).start - l.scale.category(i, n).start,
+      );
+      for (const pitch of pitches) {
+        assert.ok(
+          near(pitch, pitches[0], 1e-12),
+          `${orientation} pad=${innerPadding}: slot pitch must be uniform, got ${pitches.join(", ")}`,
+        );
+      }
+      // Changing the index moves the slot without resizing it.
+      assert.ok(near(l.scale.category(0, n).size, l.scale.category(n - 1, n).size, 1e-12));
+      assert.ok(l.scale.category(n - 1, n).start > l.scale.category(0, n).start);
+    }
+  }
+});
