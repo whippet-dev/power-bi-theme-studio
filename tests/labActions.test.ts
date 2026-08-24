@@ -3,6 +3,10 @@ import test from "node:test";
 import {
   ALLOWED_ACTIONS,
   ActionError,
+  SUPPORTED_BASE_THEMES,
+  checkVariantTheme,
+  expandMatrix,
+  selectLabVisual,
   detectBreakpoints,
   expandExperiment,
   identifyLabEnvironment,
@@ -66,7 +70,14 @@ test("visual sizes outside a safe range are rejected", () => {
 // Environment identification
 // ---------------------------------------------------------------------------
 
-const LAB = { visualType: "cartesian", categories: ["London", "North West", "Scotland", "Wales"], seriesCount: 3 };
+const LAB = {
+  visualType: "cartesian",
+  categories: ["London", "North West", "Scotland", "Wales"],
+  seriesCount: 3,
+  // The auto-generated visual title, which names every measure. Unlike the
+  // legend it survives the small sizes where Power BI sheds furniture.
+  sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+};
 
 test("the synthetic lab environment is recognised", () => {
   assert.deepEqual(identifyLabEnvironment(LAB), { ok: true, reasons: [] });
@@ -94,6 +105,149 @@ test("an empty render is not treated as a match", () => {
   const blank = identifyLabEnvironment({ ...LAB, categories: [] });
   assert.equal(blank.ok, false);
   assert.match(blank.reasons.join(" "), /no categories rendered/);
+});
+
+test("a missing sentinel fails CLOSED", () => {
+  // Everything else about this visual looks like the lab. Without the
+  // sentinel the controller must refuse rather than assume.
+  const noSentinel = { ...LAB, sentinel: undefined };
+  const result = identifyLabEnvironment(noSentinel);
+  assert.equal(result.ok, false);
+  assert.match(result.reasons.join(" "), /no lab sentinel/);
+
+  assert.equal(identifyLabEnvironment({ ...LAB, sentinel: "" }).ok, false);
+});
+
+test("the same categories with different measures is rejected", () => {
+  // The false positive the sentinel exists to catch: another cartesian
+  // visual plotting the same four regions against three other measures.
+  const impostor = { ...LAB, sentinel: "Sum of Revenue, Sum of Cost and Sum of Margin by Category" };
+  const result = identifyLabEnvironment(impostor);
+  assert.equal(result.ok, false);
+  assert.match(result.reasons.join(" "), /does not plot Online, Phone, Post/);
+});
+
+test("a partially rendered lab still carries its sentinel", () => {
+  // At 372x128 Power BI drops the legend and half the categories. The
+  // sentinel must survive that, or the lab stops recognising itself
+  // exactly where the interesting measurements are.
+  assert.equal(identifyLabEnvironment({ ...LAB, categories: ["London"] }).ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// Choosing the right visual among several
+// ---------------------------------------------------------------------------
+
+const OTHER_CARTESIAN = {
+  visualType: "cartesian",
+  categories: ["London", "North West", "Scotland", "Wales"],
+  seriesCount: 3,
+  sentinel: "Sum of Revenue, Sum of Cost and Sum of Margin by Category",
+};
+
+test("the lab visual is picked out from among other cartesian visuals", () => {
+  const result = selectLabVisual([OTHER_CARTESIAN, LAB]);
+  assert.equal(result.ok, true);
+  assert.equal(result.index, 1, "identity must not depend on DOM order");
+  assert.equal(result.visual?.sentinel, LAB.sentinel);
+});
+
+test("identity does not depend on size or ordering", () => {
+  // The lab resizes its own visual, so anything derived from geometry would
+  // move during the very experiments it is meant to guard.
+  const small = { ...LAB, width: 372, height: 128, categories: ["London"] };
+  const large = { ...OTHER_CARTESIAN, width: 900, height: 900 };
+  assert.equal(selectLabVisual([small, large]).ok, true);
+  assert.equal(selectLabVisual([large, small]).visual?.sentinel, LAB.sentinel);
+});
+
+test("an ambiguous page is an error, not a guess", () => {
+  const result = selectLabVisual([LAB, { ...LAB }]);
+  assert.equal(result.ok, false);
+  assert.match(String(result.reasons?.join(" ")), /refusing to guess/);
+});
+
+test("no match explains why, per candidate", () => {
+  const result = selectLabVisual([OTHER_CARTESIAN]);
+  assert.equal(result.ok, false);
+  assert.match(String(result.reasons?.join(" ")), /does not plot/);
+  assert.equal(selectLabVisual([]).ok, false);
+});
+
+// ---------------------------------------------------------------------------
+// Base theme
+// ---------------------------------------------------------------------------
+
+test("only the themes this build exposes are accepted", () => {
+  // Read from the live control, not assumed: an arbitrary label would be
+  // typed into a dropdown that silently does nothing.
+  assert.deepEqual([...SUPPORTED_BASE_THEMES], ["Fluent 2", "Classic 2026", "Classic 2018"]);
+  for (const theme of SUPPORTED_BASE_THEMES) {
+    assert.equal(validateAction({ type: "setBaseTheme", theme }), true);
+  }
+});
+
+test("arbitrary or near-miss theme names are rejected", () => {
+  for (const bad of ["Fluent", "classic 2026", "Classic2026", "", null, 42, "'; DROP"]) {
+    assert.throws(() => validateAction({ type: "setBaseTheme", theme: bad }), ActionError, String(bad));
+  }
+});
+
+test("a variant is failed when the verified theme is not the requested one", () => {
+  assert.deepEqual(checkVariantTheme("Classic 2026", "Classic 2026"), { ok: true });
+
+  const mismatch = checkVariantTheme("Fluent 2", "Classic 2026");
+  assert.equal(mismatch.ok, false);
+  assert.match(String(mismatch.reason), /requested Fluent 2 but the control reports Classic 2026/);
+
+  assert.equal(checkVariantTheme("Fluent 2", null).ok, false, "unreadable is not a pass");
+});
+
+test("restoration puts the theme back, and last", () => {
+  const initial = { width: 600, height: 600, gap: 10, baseTheme: "Classic 2026" };
+  const plan = planRestoration(initial, { width: 372, height: 128, gap: 40, baseTheme: "Fluent 2" });
+
+  assert.deepEqual(plan.map((a) => a.type), ["setVisualSize", "setSeriesGap", "setBaseTheme"]);
+  assert.equal(plan.at(-1)?.theme, "Classic 2026");
+  for (const action of plan) assert.equal(validateAction(action), true);
+});
+
+test("theme restoration is verified by name, exactly", () => {
+  const initial = { baseTheme: "Classic 2026" };
+  assert.equal(verifyRestoration(initial, { baseTheme: "Classic 2026" }).restored, true);
+
+  const failed = verifyRestoration(initial, { baseTheme: "Classic 2018" });
+  assert.equal(failed.restored, false);
+  assert.match(failed.problems[0], /baseTheme: expected Classic 2026, found Classic 2018/);
+});
+
+// ---------------------------------------------------------------------------
+// Matrix
+// ---------------------------------------------------------------------------
+
+test("a theme x size matrix expands with themes as the outer loop", () => {
+  const variants = expandMatrix({
+    themes: ["Classic 2026", "Fluent 2"],
+    sizes: [{ width: 600, height: 600 }, { width: 372, height: 128 }],
+    baseline: { gap: 10 },
+  });
+
+  assert.equal(variants.length, 4);
+  // Switching a theme re-resolves every default and re-renders from
+  // scratch; a resize only re-lays out. So themes change least often.
+  assert.deepEqual(variants.map((v) => v.theme), [
+    "Classic 2026", "Classic 2026", "Fluent 2", "Fluent 2",
+  ]);
+  assert.equal(variants[0].gap, 10, "baseline reaches every variant");
+  assert.equal(variants[0].name, "Classic 2026 600x600");
+});
+
+test("a matrix cannot smuggle in an unsupported theme", () => {
+  assert.throws(
+    () => expandMatrix({ themes: ["Classic 2026", "Nonsense"], sizes: [{ width: 600, height: 600 }] }),
+    ActionError,
+  );
+  assert.throws(() => expandMatrix({ themes: [], sizes: [{ width: 1, height: 1 }] }), /needs both/);
 });
 
 // ---------------------------------------------------------------------------

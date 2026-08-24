@@ -33,7 +33,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  SUPPORTED_BASE_THEMES,
   identifyLabEnvironment,
+  selectLabVisual,
   isStable,
   planRestoration,
   settleOutcome,
@@ -122,6 +124,14 @@ class LabSession {
     }
   }
 
+  /** Closes a popup without choosing anything from it. */
+  async pressEscape() {
+    for (const type of ["keyDown", "keyUp"]) {
+      await this.send("Input.dispatchKeyEvent", { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    }
+    await sleep(400);
+  }
+
   close() {
     try { this.socket?.close(); } catch { /* already gone */ }
   }
@@ -133,9 +143,25 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Fixed payloads — reads and UI lookups only
 // ---------------------------------------------------------------------------
 
-const VISUAL = `[...document.querySelectorAll('[class*="visualContainer"]')]
+/**
+ * Every cartesian visual on the page, so the caller can pick the lab one by
+ * identity. Deliberately not 'the smallest': the lab resizes its own visual,
+ * so a geometric rule would move during the experiments it exists to guard.
+ */
+const CARTESIAN_VISUALS = `[...document.querySelectorAll('[class*="visualContainer"]')]
   .filter((e) => e.querySelector('svg.cartesianChart'))
-  .sort((a, b) => a.getBoundingClientRect().width - b.getBoundingClientRect().width)[0]`;
+  .filter((e) => ![...e.querySelectorAll('[class*="visualContainer"]')]
+    .some((inner) => inner.querySelector('svg.cartesianChart')))`;
+
+/** The lab visual: the one whose title names the fixture's three measures. */
+const VISUAL =
+  "(() => { const all = " + CARTESIAN_VISUALS + ";" +
+  "  const named = all.filter((e) => {" +
+  "    const text = [...e.querySelectorAll('[class*=\"visualsEnterHint\"]')]" +
+  "      .map((n) => (n.textContent || '')).join(' ');" +
+  "    return text.includes('Online') && text.includes('Phone') && text.includes('Post');" +
+  "  });" +
+  "  return named.length === 1 ? named[0] : (named[0] || all[0]); })()";
 
 const PAYLOADS = {
   /** Enough to decide whether this is the lab, plus the geometry we sweep. */
@@ -187,8 +213,18 @@ const PAYLOADS = {
     const seriesStep = series.length >= 2 ? series[1][0] - series[0][0] : null;
     const categoryStep = series[0] && series[0].length >= 2 ? series[0][1] - series[0][0] : null;
 
+    // The lab sentinel: the visual's accessible description, which names
+    // every measure and the category field. Present at every size, unlike
+    // the legend, and unlike any class-named title element -- Power BI does
+    // not expose one here.
+    const hint = [...el.querySelectorAll('[class*="visualsEnterHint"]')]
+      .map((n) => (n.textContent || '').trim())
+      .find((txt) => txt.length > 10 && !/^Press /.test(txt)) || '';
+    const sentinel = hint.slice(0, 120);
+
     return {
       visualType: 'cartesian',
+      sentinel,
       width: Math.round(r.width),
       height: Math.round(r.height),
       categories: catLabels.map((t) => t.text),
@@ -218,18 +254,115 @@ const PAYLOADS = {
     };
   })()`,
 
-  /** Just the numbers the settle loop watches. */
+  /**
+   * What the settle loop watches.
+   *
+   * Geometry alone is not enough for a theme change: the visual can reach
+   * its final size while the old theme's text and colours are still on
+   * screen, and a geometry-only fingerprint would call that settled. So it
+   * also carries mark count, a colour and a font size -- the things a theme
+   * switch changes last.
+   */
   geometry: () => `(() => {
     const el = ${VISUAL};
     if (!el) return {};
     const r = el.getBoundingClientRect();
     const plot = el.querySelector('svg.mainGraphicsContext');
+    const bar = el.querySelector('svg rect.bar');
+    const text = el.querySelector('svg text');
     return {
       w: +r.width.toFixed(2), h: +r.height.toFixed(2),
       plotW: plot ? Number(plot.getAttribute('width')) : 0,
       plotH: plot ? Number(plot.getAttribute('height')) : 0,
       bars: el.querySelectorAll('svg rect.bar').length,
+      texts: el.querySelectorAll('svg text').length,
+      fill: bar ? getComputedStyle(bar).fill : '',
+      fontPx: text ? getComputedStyle(text).fontSize : '',
     };
+  })()`,
+
+  /** Every cartesian visual's identity fields, for picking the lab one. */
+  labVisuals: () => `(() => {
+    return CARTESIAN_PLACEHOLDER.map((el) => {
+      const hint = [...el.querySelectorAll('[class*="visualsEnterHint"]')]
+        .map((n) => (n.textContent || '').trim())
+        .find((txt) => txt.length > 10 && !/^Press /.test(txt)) || '';
+      const bars = [...el.querySelectorAll('svg rect.bar')];
+      const own = (n) => {
+        const d = [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+        return d || (n.children.length === 0 ? (n.textContent || '').trim() : '');
+      };
+      const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+      const cats = [...el.querySelectorAll('svg text')]
+        .filter((x) => barLeft !== null && x.getBoundingClientRect().right <= barLeft + 2
+          && !/wf_standard-font/.test(getComputedStyle(x).fontFamily))
+        .map(own).filter(Boolean);
+      return {
+        visualType: 'cartesian',
+        sentinel: hint.slice(0, 120),
+        categories: cats,
+        seriesCount: [...new Set(bars.map((b) => getComputedStyle(b).fill))].length,
+      };
+    });
+  })()`.replace('CARTESIAN_PLACEHOLDER', CARTESIAN_VISUALS),
+
+  /**
+   * The Base theme control's current value.
+   *
+   * It is a button whose own label IS the value, carrying
+   * aria-haspopup="listbox". Reading the control directly is the primary
+   * proof a theme changed -- a palette fingerprint is only a sanity check,
+   * and two themes could in principle share a palette.
+   */
+  baseThemeValue: () => `(() => {
+    const el = [...document.querySelectorAll('button[aria-haspopup="listbox"]')]
+      .find((e) => {
+        const r = e.getBoundingClientRect();
+        return r.x > window.innerWidth * 0.62 && r.width > 80 && r.height > 10;
+      });
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { value: (el.getAttribute('aria-label') || el.textContent || '').trim(),
+             expanded: el.getAttribute('aria-expanded'),
+             x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  })()`,
+
+  /** The open dropdown's options. HTML listbox only -- the chart's are SVG. */
+  baseThemeOptions: () => `(() => {
+    const box = [...document.querySelectorAll('[role=listbox]')]
+      .filter((b) => !(b instanceof SVGElement))
+      .find((b) => b.getBoundingClientRect().x > window.innerWidth * 0.62);
+    if (!box) return [];
+    return [...box.querySelectorAll('[role=option]')].map((o) => {
+      const r = o.getBoundingClientRect();
+      return { label: (o.getAttribute('aria-label') || o.textContent || '').trim(),
+               selected: o.getAttribute('aria-selected'),
+               x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+    });
+  })()`,
+
+  /** Somewhere empty on the canvas, to deselect. */
+  canvasPoint: () => `(() => {
+    const c = document.querySelector('[class*="displayArea"]');
+    if (!c) return null;
+    const r = c.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width - 30), y: Math.round(r.y + r.height - 30) };
+  })()`,
+
+  /**
+   * A right-pane TAB, by accessible name.
+   *
+   * Separate from `controlAt` because several names are used twice: 'Theme'
+   * is both a tab and a section header inside that tab, and a generic
+   * lookup matches whichever comes first in the DOM.
+   */
+  tabAt: (label) => `(() => {
+    const el = [...document.querySelectorAll('[role=tab]')]
+      .find((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === ${JSON.stringify(label)}));
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+             selected: el.getAttribute('aria-selected') };
   })()`,
 
   /** Centre of a pane control, found by its accessible name. */
@@ -291,6 +424,17 @@ export class LabController {
 
   async open() {
     await this.session.open();
+
+    // Identity first, across every cartesian visual on the page, so a second
+    // reference visual cannot be mutated by mistake and an ambiguous page is
+    // an error rather than a guess.
+    const candidates = await this.session.read("labVisuals");
+    const chosen = selectLabVisual(candidates);
+    if (!chosen.ok) {
+      this.session.close();
+      throw new Error(`REFUSING TO MUTATE — ${chosen.reasons.join("; ")}`);
+    }
+
     const state = await this.session.read("labState");
     const check = identifyLabEnvironment(state);
     if (!check.ok) {
@@ -299,31 +443,167 @@ export class LabController {
         `REFUSING TO MUTATE — this is not the synthetic lab visual:\n  ${check.reasons.join("\n  ")}`,
       );
     }
+
+    // The base theme is part of every measurement's identity, so it is read
+    // up front and restored at the end like any other mutated setting.
+    state.baseTheme = await this.readBaseTheme();
     this.initialState = state;
-    this.log(`lab identified: ${state.width}x${state.height}, ${state.barsRendered} bars, palette ${state.palette.join(" ")}`);
+    this.log(
+      `lab identified: ${state.width}x${state.height}, ${state.barsRendered} bars, ` +
+        `base theme ${state.baseTheme ?? "(unreadable)"}`,
+    );
     return state;
+  }
+
+  /**
+   * Opens the report-theme pane and reads the Base theme control.
+   *
+   * The control only exists with no visual selected, so this deselects on
+   * the way in. Callers that need the visual selected afterwards re-select
+   * it themselves -- `openSizeControls` already does.
+   */
+  async openThemeControls() {
+    const existing = await this.session.read("baseThemeValue");
+    if (existing && SUPPORTED_BASE_THEMES.includes(existing.value)) return existing;
+
+    // The Base theme control only exists with no visual selected.
+    const canvas = await this.session.read("canvasPoint");
+    if (canvas) await this.session.click(canvas.x, canvas.y);
+
+    const themeTab = await this.session.read("tabAt", "Theme");
+    if (!themeTab) return null;
+    if (themeTab.selected !== "true") await this.session.click(themeTab.x, themeTab.y);
+
+    // The section may already be open from a previous call; only click when
+    // it is not, or the click closes it again.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const settings = await this.session.read("controlAt", "Theme settings");
+      if (!settings) break;
+      if (settings.expanded === "true") break;
+      await this.session.click(settings.x, settings.y);
+    }
+
+    return this.session.read("baseThemeValue");
+  }
+
+  /**
+   * The current Base theme, leaving the UI as it was found.
+   *
+   * Reading a setting should not change what the next operation sees, and
+   * getting to this control means deselecting the visual.
+   */
+  async readBaseTheme() {
+    const control = await this.openThemeControls();
+    const value = control ? control.value : null;
+    await this.selectVisual();
+    return value;
+  }
+
+  /**
+   * Selects the lab visual, verified by the Format visual tab appearing.
+   *
+   * That tab only exists while a visual is selected, so its presence is a
+   * more meaningful check than an undocumented class name -- and it is the
+   * thing every later step actually depends on.
+   */
+  async selectVisual() {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (await this.session.read("tabAt", "Format visual")) return true;
+      const selection = await this.session.read("selection");
+      if (!selection) throw new Error("the lab visual is no longer on the page");
+      await this.session.click(selection.x, selection.y);
+      await sleep(800);
+    }
+    return Boolean(await this.session.read("tabAt", "Format visual"));
+  }
+
+  /**
+   * Switches the report's Base theme through Power BI's own dropdown.
+   *
+   * Verification reads the control back, not the rendered colours: a palette
+   * is a secondary sanity check at best, and filing a measurement under a
+   * theme that was merely requested is exactly the mistake that made a whole
+   * earlier dataset unusable.
+   */
+  async setBaseTheme(theme) {
+    validateAction({ type: "setBaseTheme", theme });
+
+    // Navigate once and keep the control on screen for the write.
+    const control = await this.openThemeControls();
+    if (!control) throw new Error("the Base theme control could not be found");
+    if (control.value === theme) {
+      this.log(`base theme already ${theme}`);
+      await this.selectVisual();
+      return { theme, changed: false, settled: true };
+    }
+    if (control.expanded !== "true") await this.session.click(control.x, control.y);
+
+    const options = await this.session.read("baseThemeOptions");
+    const option = options.find((o) => o.label === theme);
+    if (!option) {
+      // Leave the dropdown as we found it rather than mid-interaction.
+      await this.session.pressEscape();
+      throw new Error(`"${theme}" is not offered by this build (saw: ${options.map((o) => o.label).join(", ")})`);
+    }
+    await this.session.click(option.x, option.y);
+
+    // A theme switch re-resolves every default and re-renders from scratch,
+    // so it needs a longer settle than a resize.
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("baseThemeValue");
+    const verified = after ? after.value : null;
+    await this.selectVisual();
+    if (verified !== theme) {
+      throw new Error(`base theme did not change: asked for ${theme}, control reports ${verified}`);
+    }
+    this.mutated.baseTheme = theme;
+    this.log(`base theme now ${verified}`);
+    return { theme: verified, changed: true, settled: outcome.settled };
   }
 
   /** Selects the visual and opens General → Properties, verifying each step. */
   async openSizeControls() {
-    const selection = await this.session.read("selection");
-    if (!selection.selected) {
-      await this.session.click(selection.x, selection.y);
-      const after = await this.session.read("selection");
-      if (!after.selected) throw new Error("could not select the lab visual");
+    // Selection is verified by the thing that actually depends on it -- the
+    // Format visual tab only exists while a visual is selected -- rather
+    // than by a class name, which is both undocumented and easy to confuse
+    // with 'unselectable'.
+    if (!(await this.selectVisual())) {
+      throw new Error("could not select the lab visual — the Format visual tab never appeared");
     }
-    for (const [label, check] of [
-      ["Format visual", (c) => c.selected === "true"],
-      ["General", () => true],
-      ["Properties", (c) => c.expanded === "true"],
-    ]) {
-      const control = await this.session.read("controlAt", label);
-      if (!control) throw new Error(`could not find the "${label}" control`);
-      if (!check(control)) {
-        await this.session.click(control.x, control.y);
-        await sleep(600);
+    // The pane is stateful and a previous operation may have left it on the
+    // theme tab, so each step is verified and retried rather than assumed.
+    const step = async (payload, label, done) => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const control = await this.session.read(payload, label);
+        if (control && done(control)) return;
+        if (control) {
+          await this.session.click(control.x, control.y);
+          await sleep(700);
+        } else {
+          await sleep(500);
+        }
       }
+      const final = await this.session.read(payload, label);
+      if (!final) throw new Error(`could not find the "${label}" control`);
+      if (!done(final)) throw new Error(`"${label}" did not reach the expected state`);
+    };
+
+    await step("tabAt", "Format visual", (c) => c.selected === "true");
+
+    // The General sub-tab has no selected state to read, so it is driven by
+    // what it is for: click it until the Properties section it contains
+    // appears. A predicate that always returns true would never click at
+    // all, and the pane would silently stay on whichever sub-tab it was on.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", "Properties")) break;
+      const general = await this.session.read("controlAt", "General");
+      if (!general) throw new Error("could not find the General sub-tab");
+      await this.session.click(general.x, general.y);
+      await sleep(700);
     }
+
+    await step("controlAt", "Properties", (c) => c.expanded === "true");
     const fields = await this.session.read("sizeFields");
     if (fields.length < 2) throw new Error(`expected two size fields, found ${fields.length}`);
     return fields;
@@ -417,8 +697,10 @@ export class LabController {
     this.log(`restoring: ${plan.map((a) => a.type).join(", ")}`);
     for (const action of plan) {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
+      if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
     }
     const current = await this.session.read("labState");
+    current.baseTheme = await this.readBaseTheme();
     const result = verifyRestoration(this.initialState, current);
     if (!result.restored) {
       console.error("\n*** RESTORATION FAILED ***");

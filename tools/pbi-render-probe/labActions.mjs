@@ -22,9 +22,18 @@
  */
 export const ALLOWED_ACTIONS = Object.freeze({
   setVisualSize: { params: ["width", "height"], mutates: true },
+  setBaseTheme: { params: ["theme"], mutates: true },
   setSeriesGap: { params: ["gap"], mutates: true },
   readState: { params: [], mutates: false },
 });
+
+/**
+ * The Base theme options this Desktop build actually exposes, read from the
+ * live control rather than assumed. A caller may only name one of these:
+ * an arbitrary label would be typed into a dropdown that silently does
+ * nothing, and the run would then be filed under the wrong theme.
+ */
+export const SUPPORTED_BASE_THEMES = Object.freeze(["Fluent 2", "Classic 2026", "Classic 2018"]);
 
 export class ActionError extends Error {}
 
@@ -56,6 +65,14 @@ export function validateAction(action) {
       }
     }
   }
+  if (action.type === "setBaseTheme") {
+    if (typeof action.theme !== "string" || !SUPPORTED_BASE_THEMES.includes(action.theme)) {
+      throw new ActionError(
+        `base theme ${JSON.stringify(action.theme)} is not one this build exposes ` +
+          `(${SUPPORTED_BASE_THEMES.join(", ")})`,
+      );
+    }
+  }
   if (action.type === "setSeriesGap") {
     if (!Number.isFinite(action.gap) || action.gap < 0 || action.gap > 75) {
       throw new ActionError("gap must be between 0 and 75");
@@ -80,6 +97,7 @@ export function identifyLabEnvironment(state, expected = {}) {
   const reasons = [];
   const want = {
     categories: ["London", "North West", "Scotland", "Wales"],
+    series: ["Online", "Phone", "Post"],
     seriesCount: 3,
     visualType: "cartesian",
     ...expected,
@@ -103,7 +121,52 @@ export function identifyLabEnvironment(state, expected = {}) {
   if (state.seriesCount !== want.seriesCount) {
     reasons.push(`series count ${state.seriesCount} is not ${want.seriesCount}`);
   }
+
+  // The sentinel. Categories and a series count are not enough on their own:
+  // another cartesian visual could plot the same four regions with three
+  // different measures. The auto-generated visual title names every measure
+  // and the category field, and unlike the legend it survives the small
+  // sizes where Power BI sheds furniture -- so it is the one signal present
+  // in every state this lab measures.
+  if (typeof state.sentinel !== "string" || !state.sentinel) {
+    // Fail CLOSED: an absent sentinel is a refusal, never a pass.
+    reasons.push("no lab sentinel could be read from the visual");
+  } else {
+    const missing = want.series.filter((name) => !state.sentinel.includes(name));
+    if (missing.length) {
+      reasons.push(`the visual does not plot ${missing.join(", ")} -- this is not the lab fixture`);
+    }
+  }
+
   return { ok: reasons.length === 0, reasons };
+}
+
+/**
+ * Picks the intended reference visual out of however many are on the page.
+ *
+ * Deliberately NOT "the smallest cartesian visual": the lab resizes its own
+ * visual, so any identity derived from geometry, DOM order or screen
+ * position would move during the very experiments it is meant to guard.
+ * Identity is the sentinel and the fixture data, both of which the
+ * experiments leave alone.
+ *
+ * Ambiguity is an error rather than a guess: two matching visuals means the
+ * page is not what the lab thinks it is.
+ */
+export function selectLabVisual(candidates, expected = {}) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const matches = list.filter((c) => identifyLabEnvironment(c, expected).ok);
+  if (matches.length === 1) return { ok: true, visual: matches[0], index: list.indexOf(matches[0]) };
+  if (matches.length === 0) {
+    const why = list.length
+      ? list.map((c, i) => `  [${i}] ${identifyLabEnvironment(c, expected).reasons.join("; ")}`).join("\n")
+      : "  no cartesian visuals found on the page";
+    return { ok: false, reasons: [`no visual matched the lab fixture:\n${why}`] };
+  }
+  return {
+    ok: false,
+    reasons: [`${matches.length} visuals matched the lab fixture -- refusing to guess which is the reference`],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +234,46 @@ export function expandExperiment(spec) {
   }));
 }
 
+/**
+ * Expands a theme x size matrix.
+ *
+ * Themes are the outer loop because switching one is the expensive
+ * operation: a size change re-lays out, a theme change re-resolves every
+ * default and re-renders from scratch.
+ */
+export function expandMatrix(spec) {
+  if (!spec?.themes?.length || !spec?.sizes?.length) {
+    throw new ActionError("a matrix needs both themes and sizes");
+  }
+  for (const theme of spec.themes) validateAction({ type: "setBaseTheme", theme });
+  const variants = [];
+  for (const theme of spec.themes) {
+    for (const size of spec.sizes) {
+      variants.push({
+        index: variants.length,
+        name: `${theme} ${size.width}x${size.height}`,
+        theme,
+        ...spec.baseline,
+        ...size,
+      });
+    }
+  }
+  return variants;
+}
+
+/**
+ * A measurement may only be filed under a theme that was verified, never
+ * one that was merely requested. Silently mislabelling a result is how the
+ * whole Fluent-versus-Classic confusion happened in the first place.
+ */
+export function checkVariantTheme(requested, verified) {
+  if (!verified) return { ok: false, reason: "the base theme could not be read back" };
+  if (requested !== verified) {
+    return { ok: false, reason: `requested ${requested} but the control reports ${verified}` };
+  }
+  return { ok: true };
+}
+
 /** The actions needed to put every mutated setting back. */
 export function planRestoration(initial, mutated) {
   const plan = [];
@@ -184,6 +287,11 @@ export function planRestoration(initial, mutated) {
   if (mutated?.gap !== undefined && initial.gap !== mutated.gap) {
     plan.push({ type: "setSeriesGap", gap: initial.gap });
   }
+  // Theme last: it triggers the largest re-render, so putting it back after
+  // the cheaper settings avoids paying for that settle more than once.
+  if (mutated?.baseTheme !== undefined && initial.baseTheme !== mutated.baseTheme) {
+    plan.push({ type: "setBaseTheme", theme: initial.baseTheme });
+  }
   for (const action of plan) validateAction(action);
   return plan;
 }
@@ -195,6 +303,12 @@ export function verifyRestoration(initial, current, tolerance = 0.5) {
     if (initial?.[key] === undefined || current?.[key] === undefined) continue;
     if (Math.abs(initial[key] - current[key]) > tolerance) {
       problems.push(`${key}: expected ${initial[key]}, found ${current[key]}`);
+    }
+  }
+  // Compared exactly: a theme is a name, and "close enough" is meaningless.
+  if (initial?.baseTheme !== undefined && current?.baseTheme !== undefined) {
+    if (initial.baseTheme !== current.baseTheme) {
+      problems.push(`baseTheme: expected ${initial.baseTheme}, found ${current.baseTheme}`);
     }
   }
   return { restored: problems.length === 0, problems };
