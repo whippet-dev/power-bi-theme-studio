@@ -505,8 +505,14 @@ They differ only in **sub-pixel phase**: the fractional parts of their tops are
 pixel gives 9, 9, 8, 9 — Scotland rasterises **one pixel thinner, an 11.5%
 error on an 8.7px bar**.
 
-This is a rasterisation artefact of correct fractional geometry. It was
-measured, not assumed.
+This is a rasterisation artefact of correct fractional geometry.
+
+*Task 8 correction:* the geometry above was measured, but the snapped row
+was computed by rounding those measured edges, not read off a screen, so
+“measured, not assumed” overstates it by one step. The model is Blink's own
+rule and it predicts everything since, but no painted pixel has been read
+in either product. See §17.8. Task 8 also re-measured this table from
+scratch after the box change — §17.3 supersedes the numbers here.
 
 ### Phase sweep — direct proof
 
@@ -1029,3 +1035,286 @@ One assertion was deliberately **removed**: that `BAR_CHART_BOX` and
 Column is good rationale for choosing it (§16.6) but it is not a durable
 rule — Power BI's fixed-container behaviour requires nothing of the sort,
 and two visual types are free to have different preview rectangles.
+
+---
+
+## 17. Cartesian rasterisation (task 8)
+
+*Implements nothing. §5 diagnosed unequal bar thickness and deferred the
+fix; task 7 then changed the bar box, so this re-measures from scratch and
+settles what the correct fix would be.*
+
+### 17.1 Environment
+
+Chromium 148 in the Claude browser pane, viewport 1280, **`devicePixelRatio`
+= 1**, Power BI Desktop 2.157.879.0 (26.08). Every number below is fresh;
+none is carried over from §5.
+
+### 17.2 Three coordinate spaces, kept apart
+
+| | space | measured by |
+|---|---|---|
+| A | ChartLayout natural units | `scale.category(i, n)` |
+| B | CSS layout, pre-transform | `getComputedStyle().height` |
+| B′ | CSS layout, post-transform | `getBoundingClientRect()` |
+| C | device pixels | `round(edge × dpr)`, **modelled** |
+
+A and B are exact and equal for every mark. C is the only place a
+difference appears, and see §17.8 on why it is modelled rather than read.
+
+### 17.3 Fresh baseline after task 7
+
+Four equal-valued categories. “CSS” is `getBoundingClientRect().height`,
+identical across all four marks in every row — spread `0.0000` throughout.
+“Snapped” is `round(bottom) - round(top)` per mark.
+
+**Classic 2026** (`innerPadding` 10):
+
+| Chart | Presentation | Plot | CSS mark | Snapped | Spread | Relative |
+|---|---|---:|---:|---|---:|---:|
+| Clustered Bar | hero 1.5 | 129.3047 | 26.1563 | 26, 27, 26, 26 | 1 | 3.8% |
+| Clustered Bar | thumb 1.0 | 86.2031 | 17.4375 | 18, 17, 18, 17 | 1 | 5.7% |
+| Stacked Bar | thumb 1.0 | 86.2031 | 18.2188 | 18, 19, 18, 19 | 1 | 5.5% |
+| Clustered Column | thumb 1.0 | 111.4063 | 22.5469 | 23, 23, 23, 23 | **0** | — |
+| Stacked Column | thumb 1.0 | 111.4063 | 23.5469 | 23, 23, 23, 24 | 1 | 4.2% |
+
+**Fluent 2** (`innerPadding` 50):
+
+| Chart | Presentation | Plot | CSS mark | Snapped | Spread | Relative |
+|---|---|---:|---:|---|---:|---:|
+| Clustered Bar | hero 1.5 | 157.6641 | 17.7188 | 17, 18, 17, 18 | 1 | 5.6% |
+| Clustered Bar | thumb 1.0 | 105.1094 | 12.8594 | 12, 13, 13, 13 | 1 | 7.8% |
+| Clustered Column | thumb 1.0 | 121.5000 | 13.6563 | 14, 14, 13, 14 | 1 | 7.3% |
+| Stacked Column | thumb 1.0 | 121.5000 | 14.8750 | 15, 15, 15, 14 | 1 | 6.7% |
+
+**Task 7 halved the relative error.** §5 recorded 11.5% on an 8.7px bar
+(private theme + Fluent, hero). The same class of case now reads 5.6% on a
+17.7px bar, because a taller box gives each row roughly twice the
+thickness while the absolute error stays pinned at one pixel. The defect
+is not fixed; it is diluted.
+
+### 17.4 Presentation scale, and why it is not the cause
+
+Sweeping the hero transform, Clustered Bar on Classic:
+
+| Scale | CSS mark | Fractional tops | Snapped | Spread |
+|---:|---:|---|---|---:|
+| 1.00 | 17.4375 | .2031 .7656 .3125 .8594 | 18, 17, 18, 17 | 1 |
+| 1.25 | 21.7969 | .1602 .1133 .0469 .9805 | 22, 22, 22, 22 | **0** |
+| 1.50 | 26.1563 | .1172 .4609 .7813 .1016 | 26, 27, 26, 26 | 1 |
+| 2.00 | 34.8750 | .0313 .1563 .2500 .3438 | 35, 35, 35, 35 | **0** |
+
+CSS spread is `0` at every scale. The defect **is present at natural scale
+1.0**, so the hero transform does not cause it, and a presentation-layer
+fix cannot cure it. Which scales happen to look clean is phase luck.
+
+### 17.5 Device pixel ratio
+
+Only DPR 1 was available. It did not need emulating: snapping evaluates
+`round(edge × scale × dpr)`, so **scale `s` at DPR 1 is arithmetically the
+same experiment as scale 1 at DPR `s`**. The sweep in §17.4 therefore
+covers the DPR question, and answers it: the outcome depends on the
+product of scale and DPR, i.e. it is **device-pixel dependent, not
+CSS-layout deterministic**. CSS layout is invariant; only C moves.
+
+### 17.6 Phase sweep: this is not an edge case
+
+For each configuration, how many of 64 sub-pixel plot origins paint
+unevenly (64 because Blink lays out in 1/64px LayoutUnits):
+
+| `innerPadding` | 4 cats | 5 | 6 | 7 |
+|---:|---:|---:|---:|---:|
+| 0 | 64/64 | 64/64 | 64/64 | 64/64 |
+| 10 | 60/64 | 64/64 | 24/64 | 30/64 |
+| 50 | 42/64 | 64/64 | 54/64 | 46/64 |
+
+(plot 86.2031; the 129.3047 hero plot behaves the same way, range 19/64 to
+64/64.) Spread never exceeds 1. Several configurations are uneven at
+**every** phase: when the slot is not a whole number there may be no offset
+at which all marks quantise alike.
+
+### 17.7 Root cause
+
+Not geometry. `ChartLayout` divides the plot into exactly equal slots that
+tile it with no gap, no overlap and **zero** end-to-end drift at 4, 5, 6 and
+7 categories, and the browser gives every mark an identical CSS height.
+
+The cause is the **rendering primitive**. Each mark is an HTML box
+(`.bar-item__fill`, `.column-item__fill`) positioned by percentage inside
+`.chart-plot`, and Blink pixel-snaps a box's background at paint time, as
+`PixelSnappedIntRect` does: `round(top + height) - round(top)`, each box
+independently. A fractional slot puts consecutive marks on different
+sub-pixel phases, so identical fractional heights quantise to integers one
+apart.
+
+The chain, for the record:
+
+```
+scale.category(i, n)  slot = plotH / n; size = slot - slot·pad/100
+categoryPercent       top% = (start-origin)/plotH; height% = size/plotH
+.bar-item             top: top%; height: height%
+.bar-item__fill       height: (100-gapSize)%; top: 50%; translateY(-50%)
+```
+
+Three things are worth keeping apart here:
+
+- **All five** cartesian previews share the same category geometry, via
+  `categoryPercent` over `ChartLayout`.
+- **The four Bar and Column previews** paint their rectangular marks as
+  HTML boxes, using the markup above. That is where the snapping applies,
+  so Bar and Column are **one mechanism on two axes**, not two defects.
+- **Line** consumes the same geometry — it calls `categoryPercent` for its
+  point positions — but paints its series, markers and error bars as SVG.
+  It has no rectangular mark in the HTML box path, so the mechanism
+  diagnosed here does not reach it.
+
+### 17.8 What was not measured
+
+This environment cannot read painted pixels — no screenshots, no pixel
+readback. Space C above is therefore a **model**, not an observation. It is
+Blink's documented box-decoration snapping rule rather than an invented
+one, and it predicts every measurement taken, but it has not been confirmed
+against actual output here.
+
+§5 has the same limitation. Its “device pixels after snapping” row was
+computed by rounding the measured CSS edges, not read off a screen, and its
+claim that the defect “was measured, not assumed” overstates that by one
+step: the *geometry* was measured, the *quantisation* was modelled.
+
+### 17.9 What Power BI does
+
+From `desktop.CartesianVisuals.min.js` (Desktop 2.157.879.0), the bundle
+that actually implements the cartesian family — `desktop.min.js` does not,
+and has no `cartesianChart` or `mainGraphicsContext` at all.
+
+Power BI paints marks as **SVG `<rect>`**. The shape renderer appends
+`rect` elements into `mainGraphicsContext`, itself an `<svg>`, and the
+attribute setter writes coordinates straight through:
+
+```js
+e.attrs({ width: t.width, height: t.height, x: t.x, y: t.y })
+```
+
+No rounding, anywhere in that path. The bundle contains no
+`shape-rendering` and no `crispEdges`, so the default `auto` applies and
+fractional edges **antialias**.
+
+#### Evidence grades
+
+This section mixes what was recovered from a shipped binary with what
+follows from it, so the two are graded separately.
+
+**PROVEN-RUNTIME.** Power BI's cartesian marks are SVG `<rect>` elements
+with unrounded `x/y/width/height`, and that path contains no
+`shape-rendering` or `crispEdges` override. Power BI does **not**
+implement the per-box integer snapping policy that Theme Studio's HTML box
+path is subject to. Read directly from
+`desktop.CartesianVisuals.min.js` in build 2.157.879.0.
+
+**STRONGLY-SUPPORTED.** SVG's default fractional-edge rendering should
+avoid the independent box-decoration snapping mechanism diagnosed in
+§17.7, because that mechanism is specific to how boxes are painted and
+does not apply to SVG shapes. This is an inference from the two rendering
+paths, not a measurement of either.
+
+**UNVERIFIED.** Power BI's actual painted bar thickness, at any particular
+Desktop zoom or DPR, was not pixel-read or screenshot-measured in this
+task. Nothing here establishes what its bars look like on screen, only
+what its code asks the renderer for.
+
+So the honest form of “does Power BI allow 1px raster variation?” is: its
+code contains no step that would introduce one, and the primitive it uses
+is not the one that introduces Theme Studio's. Whether its output is in
+fact uniform was not observed.
+
+### 17.10 Remediation options
+
+| | Option | Verdict |
+|---|---|---|
+| A | No remediation | Weak as a *justification*: it would rest on Power BI behaving the same way, and its recovered code does not implement the policy Theme Studio is subject to |
+| B | Shared-boundary snapping | Does not achieve the goal. It conserves the plot, but cannot guarantee equal painted thickness while keeping the present equal fractional slots — see below |
+| C | Equal integer thickness | Rejected on policy, not on arithmetic. It is achievable (see below) but changes the geometry policy, and does not reproduce the unrounded SVG path recovered from Power BI |
+| D | SVG rects | **The best-supported, Power-BI-aligned candidate.** Same primitive and same absence of a rounding step, consuming the existing ChartLayout numbers unchanged. Not yet demonstrated to change painted output, because painted output cannot be read here |
+| E | Presentation-scale adjustment | Rejected on evidence: §17.4 shows the defect at scale 1.0, where there is no transform to adjust |
+
+B deserves emphasis because it is the intuitive answer and the one §5
+floated. Stated precisely:
+
+> Shared-boundary snapping cannot guarantee equal painted mark thickness
+> while also preserving the current equal fractional slot geometry. For
+> fractional slots, rounded adjacent boundaries necessarily distribute
+> residual device pixels somewhere; depending on phase, mark extents can
+> differ by one.
+
+That is narrower than “no quantising policy can work”, which would be
+false. A different policy **could** force equal integer mark thickness by
+moving the residual into the spacing between marks — option C. It is
+rejected because it would change the geometry policy, making gaps unequal
+to keep marks equal, and because it would not reproduce the unrounded SVG
+path recovered from Power BI. Not because it is impossible.
+
+The measured support for the B claim is narrow too: §17.12's phase test
+covers the two measured plot heights at four categories with
+`innerPadding` 0. The sweep in §17.6 shows other configurations that do
+have uniformly snapped phases, so “no phase works” is a statement about
+those two cases, not about fractional slots in general.
+
+### 17.11 Why task 8 stops here
+
+D is the best-supported candidate, and it is not a small change.
+`.bar-item__fill` is an HTML
+box carrying background, border, border-radius, error bars, value labels
+and reference-line furniture; moving the mark to SVG means moving or
+re-anchoring all of it across four previews. That is a renderer migration,
+and this task's own instruction is not to migrate rendering technology for
+a 1px cosmetic defect without strong evidence.
+
+The evidence is strong for the *diagnosis*, but the *change* cannot be
+verified here: an environment that cannot read painted pixels cannot
+demonstrate that an SVG migration fixed an appearance problem, nor compare
+the result against Power BI's actual output. So no rounding was added —
+adding B or C would import a rounding step that Power BI's recovered code
+does not contain — and D is recorded as a scoped follow-up that needs a
+pixel-verification route before it can be justified or accepted.
+
+The backlog item stays **open**.
+
+Task 7 has meanwhile halved the relative error, which lowers the urgency
+without changing the analysis.
+
+### 17.12 What is pinned instead
+
+`tests/cartesianRaster.test.ts` holds the evidence this conclusion rests
+on, so it cannot rot into a wrong premise: equal categories get exactly
+equal marks; slots tile the plot with no gap, overlap or drift;
+`innerPadding` thins the mark monotonically and keeps it centred;
+inversion reorders slots without resizing them; and — documenting the
+arithmetic behind option B — *the two measured zero-padding cases* have no
+uniformly snapped phase, while a whole-number slot snaps evenly at every
+phase.
+
+That phase test is deliberately named for its scope. It covers plot
+heights 86.2031 and 129.3047 at four categories with `innerPadding` 0, and
+nothing wider: §17.6 lists configurations that *do* have uniform phases, so
+a test asserting otherwise in general would be false.
+
+Mutation-checked, 6 tests: rounding each mark height, flooring every edge,
+ceiling every edge, or forcing an integer slot each fail 3; dropping the
+centring half-padding or ignoring `innerPadding` each fail 1.
+
+### 17.13 Remaining uncertainty
+
+- Painted output is unverified in both products (§17.8). The model is
+  Blink's rule and fits every measurement, but confirming it needs a
+  screenshot or pixel-readback route this environment lacks.
+- Power BI Desktop was read from its bundle, not driven through its UI. The
+  primitive and the absence of a rounding step are PROVEN-RUNTIME; that SVG
+  therefore avoids the mechanism is STRONGLY-SUPPORTED; what its bars
+  actually paint at a given zoom or DPR is UNVERIFIED. No claim here rests
+  on having seen Power BI's output, because it was not seen.
+- Only DPR 1 was available directly. §17.5 argues the scale sweep is
+  equivalent, which is sound arithmetic but not the same as testing a real
+  high-DPI display.
+- Whether antialiased marks are *preferable* here is a judgement about
+  fidelity, not a measurement. Soft edges at 12px may read as blurrier than
+  the current crisp ones.
