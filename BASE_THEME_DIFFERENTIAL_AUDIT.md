@@ -409,7 +409,8 @@ resized to compensate:
 Conservation is still exact in both axes. The plot shrinking is the
 correct consequence of honest typography, not a regression — and it is the
 input the natural-box task needs: `BAR_CHART_BOX.height = 84` was sized
-against 6px axis text and now has 20.25px less to give.
+against 6px axis text and now has 20.25px less to give. §16 spends that
+input.
 
 **Rasterisation baseline after the change** (§5's defect is untouched):
 
@@ -613,7 +614,8 @@ box (−19%), and `innerPadding` 50 vs 10 (−44%).
 
 This exposes a third finding: `BAR_CHART_BOX.height = 84` was sized when axis
 type was 6px. With realistic 10.5px typography the plot is starved, and it
-would be starved further at a true 14px.
+would be starved further at a true 14px. It was, and §16 re-derives the
+constant.
 
 ---
 
@@ -714,9 +716,10 @@ transform (the thumbnail shows it at scale 1.0) and not caused by
 low)* Power BI's cartesian default is Bottom and Fluent states it explicitly.
 
 **4 — Fixed natural chart boxes starve the plot at realistic typography.**
-*(moderate · cartesian family · medium)* `BAR_CHART_BOX.height = 84` was sized
-against 6px axis text. Fixing cause 1 makes this worse, not better — the value
-gutter would grow again.
+*(moderate · cartesian family · medium)* **Resolved in task 7 — see §16.**
+`BAR_CHART_BOX.height = 84` was sized against 6px axis text, and each
+subsequent correction spent more of it. The boxes stay fixed, which is what
+Power BI does; the bar constant was re-derived to 128.
 
 **5 — Font sizes are points rendered as pixels.** *(moderate · whole app ·
 medium)* Flagged, not proven. Needs its own investigation.
@@ -810,8 +813,219 @@ Fixes 1 and 2 are independent and can land in either order. Fix 4 depends on 1.
 
 ---
 
-**Scope statement.** Diagnosis only. No resolver fallback, base theme,
+**Scope statement — sections 1 to 15 only.** The audit itself was diagnosis
+only. No resolver fallback, base theme,
 `ChartLayout`, renderer, sample data or CSS was modified. All browser overrides
 were temporary, reverted in-session, and are not in the repository. The private
 theme file was not modified, and its working copy lived only in the gitignored
 `themes/local/`.
+
+---
+
+## 16. Natural cartesian box sizing (task 7)
+
+*Unlike sections 1-15, this one implements. It is recorded here because it
+spends the measurements those sections took.*
+
+### 16.1 The question, and why it is not a styling question
+
+The cartesian boxes were sized against undersized fallback typography.
+Two later corrections changed what the gutters legitimately spend: text-
+class inheritance (§4.2, tasks 3-4) fixed where axis typography comes from,
+replacing `fontSize → 6` fallbacks with resolved text-class sizes, and the
+proven point-to-pixel conversion (§4.4, task 5) then scaled those sizes by
+4/3. Both took their space out of the plot, and nothing was watching the
+remainder.
+
+Font-face aliases are **not** part of that story. Task 6 settled their
+semantics but also measured that they move no geometry: `estimateText`
+never reads `fontFamily`, so all five cartesian previews are byte-identical
+to task 5 (§4.6). Aliases change what the browser paints, not what
+`ChartLayout` computes.
+
+The tempting fix — grow the box until the plot is back to what it used to
+be — is the one thing that must not happen, because a theme preview whose
+plot never changes size cannot show a user what their font choice costs. So
+the first question was not *how big* but *fixed or dynamic*.
+
+### 16.2 Power BI's own answer: the container is an input
+
+From `desktop.min.js` in Power BI Desktop **2.157.879.0 (26.08)**, the same
+bundle §4 and §6 read. `VisualContainer.getVisualViewport(e, t, i, a)` takes
+the container's width and height as arguments and returns
+
+```
+width  = e - (border padding + container padding)
+height = t - (border padding + container padding)
+           - title - subtitle - divider - warning banners
+```
+
+Every formatting-derived term **subtracts**. The title's contribution is
+measured from its own font properties (`getTitleFontProperties`, then
+wrapped against the available width), so a bigger title font genuinely
+costs the visual plot area — and nothing anywhere in that path feeds a
+measurement back into `e` or `t`. The bundle contains no
+`autoSizeToContent`, `resizeToContent`, `preferredSize` or `shrinkToFit`;
+the five hits for `autoResize` are all one gallery-carousel component in
+the authoring UI.
+
+A visual's rectangle is authored, and formatting reflows what is inside it.
+That settles the model: **Theme Studio's boxes stay fixed, and larger
+typography must visibly consume plot.**
+
+The same reasoning disposes of category count, which was the other
+candidate for a dynamic input. Adding categories to a Power BI bar chart
+makes the bars thinner and eventually scrolls; it does not make the visual
+taller.
+
+### 16.3 What the constants actually were
+
+None of the three was ever derived from Power BI. Each was back-computed
+from a *plot* target using the gutters of its day:
+
+| Box | Height | Chosen to reproduce |
+|---|---:|---|
+| `BAR_CHART_BOX` | 84 | the pre-engine layout's ~57px of plot |
+| `COLUMN_CHART_BOX` | 128 | `.column-preview__plot`'s CSS `height: 128px` |
+| `LINE_CHART_BOX` | 150 | `.line-preview__plot`'s 120px, plus ~30 for the new value gutter |
+
+The line chart's is the interesting one: growing the box to give a new
+gutter its space back is exactly the compensating move §16.2 rules out,
+applied once by hand before there was a model to rule it out.
+
+### 16.4 The floor
+
+A fixed box still owes the shipped themes enough room to stay legible. The
+rule, `minimumPlotHeight(divisions, labelCssPx)`: every division of the
+plot must be at least one line of the label stacked down it, measured in
+the CSS pixels the browser actually draws (§4.4’s 4/3 conversion — measuring
+the raw point value understates the requirement by a quarter).
+
+Two things vary by orientation, and both follow from which way the value
+scale runs:
+
+| | divisions | labels dividing the height |
+|---|---|---|
+| **Bar** (horizontal) | one per category row | `categoryAxis` |
+| **Column, Line** (vertical) | `DEFAULT_TICK_COUNT` intervals | `valueAxis` |
+
+A bar chart lays its categories down the plot and runs its values along the
+width; a column or line chart does the opposite, so the labels stacked down
+its height are value-axis tick labels.
+
+The sample data hides the first distinction — four categories, four tick
+intervals — and the shipped bases hide the second, sizing the two axes at
+10pt and 9pt on Classic 2026 and 10.5pt for both on Fluent 2. Reading the
+wrong axis therefore moves a floor by under two units and passes. The tests
+separate both explicitly, the axis one with a synthetic 30pt-against-6pt
+theme.
+
+### 16.5 Measured, before
+
+Natural units, production inputs (axis titles included; they are worth ~21
+units of gutter on their own). “Line” is one line of the axis that divides
+the height, so it is category-axis text for Bar and value-axis text for
+Column and Line — which is why Classic's vertical charts show 16.20 (9pt)
+where its bars show 18.00 (10pt):
+
+| Fixture | Chart | Box | Gutter | Plot h | Slot | Line | Verdict |
+|---|---|---:|---:|---:|---:|---:|---|
+| starter + Classic | Bar | 84 | 41.80 | 42.20 | 10.55 | 18.00 | **short 29.8** |
+| starter + Fluent | Bar | 84 | 22.90 | 61.10 | 15.27 | 18.90 | **short 14.5** |
+| private + Classic | Bar | 84 | 43.60 | 40.40 | 10.10 | 18.00 | **short 31.6** |
+| private + Fluent | Bar | 84 | 41.80 | 42.20 | 10.55 | 18.90 | **short 33.4** |
+| starter + Classic | Column | 128 | 43.60 | 84.40 | 21.10 | 16.20 | ok |
+| starter + Fluent | Column | 128 | 22.90 | 105.10 | 26.27 | 18.90 | ok |
+| starter + Classic | Line | 150 | 43.60 | 106.40 | 26.60 | 16.20 | ok |
+| starter + Fluent | Line | 150 | 22.90 | 127.10 | 31.77 | 18.90 | ok |
+
+Every bar row was shorter than the label naming it, in all four fixtures.
+Column and Line cleared the floor in all four, and by more than first
+recorded: the original pass measured them against category-axis text, which
+on Classic 2026 is a point larger than the value-axis text that actually
+divides their height. Correcting the axis loosens their floor and changes
+no verdict.
+
+**So only one constant was wrong.** The compression was real everywhere,
+but only the bar chart's box had been pushed past what it could afford.
+
+### 16.6 The new bar constant
+
+`BAR_CHART_BOX.height = 128`, from three independent directions:
+
+1. **The floor.** The worst measured requirement across the shipped bases
+   and the private validation theme is 117.4; 128 clears it in all four
+   fixtures with headroom for a theme whose label text is larger than
+   either base ships.
+2. **The transpose.** A clustered bar is a clustered column over the same
+   four categories with the axes swapped. An equal footprint is the
+   expected answer; 84 was a divergence introduced by plot preservation,
+   which the model rejects.
+3. **Already proven to fit.** The column charts render at 128 in both the
+   hero and the thumbnail today, and `.bar-preview__plot` and
+   `.column-preview__plot` are structurally identical rules.
+
+Column and Line were re-checked against the same floor and left alone. 150
+survives on its margins rather than on the reasoning that produced it, and
+the line chart has the most in-plot furniture — markers, series labels,
+leaders — to keep clear of.
+
+### 16.7 Measured, after
+
+| Fixture | Bar box | Gutter | Plot h | Slot | Line | Verdict |
+|---|---:|---:|---:|---:|---:|---|
+| starter + Classic | 128 | 41.80 | 86.20 | 21.55 | 18.00 | ok |
+| starter + Fluent | 128 | 22.90 | 105.10 | 26.27 | 18.90 | ok |
+| private + Classic | 128 | 43.60 | 84.40 | 21.10 | 18.00 | ok |
+| private + Fluent | 128 | 41.80 | 86.20 | 21.55 | 18.90 | ok |
+
+All twenty chart × fixture combinations now clear the floor. Bar slots
+roughly doubled, from 10.1-10.55 to 21.1-21.55.
+
+**Rendered, in the browser** (Classic 2026, thumbnail, scale 1.0): the bar
+marks measure **18.98px** against an 18px label line — the mark, not the
+slot, so `innerPadding` is already taken off. At 84 the same measurement
+was ~10.5px. Every tile, hero and thumbnail, reports **zero** descendants
+escaping its bounds, on both bases. The hero renders the box at 192px
+(128 × 1.5) and the thumbnail at 128px, from one natural geometry.
+
+### 16.8 What this deliberately did not fix
+
+- **Data labels overflowing the plot on Column with the private validation
+  theme.** A taller box does not help: the tallest column reaches the top
+  of the plot whatever its height, so its label has nowhere to go. Power BI
+  flips such a label inside the column. That is label placement, not box
+  sizing.
+- **Rasterisation** (§5). Untouched, as before.
+- **The nominal 372 width.** Nothing measured argued for changing it.
+
+### 16.9 Why this cannot rot again quietly
+
+`tests/cartesianBoxes.test.ts` asserts the floor for all five charts on
+both shipped bases, that the floor reads the axis that divides the height,
+that a bigger font shrinks the plot without moving the box, that category
+count does neither, and — as the anti-vacuity check — that the old 84 still
+**fails** the floor.
+
+Mutation-checked, 15 tests:
+
+| Mutation | Fails |
+|---|---:|
+| `BAR_CHART_BOX.height` back to 84 | 6 |
+| floor measured in raw points, not CSS px | 2 |
+| `minimumPlotHeight` ignores `divisions` | 1 |
+| `divisionsOf` collapses to the tick count | 1 |
+| `verticalDivisionAxis` always `categoryAxis` (wrong for Column, Line) | 1 |
+| `verticalDivisionAxis` always `valueAxis` (wrong for Bar) | 1 |
+
+The last two are only detectable against the synthetic asymmetric theme;
+the shipped bases size the two axes too similarly to expose them. An
+earlier version of that test derived its own fixture from the function it
+was testing, so both mutations passed it — the expected axis is now a
+literal table.
+
+One assertion was deliberately **removed**: that `BAR_CHART_BOX` and
+`COLUMN_CHART_BOX` have equal width and height. That 128 currently matches
+Column is good rationale for choosing it (§16.6) but it is not a durable
+rule — Power BI's fixed-container behaviour requires nothing of the sort,
+and two visual types are free to have different preview rectangles.

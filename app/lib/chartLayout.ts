@@ -252,7 +252,7 @@ export function categoryPercent(
   return { offset: ((slot.start - origin) / total) * 100, size: (slot.size / total) * 100 };
 }
 
-const DEFAULT_TICK_COUNT = 4;
+export const DEFAULT_TICK_COUNT = 4;
 const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */
 const LEGEND_SWATCH_EXTENT = 14;
