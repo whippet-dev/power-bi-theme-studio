@@ -250,12 +250,127 @@ defines. `readVisualStyleValue` already resolves `visualStyles` colours this
 way. Provenance continues to describe where the *declaration* was found,
 which is deliberately not the same as where the token's value came from.
 
-The same bundle also expands a primary's `fontFace` through an alias table
-(`Segoe UI` → `'Segoe UI', wf_segoe-ui_normal, helvetica, arial,
-sans-serif`, which is what Fluent 2's `visualStyles` carries). Only the
-four primaries are expanded; secondaries inherit the expanded string. The
-pilot does **not** implement this — the full table was not extracted, and a
-partial one would be a guess. Recorded as an open detail.
+### 4.5 Font-face aliases — **PROVEN and implemented (phase 2 task 6)**
+
+Recorded here previously as an open detail. The table has now been
+recovered whole from Power BI Desktop **2.157.879.0 (26.08)**,
+`bin/WebView2Resources/minerva/scripts/desktop.min.js`, module 468595:
+
+```js
+class FamilyInfo {
+  get family() { return this.families.join(", ") }              // used by the theme path
+  get css()    { return …map(e => e.includes(" ") ? `'${e}'` : e).join(", ") }
+}
+const H1 = { "Segoe UI": regular, "Segoe UI Semibold": semibold, DIN: regularSecondary, … }
+```
+
+looked up in `applyTextClassDefaults` (module 797633) by
+`function u(e) { const t = n.H1[e]; return t ? t.family : e }`.
+
+**The complete table — exactly ten entries:**
+
+| Theme value | Rendered CSS font-family |
+|---|---|
+| `Segoe UI` | `Segoe UI, wf_segoe-ui_normal, helvetica, arial, sans-serif` |
+| `Segoe UI Light` | `Segoe UI Light, wf_segoe-ui_light, helvetica, arial, sans-serif` |
+| `Segoe UI Semilight` | `Segoe UI Semilight, wf_segoe-ui_semilight, helvetica, arial, sans-serif` |
+| `Segoe UI Semibold` | `Segoe UI Semibold, wf_segoe-ui_semibold, helvetica, arial, sans-serif` |
+| `Segoe UI Bold` | `Segoe UI Bold, wf_segoe-ui_bold, helvetica, arial, sans-serif` |
+| `Segoe (Bold)` | `Segoe UI Bold, wf_segoe-ui_bold, helvetica, arial, sans-serif` |
+| `DIN` | `wf_standard-font, helvetica, arial, sans-serif` |
+| `DIN Light` | `wf_standard-font_light, helvetica, arial, sans-serif` |
+| `Heading` | `Segoe UI Light, wf_segoe-ui_light, helvetica, arial, sans-serif` |
+| `Body` | `Segoe UI, wf_segoe-ui_normal, helvetica, arial, sans-serif` |
+
+**Call path.** theme `textClasses.<primary>.fontFace` → `u()` in
+`applyTextClassDefaults` → secondaries inherit the *already expanded*
+string via `e.fontFace = e.fontFace || t.fontFace` → the text-class reader
+(module 480549) passes it as `family` → CSS is written verbatim,
+`e.family && (t["font-family"] = e.family)`.
+
+**Scope.** Only the four primary text classes are aliased. The
+`visualStyles` property reader (module 4393285) does
+`family: t.family && getProp(e, t.family)` — **no lookup at all**, so a
+visual font-family reaches CSS raw. Note also `.family`, not `.css`: the
+value Power BI renders is the **unquoted** join.
+
+**Behaviour of everything else**, from running the extracted table:
+
+- unknown or custom families (`Arial`, `Calibri`, `My Company Sans`) pass
+  through untouched — no fallbacks are appended;
+- matching is an object lookup, so it is **case- and whitespace-sensitive**:
+  `segoe ui`, `SEGOE UI` and ` Segoe UI ` all pass through;
+- an already-expanded stack is not a key, so it **cannot be
+  double-expanded** — which matters because Fluent 2 ships
+  `'Segoe UI', wf_segoe-ui_normal, …` directly in `visualStyles`;
+- `Segoe UI Semibold` is a **family** alias with its own stack, entirely
+  separate from `fontWeight`. Family and weight are not collapsed.
+
+**The `wf_*` members need fonts Power BI ships.** Its CSS declares
+`@font-face { font-family: wf_segoe-ui_normal; src: local('Segoe UI'), …
+url(../fonts/SegoeUI-Regular-final.woff) … }`, backed by twenty Segoe files
+in `minerva/fonts/`. Theme Studio does not and must not vendor those.
+Emitting the stack is still correct: every alias except `DIN`, `DIN Light`,
+`Heading` and `Body` begins with the real family name, so a machine with the
+font resolves identically and everything else falls through to
+helvetica/arial/sans-serif.
+
+**Theme Studio's boundary.** `app/lib/fontFamilies.ts`, applied with the
+same scope Power BI applies — not blindly at the end of the pipeline.
+
+Every font family is carried in two forms, because the same string means
+different things depending on where it came from:
+
+| | raw | effective |
+|---|---|---|
+| primary text class `fontFace: DIN` | `DIN` | `wf_standard-font, helvetica, arial, sans-serif` |
+| secondary inheriting that primary | `DIN` | the same expanded stack |
+| secondary declaring `fontFace: DIN` itself | `DIN` | **`DIN`** — never reaches the lookup |
+| `visualStyles` `fontFamily: DIN` | `DIN` | **`DIN`** — the visual reader has no lookup |
+
+`ResolvedTextClass` exposes `fontFamily` and `cssFontFamily`; the cartesian
+resolved styles expose `fontFamily` / `fontFamilyCss` and
+`titleFontFamily` / `titleFontFamilyCss`. The effective fields are render
+semantics, not theme properties, and are never written back to JSON.
+
+The distinction is decided by **provenance, never by the string**.
+`effectiveFontFamily` reads `resolvePropertyEntry`, so
+`source === "fallback"` — nothing declared it — takes the text class's
+expanded family, and anything else stays literal. Two themes can resolve
+the identical raw `DIN` and correctly render differently.
+
+The renderer never re-derives this. It receives the effective family from
+the style model and paints it, which keeps the invariant that renderers
+consume resolved render semantics rather than inspecting raw theme JSON.
+The editor and the exporter continue to read the raw field only.
+
+### 4.6 Aliases do **not** change ChartLayout geometry
+
+The backlog assumed alias expansion would move text metrics and therefore
+block natural-box sizing. Measured, that is too strong.
+
+`ChartLayout` passes `fontFamily` into `measureText`, but the default
+`estimateText` is `(text, fontSize) => …` — it never reads the family. So
+expansion changes **no** computed gutter or plot value. All five cartesian
+previews measure byte-identically to task 5.
+
+Browser metrics are a different matter. Measuring five representative
+strings at 13.3333px, raw family vs expanded stack:
+
+| Family | Δ width | Δ height |
+|---|---|---|
+| `Segoe UI` | **0.000px** on all five | 0 |
+| `Arial` (not aliased) | **0.000px** | 0 |
+| `DIN` | **+3.0 to +5.9px** | 0 |
+
+`Segoe UI` is unchanged because the stack's first member is the same
+installed face. `DIN` changes because it is not installed: previously the
+browser fell back to its own default, now the stack lands it on Arial — its
+expanded widths match Arial's exactly. So the estimator and the browser can
+diverge, but they already did before this task; the estimator approximates
+every family at 0.55em regardless.
+
+**Natural-box sizing is therefore not blocked on aliases.**
 
 ### 4.3 Pilot result — Clustered Bar, private theme + Classic 2026
 
