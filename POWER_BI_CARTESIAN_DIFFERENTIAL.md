@@ -198,6 +198,8 @@ refuted — only shown not to hold under the hero transform.
 | Finding | Grade |
 |---|---|
 | Native geometry, typography, tick values, band model | `PROVEN-EXPERIMENT` |
+| `clusteredGapSize` subdivides a fixed category slot, affecting nothing else | `PROVEN-EXPERIMENT` (§7.1) |
+| Theme Studio's band model predicts Power BI's response to a gap change | `PROVEN-EXPERIMENT` (§7.1) |
 | Power BI antialiases fractional edges (2 phases sampled) | `PROVEN-EXPERIMENT` |
 | Theme Studio antialiases **under the hero transform** (1 clean sample) | `PROVEN-EXPERIMENT` |
 | `estimateText` error is the 0.55 heuristic | `STRONGLY-SUPPORTED` — two independent browser measurements agree to 0.4% |
@@ -234,6 +236,49 @@ reported honestly rather than papered over with a guessed rename.
 
 Verified end to end: two captures with nothing changed produce
 `no semantic change`, `unchanged 35`.
+
+### 7.1 First experiment: "Space between series" 10 → 40
+
+One human action, nothing else touched. The diff:
+
+```
+changed  rect.bar.setFocusRing#0      rect.h: 14.3211 -> 10.649   (-3.6721)
+…                                     (all twelve bars)
+changed  rect.bar.setFocusRing#4      rect.y: 140.1216 -> 141.9577 (+1.8361)
+changed  rect.bar.setFocusRing#8      rect.y: 156.034  -> 159.7061 (+3.6721)
+
+unchanged 23   added 0   removed 0   changed 12
+```
+
+**What moved:** every bar thinned by the same 3.6721, series 1 shifted down
+1.8361 and series 2 by exactly twice that. **What did not:** the plot, the
+category slot, the value scale, the axis, the gridlines, the legend —
+23 elements untouched, nothing added or removed.
+
+So `clusteredGapSize` subdivides a **fixed** category slot and touches
+nothing outside it. That answers the question directly rather than by
+inference: category slot unchanged, series step changed, band width changed,
+series positions changed, plot and axis unchanged.
+
+**And Theme Studio predicts it.** Feeding `clusteredSeriesBands` the same
+slot and the new gap, without touching the code:
+
+| | Theme Studio | Power BI measured | delta |
+|---|---:|---:|---:|
+| step at gap 10 | 15.912356 | 15.912356 | 0 |
+| band at gap 10 | 14.321120 | 14.321100 | 2.0e-5 |
+| step at gap 40 | 17.748397 | 17.748397 | 7.7e-8 |
+| band at gap 40 | 10.649038 | 10.649000 | 3.8e-5 |
+| series 1 shift | 1.836000 | 1.836100 | 1.0e-4 |
+| series 2 shift | 3.672100 | 3.672100 | 4.4e-16 |
+
+The residuals are the snapshot's four-decimal rounding, not model error.
+This is a **predictive** confirmation rather than a descriptive one: the
+model was derived from bundle archaeology, and it correctly anticipates how
+Power BI responds to a setting a user changes. `PROVEN-EXPERIMENT`.
+
+It also validates the workflow itself — a one-property change produced
+twelve relevant lines and no noise.
 
 ---
 
