@@ -445,6 +445,78 @@ margin — its categories sit closer together than native Classic's.
 categories drawn, so its outer-padding term is not comparable. The two
 full-category measurements agree at 23.33%.)*
 
+### 5.12 Unattended Classic size sweep — twelve states, no human
+
+Run by the lab controller (`tools/pbi-render-probe/LAB.md`) without any
+manual step: it resized the visual twelve times through Power BI's own
+Format pane, waited for each render to settle, measured, then restored
+600 × 600 and verified.
+
+| size | plot | bars | cats | cat label | legend | value labels |
+|---|---|---:|---:|---|---|---:|
+| 600×600 | 486 × 485.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×500 | 486 × 385.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×450 | 486 × 335.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×400 | 486 × 285.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×350 | 486 × 235.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×300 | 486 × 185.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 600×250 | 490 × 141 | 12 | 4 | 12px | **12px** | 3 |
+| 600×206 | 490 × 97 | 12 | 4 | 12px | 12px | 3 |
+| 500×300 | 386 × 185.7 | 12 | 4 | 12px | 13.333px | 3 |
+| 450×250 | 340 × 141 | 12 | 4 | 12px | 12px | 3 |
+| 400×225 | 290 × 97 | 12 | 4 | 12px | 12px | **2** |
+| 372×128 | 256 × 61 | **6** | **2** | 12px | **none** | **0** |
+
+#### The category axis label never moves
+
+**12px at all twelve sizes**, across a 7.4× range of visual area. The
+earlier three-sample finding is now a twelve-sample one: Classic's axis
+label size is fixed, and Theme Studio's Classic 2026 fallback of
+10pt/13.3333px is simply a point too large.
+
+#### The responsive cascade, by height
+
+Legend and axis titles shrink together at a **height** threshold between
+250 and 300 — 500 × 300 keeps the large sizes while 450 × 250 does not, so
+width is not what drives it:
+
+| | legend | axis titles |
+|---|---|---|
+| height ≥ 300 | 13.333px | 16px |
+| height ≤ 250 | 12px | 12px |
+
+Then furniture is shed, in order:
+
+1. **value labels thin** — 3 → 2 between 450×250 and 400×225
+2. **legend disappears entirely** — between 400×225 and 372×128
+3. **value labels disappear** — same step
+4. **categories halve** — 4 → 2, bars 12 → 6, same step
+
+Category count is the *last* thing Classic gives up, which is the opposite
+of Fluent, where reducing to one visible category was the *first* response
+(§5.9).
+
+#### A canonical size, chosen rather than guessed
+
+The smallest swept size at which native Classic still renders the complete
+furniture set — twelve bars, four categories, legend, three value labels —
+is **450 × 250**. At 400 × 225 value labels begin thinning; by 372 × 128
+half the data is gone.
+
+Theme Studio's box is **372 × 128**, where native Classic draws 6 bars, 2
+categories, no legend and no value labels. Theme Studio draws all twelve
+bars, four categories, a legend and five value labels in that space.
+
+So there are two coherent directions, and this measurement is what makes
+them a choice rather than a guess:
+
+- **grow the preview box** toward ~450 × 250, where native still shows
+  everything Theme Studio shows; or
+- **adopt progressive decluttering**, and shed furniture at the same points
+  Classic does.
+
+Neither is implemented. Both now have a measured basis.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -517,7 +589,10 @@ refuted — only shown not to hold under the hero transform.
 | Classic renders 12px axis text at both 600×206 and 372×128 | `PROVEN-EXPERIMENT` |
 | Classic sheds legend, value labels and categories as the box shrinks | `PROVEN-EXPERIMENT` (§5.10) |
 | Theme Studio draws ~2× the furniture of native Classic at the same size | `PROVEN-EXPERIMENT` (§5.10) |
-| No responsive axis-label size change observed across the three tested Classic sizes (12px at each) | `PROVEN-EXPERIMENT` |
+| No responsive axis-label size change observed across **twelve** tested Classic sizes (12px at each) | `PROVEN-EXPERIMENT` (§5.12) |
+| Classic legend and axis titles shrink at a height threshold between 250 and 300 | `PROVEN-EXPERIMENT` (§5.12) |
+| Classic sheds furniture in order: value labels, then legend, then categories | `PROVEN-EXPERIMENT` (§5.12) |
+| 450×250 is the smallest swept size retaining the full native furniture set | `PROVEN-EXPERIMENT` (§5.12) |
 | Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
 | The automatic axis maximum rule is theme-invariant (46→50 both themes) | `PROVEN-EXPERIMENT` |
 | Category `innerPadding` is theme-dependent: Classic 23.33%, Fluent 55.2% at the same size | `PROVEN-EXPERIMENT` |
