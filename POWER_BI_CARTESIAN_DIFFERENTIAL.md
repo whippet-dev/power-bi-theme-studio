@@ -391,6 +391,60 @@ These call for completely different work — (a) is a fallback correction,
 **large** Classic visual. `UNKNOWN` until then, and no implementation should
 be chosen on the strength of a guess between them.
 
+### 5.11 Classic at 600 × 600 — the Classic dataset completed
+
+Third Classic size. Plot **486 × 485.667**, all four categories, twelve bars.
+
+#### Typography across all three Classic sizes
+
+| Role | 600×600 | 600×206 | 372×128 | Theme Studio (Classic 2026) |
+|---|---|---|---|---|
+| **axis labels** | **12px** | **12px** | **12px** | category **13.3333px**, value 12px |
+| axis titles | **16px** | **12px** | 12px | 16px |
+| legend | **13.3333px** | **12px** | dropped | 13.3333px |
+| visual title | 18.6667px | 18.6667px | 18.6667px | n/a |
+
+This resolves §5.10's open question, and the answer is *both* of its options
+applying to different roles:
+
+- **Axis labels are NOT responsive.** 12px at every size, a 9.8× range of
+  visual area. So option (a): **Classic's default axis label size is
+  9pt/12px**, and Theme Studio's category-label fallback of 10pt/13.3333px
+  is one point too large. Its *value*-label fallback of 12px already
+  matches.
+- **Axis titles and the legend ARE responsive.** Titles 12px → 16px and
+  legend 12px → 13.3333px as the visual grows. Theme Studio matches both
+  **at 600 × 600** and does not shrink them at smaller sizes.
+
+So there is a fallback bug *and* a missing behaviour, and they are separate.
+
+#### Geometry
+
+| | value | note |
+|---|---|---|
+| category step | 105.579710 | |
+| series step | 27.911877 | |
+| band width | 25.120690 | |
+| **band `paddingInner`** | **0.100000** | **sixth** exact measurement |
+| cluster span | 80.944444 | |
+| implied category `innerPadding` | **23.33%** | 23.3% at 600×206 too |
+| px per data unit | 9.720000 | exactly linear |
+| **automatic axis maximum** | **50.000** | data max 46 |
+
+#### Two things this settles
+
+**The axis-maximum rule is theme-invariant.** 46 → 50 under Classic exactly
+as under Fluent. Whatever picks the nice number does not consult the theme.
+
+**Category `innerPadding` IS theme-dependent, now de-confounded.** At the
+same 600 × 600: Classic **23.33%**, Fluent **55.2%**. Theme Studio's Classic
+fallback is **10%**, so it is too tight against its own baseline by a wide
+margin — its categories sit closer together than native Classic's.
+
+*(The 31.8% measured at 372 × 128 came from a state with only two of four
+categories drawn, so its outer-padding term is not comparable. The two
+full-category measurements agree at 23.33%.)*
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -463,7 +517,11 @@ refuted — only shown not to hold under the hero transform.
 | Classic renders 12px axis text at both 600×206 and 372×128 | `PROVEN-EXPERIMENT` |
 | Classic sheds legend, value labels and categories as the box shrinks | `PROVEN-EXPERIMENT` (§5.10) |
 | Theme Studio draws ~2× the furniture of native Classic at the same size | `PROVEN-EXPERIMENT` (§5.10) |
-| Whether Classic's 12px is its default or a responsive reduction | `UNKNOWN` — needs a large Classic visual |
+| Classic axis **labels** are 12px at 600×600, 600×206 and 372×128 — not responsive | `PROVEN-EXPERIMENT` |
+| Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
+| The automatic axis maximum rule is theme-invariant (46→50 both themes) | `PROVEN-EXPERIMENT` |
+| Category `innerPadding` is theme-dependent: Classic 23.33%, Fluent 55.2% at the same size | `PROVEN-EXPERIMENT` |
+| The nice-number *rule* itself | `UNKNOWN` — still one data maximum (46) |
 | Whether the axis maximum rule is theme-dependent | `UNKNOWN` — only measured under Fluent |
 | Whether `paddingInner` 0.1 holds under Classic | `UNKNOWN` — three Fluent measurements agree |
 | Theme Studio snapping in the untransformed case | `UNKNOWN` |
@@ -544,12 +602,9 @@ twelve relevant lines and no noise.
 
 ## 8. Unresolved
 
-0. **The whole native dataset needs repeating under Classic 2026.** This is
-   now the top priority and blocks every size-responsive conclusion. Needed
-   at 600×206 and at Theme Studio's exact 372×128: axis and legend font
-   sizes, plot geometry, categories and bars rendered, `svgScrollable`
-   dimensions, band geometry. Classic 2018 as well, if cheap, to see whether
-   both Classic bases share one density behaviour.
+0. ~~**Repeat the native dataset under Classic.**~~ **Done** — §5.9, §5.10,
+   §5.11 cover 600×600, 600×206 and 372×128. Classic 2018 remains untested,
+   so whether both Classic bases share one density behaviour is still open.
 
 1. **Untransformed Theme Studio painting** — the open half of §5.7.
 2. **The nice-number rule.** One sample (46 → 50). Distinguishing 1/2/5×10ⁿ
@@ -569,8 +624,18 @@ twelve relevant lines and no noise.
 
 Ranked by evidence strength × visible effect. None is done here.
 
-1. **Automatic axis maximum (nice numbers).** Changes every cartesian preview's
-   scale and removes the `11.5K` tick labels. Needs §8.2 first.
+1. **Category axis label size: 10pt → 9pt.** Classic renders 12px at every
+   measured size; Theme Studio's fallback is 13.3333px. One fallback value,
+   precisely evidenced across a 9.8× range of visual area, and it shrinks the
+   category gutter on every cartesian preview. Compounds with candidate 3.
+
+1b. **Category `innerPadding` fallback: 10% → 23.33%.** Measured twice at full
+   category count under Classic. Currently our categories crowd together more
+   than native's.
+
+1c. **Automatic axis maximum (nice numbers).** Now known theme-invariant, which
+   removes one risk — but the rule still rests on a single data maximum.
+   Needs §8.2 before implementing.
 2. **Progressive decluttering.** *Re-opened, and now Classic-evidenced.* At
    372 × 128 native Classic drops the legend, all value labels and half the
    categories; Theme Studio drops nothing (§5.10). This is the largest
