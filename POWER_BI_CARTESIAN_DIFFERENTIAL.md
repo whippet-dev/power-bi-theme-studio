@@ -26,6 +26,10 @@ neither side is an estimate.
 >
 > Findings are graded accordingly in §6. The Fluent results are kept — they
 > are a real and important behaviour, not an error to delete.
+>
+> **§5.9 now has the Classic measurement**, and it confirms the theme
+> dependence with numbers: same visual, same size, same data, two themes,
+> and almost every layout decision differs.
 
 ---
 
@@ -248,6 +252,82 @@ absolute width (600 vs 372), so proportions are comparable and absolute
 pixels are not. Theme Studio spends 27.2% of its width on the category
 gutter against Power BI's 20.8%, which is a real difference and partly
 `estimateText`'s 9% overstatement (§5.5) inflating that gutter.
+
+### 5.9 Classic at 600 × 206 — the theme dependence, measured
+
+Same visual, same size, same data, same 100% zoom, gap 10. Only the report
+theme changed. Palette fingerprint is identical
+(`#118DFF` / `#12239E` / `#E66C37`), so the *palette* is not what differs.
+
+| | Fluent | Classic |
+|---|---:|---:|
+| container padding (600 − surface width) | 34 | **10** |
+| `cartesianChart` | 566 × 86 | **590 × 138** |
+| plot (`mainGraphicsContext`) | 475 × 54 | **490 × 97** |
+| plot height ÷ visual height | 26.2% | **47.1%** |
+| **categories drawn** | **1 of 4** | **4 of 4** |
+| **bars drawn** | **3 of 12** | **12 of 12** |
+| band width | 3.1034 | 5.0172 |
+| series step | 3.4483 | 5.5747 |
+| **band `paddingInner`** | **0.100000** | **0.100000** |
+| category step | n/a (one shown) | 21.0870 |
+| cluster span | 10.0000 | 16.1667 |
+| implied category `innerPadding` | n/a | ≈23.3% |
+| **legend position** | **bottom** (y 161) | **top** (y 35) |
+| **axis titles** | **none** | **both rendered** |
+| visual title | 20px | 18.6667px |
+| axis label size | 12px | 12px |
+| axis label colour | `rgb(97,97,97)` | `rgb(96,94,92)` |
+
+**Your observation is confirmed exactly.** Classic draws all four categories
+and all twelve bars in the same space where Fluent reduces to one and
+scrolls. This is not a formatting default the user could see in the pane —
+it is the renderer responding differently to the same available space.
+
+And it is not only density. Under Classic the legend moves to the **top**,
+**both axis titles appear**, container padding drops from 34 to 10, and the
+plot ends up **80% taller** (97 vs 54). A report theme is changing layout
+structure, not just styling.
+
+#### What this makes renderer-invariant
+
+`paddingInner` is **0.100000** here too. That is now four measurements
+across **two themes and three visual sizes**, all exact. The clustered band
+model is the one thing that has survived every variation, which is worth
+something: it is also the part Theme Studio already implements correctly.
+
+#### A correction this forces
+
+§5.4 said Theme Studio *"renders axis titles the native default does not"*
+and counted that against it. **Wrong, and wrong because of the theme.**
+Classic renders both axis titles, exactly as Theme Studio does. That was a
+Fluent artefact reported as a Theme Studio divergence.
+
+The same applies to legend position: §5.6 recorded native as *bottom* and
+Theme Studio as *top*. Under Classic the native legend is on **top** — so
+Theme Studio matches its own baseline, and the "divergence" was again
+Fluent.
+
+#### Classification so far
+
+| Behaviour | Classification |
+|---|---|
+| band `paddingInner` = 0.1 | **renderer-invariant** (2 themes × 3 sizes) |
+| SVG `<rect>` marks, unrounded, antialiased | **renderer-invariant** (unchanged across themes) |
+| linear value scale | **renderer-invariant** |
+| cram all categories; no scroll | **Classic-specific** — and matches Theme Studio |
+| legend on top | **Classic-specific** — and matches Theme Studio |
+| axis titles rendered | **Classic-specific** — and matches Theme Studio |
+| reduce to one category and scroll | **Fluent-specific** |
+| legend at bottom | **Fluent-specific** |
+| container padding 34 vs 10 | **theme-dependent** |
+| axis text 14px → 12px with size | **UNKNOWN** — both sizes were Fluent; Classic measured at one size only |
+| automatic axis maximum 50 | **UNKNOWN** — only measured under Fluent |
+| category `innerPadding` (55.2% vs 23.3%) | **UNKNOWN** — theme and size both differ between the two |
+
+The pattern worth noting: **on every point where Classic differs from
+Fluent, Classic is what Theme Studio already does.** Theme Studio was not
+wrong; it was being compared against the wrong theme.
 
 ### 5.5 Text measurement
 

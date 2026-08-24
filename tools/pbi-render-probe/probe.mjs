@@ -329,11 +329,28 @@ const SCRIPTS = {
       ? Math.min(...legendIcons.map((e) => e.getBoundingClientRect().top))
       : null;
 
-    const classify = (r) => {
-      if (legendTop !== null && r.top >= legendTop - 6) return 'legend';
-      if (barTop !== null && r.top < barTop - 6 && r.bottom < barTop) return 'title';
-      if (barLeft !== null && r.right <= barLeft + 2) return 'categoryAxisLabel';
-      if (barBottom !== null && r.top >= barBottom - 6) return 'valueAxisLabel';
+    // Roles come from position relative to the plot, but the legend can sit
+    // above OR below it -- Classic puts it on top, Fluent underneath -- so a
+    // single 'below the legend band' test mislabels everything under one of
+    // them. Bracket the legend band instead, and use the DIN-stack title
+    // face to separate axis TITLES from axis labels, which are Segoe.
+    const legendBottom = legendIcons.length
+      ? Math.max(...legendIcons.map((e) => e.getBoundingClientRect().bottom))
+      : null;
+    const inLegendBand = (r) =>
+      legendTop !== null && r.bottom >= legendTop - 4 && r.top <= legendBottom + 4;
+
+    const classify = (r, el) => {
+      if (inLegendBand(r)) return 'legend';
+      if (barTop !== null && r.bottom < barTop - 4 && !inLegendBand(r)) return 'title';
+      const face = el ? getComputedStyle(el).fontFamily : '';
+      const isTitleFace = /wf_standard-font/.test(face);
+      if (barLeft !== null && r.right <= barLeft + 2) {
+        return isTitleFace ? 'categoryAxisTitle' : 'categoryAxisLabel';
+      }
+      if (barBottom !== null && r.top >= barBottom - 6) {
+        return isTitleFace ? 'valueAxisTitle' : 'valueAxisLabel';
+      }
       return 'unclassified';
     };
 
@@ -355,7 +372,7 @@ const SCRIPTS = {
       try { const b = el.getBBox(); bbox = { x: num(b.x), y: num(b.y), w: num(b.width), h: num(b.height) }; } catch { /* HTML */ }
       entries.push({
         kind,
-        role: classify(r),
+        role: classify(r, el),
         text,
         fontFamily: cs.fontFamily,
         fontSize: cs.fontSize,
