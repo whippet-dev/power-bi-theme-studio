@@ -329,6 +329,68 @@ The pattern worth noting: **on every point where Classic differs from
 Fluent, Classic is what Theme Studio already does.** Theme Studio was not
 wrong; it was being compared against the wrong theme.
 
+### 5.10 Like-for-like: Classic at 372 × 128
+
+The native visual authored at **exactly Theme Studio's box**, under the
+matching theme family. Same size, same data, same theme lineage — the first
+comparison in this document with no confound to normalise away.
+
+| | Classic Power BI | Theme Studio |
+|---|---:|---:|
+| plot | 256 × 61 | 271 × 86.2 |
+| plot w ÷ visual w | 68.8% | 72.8% |
+| plot h ÷ visual h | **47.7%** | **67.3%** |
+| **categories drawn** | **2 of 4** | **4 of 4** |
+| **bars drawn** | **6 of 12** | **12 of 12** |
+| category labels | 2 | 4 |
+| value axis labels | **0** | **5** |
+| legend | **dropped** | rendered |
+| axis label size | **12px** | **13.3333px** (+11.1%) |
+| band `paddingInner` | **0.100000** | **0.100000** |
+| band width | 4.9655 | 6.0156 |
+| category step | 23.4615 | 21.5445 |
+| implied category `innerPadding` | 31.8% | 10.0% |
+
+#### The finding: Theme Studio over-draws
+
+In the same box, native Classic **sheds furniture** as space runs out. It
+drops the legend entirely, drops every value-axis label, and draws two of
+four categories. Theme Studio draws all of it — legend, five value labels,
+four categories, twelve bars — at 11% larger text.
+
+That is the real explanation for the crowding, and it is neither of the two
+I offered earlier. Not "the fonts are too large" (§5.4, an aspect artefact)
+and not "the box is the wrong aspect" (§5.8, Fluent-scoped). At identical
+size against its own theme family, **Theme Studio renders roughly twice the
+furniture in the same space.**
+
+Power BI's response to a small visual is progressive decluttering. Theme
+Studio has no such behaviour: everything that can be drawn is drawn, and
+Task 7's legibility floor then has to defend a box carrying far more than
+the native renderer would put in it.
+
+#### `paddingInner` again
+
+**0.100000.** Fifth measurement, two themes, four visual sizes. Nothing has
+moved it.
+
+#### The one distinction that still matters
+
+Classic renders axis labels at **12px at both measured sizes** — 600 × 206
+and 372 × 128. Fluent went 14px → 12px between 600 × 600 and 600 × 206. So
+either:
+
+- **(a)** Classic's default axis size simply *is* 9pt/12px, and Theme
+  Studio's Classic 2026 fallback of 10pt/13.3333px is one point too large;
+  or
+- **(b)** Classic also scales with size, and both measured sizes happen to
+  sit below the same breakpoint.
+
+These call for completely different work — (a) is a fallback correction,
+(b) is a new responsive behaviour — and they cannot be told apart without a
+**large** Classic visual. `UNKNOWN` until then, and no implementation should
+be chosen on the strength of a guess between them.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -398,7 +460,10 @@ refuted — only shown not to hold under the hero transform.
 | Report theme changes responsive layout, not just styling | `PROVEN-EXPERIMENT` — the two behaviours differ |
 | Theme Studio's text is lighter than native at matched aspect | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
 | The rule behind Fluent's responsive axis text | `UNKNOWN` — two sizes sampled |
-| Whether Classic scales axis text with size at all | `UNKNOWN` — not measured |
+| Classic renders 12px axis text at both 600×206 and 372×128 | `PROVEN-EXPERIMENT` |
+| Classic sheds legend, value labels and categories as the box shrinks | `PROVEN-EXPERIMENT` (§5.10) |
+| Theme Studio draws ~2× the furniture of native Classic at the same size | `PROVEN-EXPERIMENT` (§5.10) |
+| Whether Classic's 12px is its default or a responsive reduction | `UNKNOWN` — needs a large Classic visual |
 | Whether the axis maximum rule is theme-dependent | `UNKNOWN` — only measured under Fluent |
 | Whether `paddingInner` 0.1 holds under Classic | `UNKNOWN` — three Fluent measurements agree |
 | Theme Studio snapping in the untransformed case | `UNKNOWN` |
@@ -506,10 +571,12 @@ Ranked by evidence strength × visible effect. None is done here.
 
 1. **Automatic axis maximum (nice numbers).** Changes every cartesian preview's
    scale and removes the `11.5K` tick labels. Needs §8.2 first.
-2. ~~**Category density behaviour.**~~ **Withdrawn.** It rested on Fluent-only
-   evidence. Classic — Theme Studio's actual baseline — crams all four
-   categories, which is what Theme Studio already does, so there may be
-   nothing to adopt here at all. Re-open only after the Classic measurement.
+2. **Progressive decluttering.** *Re-opened, and now Classic-evidenced.* At
+   372 × 128 native Classic drops the legend, all value labels and half the
+   categories; Theme Studio drops nothing (§5.10). This is the largest
+   like-for-like divergence found, and it is a behaviour rather than a
+   constant. Note this is **not** Fluent's scroll-to-one-category — Classic
+   sheds furniture instead, which is the behaviour matching our baseline.
 
 2b. ~~**Responsive axis typography.**~~ **Withdrawn** for the same reason:
    measured only under Fluent, and Fluent is demonstrably not representative
