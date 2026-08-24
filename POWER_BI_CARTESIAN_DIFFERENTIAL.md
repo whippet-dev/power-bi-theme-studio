@@ -135,13 +135,74 @@ The perception comes from the ratio to the plot:
 | Theme Studio | 19.39 | 86.2 | **22.5%** |
 
 **Theme Studio's text is 5.2× larger relative to its plot**, entirely because
-the plot is 5.1× shorter. This is a box-aspect problem, not a font-size
-problem, and Task 7 fixed those boxes against a legibility floor precisely
-because the text was crowding them.
+the plot is 5.1× shorter.
+
+> **Superseded by §5.8.** That comparison held the *data* constant but not
+> the *aspect*, and the aspect turned out to be doing all the work. Measured
+> against a native visual at Theme Studio's own aspect, the ratio reverses.
+> The sentence above is true of these two states and false as a general
+> claim about the two products.
 
 Two aggravating factors, both space Power BI does not spend: Theme Studio
 renders **axis titles** the native default does not, and its value-axis labels
 are `11.5K`-style strings that are wider than native's `20`.
+
+### 5.8 Same-aspect comparison — and a reversed conclusion
+
+The native visual was re-authored at **600 × 206** (aspect 2.913) against
+Theme Studio's 372 × 128 (aspect 2.906). Zoom 100%, gap restored to 10,
+nothing else changed. This removes the aspect confound from §5.2 and §5.4.
+
+| | Power BI 600×206 | Theme Studio 372×128 |
+|---|---:|---:|
+| visual aspect | 2.913 | 2.906 |
+| plot width ÷ visual width | 79.2% | 72.8% |
+| plot height ÷ visual height | **26.2%** | **67.3%** |
+| plot aspect | 8.80 | 3.15 |
+| axis label size | **12px** | 13.3333px |
+| **label height ÷ plot height** | **29.6%** | **22.5%** |
+| "London" width ÷ plot width | 8.5% | 16.5% |
+| categories drawn | **1 of 4** | **4 of 4** |
+| bars drawn | **3 of 12** | **12 of 12** |
+| band `paddingInner` | 0.100000 | 0.100000 |
+
+Three findings, in order of how much they change the story.
+
+**1. The typography conclusion reverses.** At matched aspect Theme Studio's
+text occupies **22.5%** of its plot height against Power BI's **29.6%**.
+Theme Studio is the *more* conservative of the two, not 5× heavier. The
+earlier 4.3%-vs-22.5% figure was measuring the difference between a square
+visual and a 2.9:1 one, not a difference between the products.
+
+**2. Power BI resizes its axis text with the visual.** 14px at 600×600,
+**12px at 600×206** — same theme, same default formatting, only the height
+changed. The title stayed at 20px, so this is specific to the axis and
+legend roles rather than a global scale. Theme Studio's sizes are fixed by
+the resolved theme and do not respond to the box at all.
+
+*(Two states are not a curve. Whether this is a continuous function of
+size, a small set of breakpoints, or an "Auto" formatting default is
+`UNKNOWN` — it needs several authored sizes to establish.)*
+
+**3. Power BI refuses to compress; it scrolls.** With 54px of plot and four
+categories it has 13.50px each, below its own 16px label line — so it draws
+**one** category, keeps `svgScrollable` (558 × 62) for the rest, and leaves
+nine of twelve bars unrendered. Theme Studio draws all four at 21.54px
+against a 19.4px label: tighter, but above its floor.
+
+That is Task 9's backlog row 9 measured rather than predicted, and it
+reframes what "category density" means. The native answer is not smaller
+bars but fewer of them plus a scrollbar — a different behaviour, not a
+different constant.
+
+**Unchanged across both sizes:** `paddingInner` exactly 0.100000, a third
+independent confirmation that the band model is invariant to visual size.
+
+One caveat on the width comparison: the two visuals are not the same
+absolute width (600 vs 372), so proportions are comparable and absolute
+pixels are not. Theme Studio spends 27.2% of its width on the category
+gutter against Power BI's 20.8%, which is a real difference and partly
+`estimateText`'s 9% overstatement (§5.5) inflating that gutter.
 
 ### 5.5 Text measurement
 
@@ -206,6 +267,10 @@ refuted — only shown not to hold under the hero transform.
 | Axis maximum is a nice-number rounding | `STRONGLY-SUPPORTED` — one data point (46→50) plus `Le = 20` px/tick |
 | Tick density is width-driven | `INFERENCE` — `bestTickCount = min(domainSpan, pixelSpan / 20)` read from the bundle; the nice-interval selection was not isolated |
 | Category `innerPadding` ≈ 55.2% | `INFERENCE` — outer padding unknown |
+| Power BI axis text is 12px at 600×206 and 14px at 600×600 | `PROVEN-EXPERIMENT` (§5.8) |
+| Power BI drops categories and scrolls rather than compressing | `PROVEN-EXPERIMENT` (§5.8) |
+| Theme Studio's text is *lighter* than native at matched aspect | `PROVEN-EXPERIMENT` (§5.8) |
+| The rule behind Power BI's responsive axis text | `UNKNOWN` — two sizes sampled |
 | Theme Studio snapping in the untransformed case | `UNKNOWN` |
 
 ---
@@ -304,9 +369,14 @@ Ranked by evidence strength × visible effect. None is done here.
 
 1. **Automatic axis maximum (nice numbers).** Changes every cartesian preview's
    scale and removes the `11.5K` tick labels. Needs §8.2 first.
-2. **Box aspect ratio.** The single biggest visual difference, and the reason
-   the fonts read as oversized. Touches Task 7's constants, so it needs its own
-   justification against that floor.
+2. **Category density behaviour.** §5.8 shows the native answer to a crowded
+   category axis is to draw fewer categories and scroll, not to shrink them.
+   Theme Studio compresses instead. This is a behaviour to adopt, not a
+   constant to retune, and it supersedes the box-aspect candidate that stood
+   here before §5.8 was measured.
+
+2b. **Responsive axis typography.** Power BI scales axis and legend text with
+   the visual; Theme Studio does not. Needs the rule established first.
 3. **`estimateText` calibration.** ~0.50 em rather than 0.55, or a real
    measurement. Well evidenced, small, affects every gutter.
 4. **Tick count.** Width-driven rather than a fixed 4.
