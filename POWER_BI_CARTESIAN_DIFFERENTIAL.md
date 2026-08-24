@@ -321,9 +321,9 @@ Fluent.
 | reduce to one category and scroll | **Fluent-specific** |
 | legend at bottom | **Fluent-specific** |
 | container padding 34 vs 10 | **theme-dependent** |
-| axis text 14px → 12px with size | **UNKNOWN** — both sizes were Fluent; Classic measured at one size only |
-| automatic axis maximum 50 | **UNKNOWN** — only measured under Fluent |
-| category `innerPadding` (55.2% vs 23.3%) | **UNKNOWN** — theme and size both differ between the two |
+| axis **label** size responsiveness | **theme-dependent** — Fluent 14px→12px; no responsive change observed across the three tested Classic sizes (§5.11) |
+| automatic axis maximum 50 | **renderer-invariant** — 46→50 under Classic and Fluent alike (§5.11) |
+| category `innerPadding` (Classic 23.33% vs Fluent 55.2%) | **theme-dependent** — de-confounded at the same 600×600 (§5.11) |
 
 The pattern worth noting: **on every point where Classic differs from
 Fluent, Classic is what Theme Studio already does.** Theme Studio was not
@@ -407,8 +407,8 @@ Third Classic size. Plot **486 × 485.667**, all four categories, twelve bars.
 This resolves §5.10's open question, and the answer is *both* of its options
 applying to different roles:
 
-- **Axis labels are NOT responsive.** 12px at every size, a 9.8× range of
-  visual area. So option (a): **Classic's default axis label size is
+- **No responsive axis-label size change was observed across the three
+  visual area — 600×600, 600×206 and 372×128. Three sizes are not the whole
   9pt/12px**, and Theme Studio's category-label fallback of 10pt/13.3333px
   is one point too large. Its *value*-label fallback of 12px already
   matches.
@@ -517,13 +517,13 @@ refuted — only shown not to hold under the hero transform.
 | Classic renders 12px axis text at both 600×206 and 372×128 | `PROVEN-EXPERIMENT` |
 | Classic sheds legend, value labels and categories as the box shrinks | `PROVEN-EXPERIMENT` (§5.10) |
 | Theme Studio draws ~2× the furniture of native Classic at the same size | `PROVEN-EXPERIMENT` (§5.10) |
-| Classic axis **labels** are 12px at 600×600, 600×206 and 372×128 — not responsive | `PROVEN-EXPERIMENT` |
+| No responsive axis-label size change observed across the three tested Classic sizes (12px at each) | `PROVEN-EXPERIMENT` |
 | Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
 | The automatic axis maximum rule is theme-invariant (46→50 both themes) | `PROVEN-EXPERIMENT` |
 | Category `innerPadding` is theme-dependent: Classic 23.33%, Fluent 55.2% at the same size | `PROVEN-EXPERIMENT` |
 | The nice-number *rule* itself | `UNKNOWN` — still one data maximum (46) |
-| Whether the axis maximum rule is theme-dependent | `UNKNOWN` — only measured under Fluent |
-| Whether `paddingInner` 0.1 holds under Classic | `UNKNOWN` — three Fluent measurements agree |
+| The axis maximum rule is theme-**invariant** | `PROVEN-EXPERIMENT` — data max 46 resolves to 50 under both Classic and Fluent |
+| Band `paddingInner` = 0.1 holds under Classic too | `PROVEN-EXPERIMENT` — six measurements, two themes, five visual sizes |
 | Theme Studio snapping in the untransformed case | `UNKNOWN` |
 
 ---
