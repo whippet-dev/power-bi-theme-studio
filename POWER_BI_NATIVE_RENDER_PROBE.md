@@ -97,8 +97,13 @@ the container's authored size minus chrome, never re-derived from content.
 
 ### Coordinate systems
 
-At 100% zoom and DPR 1 they coincide, which is why the reference was measured
-there. They are still recorded separately, because they do not always:
+At 100% zoom and DPR 1 their **scales** coincide, which is why the reference
+was measured there: one unit means the same distance in all three. Their
+**origins** still differ — `getBBox()` is relative to the element's own user
+space, `getBoundingClientRect()` to the viewport, device pixels to the
+captured surface — so a length may be compared directly while a position may
+not. They are recorded separately for that reason, and because the scales
+stop agreeing as soon as zoom or DPR moves:
 
 | | |
 |---|---|
@@ -178,14 +183,20 @@ N.West/Online  top 451.233  bottom 465.554   13 full rows + 2 blended   TOTAL IN
    450=0  451=0.764  452…464=1  465=0.554  466=0
 ```
 
-**Power BI antialiases fractional edges.** Two bars whose tops sit on different
-sub-pixel phases — `.209` and `.233` — paint **the same total ink, 14.318**,
-against a geometric height of **14.3211**. Agreement to 0.02%.
+**Power BI antialiases fractional edges.** The sampled equal-height bars
+retained equal total painted coverage across different sub-pixel phases —
+`.209` and `.233` both paint **14.318** against a geometric height of
+**14.3211**, agreement to 0.02% — which is consistent with fractional SVG
+antialiasing rather than per-mark integer snapping.
 
-That is precisely the property §17 predicted but could not observe:
-antialiasing spends the exact fractional height as ink, so nominally equal
-marks stay equal whatever their phase, whereas pixel-snapping quantises them to
-integers that vary with phase.
+That is the property §17 predicted but could not observe. Antialiasing
+spends a mark's exact fractional height as ink, whereas pixel-snapping
+quantises it to an integer that varies with phase.
+
+**Scope of the claim.** Two phases were sampled, not the phase space. This
+shows that these marks did not quantise at these phases; it does not
+establish that no phase anywhere produces a different coverage. A phase
+sweep would be needed for that, and none was run.
 
 Grade upgrade:
 
@@ -228,7 +239,28 @@ derived purely from bundle archaeology; it now matches live output exactly.
 | **text width** | `North West` = 70.837 @14px | `estimateText` = 77.0 | **+7.5%** over |
 | **text height** | bbox 19 | `fontSize × 1.35` = 18.9 | close |
 | **category innerPadding** | ≈55.2% (inferred) | fallback 10 (Classic) / 50 (Fluent) | |
-| **effective `clusteredGapSize`** | **10** | fallback 10 | task 9 read the converter's `po` default of 0; the *effective* default is 10, so Theme Studio's fallback is right and that note needs correcting |
+| **effective `clusteredGapSize`** | **10** | fallback 10 | two different layers — see below. Theme Studio's fallback matches observed output |
+
+### `clusteredGapSize`: two layers, both findings stand
+
+Task 9 read `po = { clusteredGapSize: 0, … }` out of the cartesian bundle:
+the **low-level renderer/layout default**, used when the property is absent
+from the data view. That reading was correct and is not superseded.
+
+This probe measured a **newly authored Clustered Bar with default
+formatting** and found an effective gap of **10%** (`paddingInner` exactly
+0.100000). That is also correct.
+
+Both are true because they are different layers: Power BI's low-level
+renderer/layout default is 0, but the default *formatting state* of a newly
+authored Clustered Bar resolves to an effective `clusteredGapSize` of 10.
+Theme Studio's effective fallback of 10 therefore matches observed Desktop
+output.
+
+The distinction matters beyond this property: a renderer default and an
+effective visual-formatting default are not necessarily the same layer, so
+a bundle-read default cannot be assumed to be what a user's chart actually
+renders with.
 
 Candidate causes only — text measurement, axis "nice number" rules, Power BI
 padding constants, and the authored-size difference all plausibly contribute.
@@ -289,4 +321,5 @@ is gitignored precisely because what it produces is Power BI's own rendering.
 2. Investigate the **axis maximum** rule — the clearest, most consequential
    divergence found, and one that changes every cartesian preview's scale.
 3. Calibrate `estimateText` against measured Power BI text widths.
-4. Correct task 9's note about the `clusteredGapSize` default.
+4. Record the `clusteredGapSize` layer distinction in task 9's own notes,
+   without removing the bundle finding: both layers are real.
