@@ -14,7 +14,7 @@ import { resolveColumnChartStyle } from "../app/lib/columnChartProperties";
 import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
 import { resolveLineChartStyle } from "../app/lib/lineChartProperties";
 import {
-  BAR_DATA_MAX,
+  STACKED_DATA_MAX,
   LINE_DATA_MAX,
   barCategories,
   lineCategoryLabels,
@@ -129,14 +129,14 @@ const layoutOf = (entry: Entry, baseId: (typeof BASES)[number], custom: PowerBIT
     categoryAxis: AxisLike;
     valueAxis: AxisLike;
   };
-  const categories = isLine ? lineCategoryLabels : barCategories.map(([label]) => label);
+  const categories = isLine ? lineCategoryLabels : barCategories;
   const layout = computePreviewCartesianLayout({
     box: entry.box,
     orientation: entry.orientation,
     categoryAxis: style.categoryAxis as never,
     valueAxis: style.valueAxis as never,
     categories,
-    dataMax: isLine ? LINE_DATA_MAX : BAR_DATA_MAX,
+    dataMax: isLine ? LINE_DATA_MAX : STACKED_DATA_MAX,
     innerPadding: isLine ? 0 : (style.categoryAxis.innerPadding ?? 0),
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: isLine ? "Month" : "Region",
@@ -327,13 +327,13 @@ test("category count does not resize the box either", () => {
       categoryAxis: style.categoryAxis,
       valueAxis: style.valueAxis,
       categories,
-      dataMax: BAR_DATA_MAX,
+      dataMax: STACKED_DATA_MAX,
       innerPadding: style.categoryAxis.innerPadding,
       valueAxisTitleFallback: "Applications",
       categoryAxisTitleFallback: "Region",
     });
 
-  const four = lay(barCategories.map(([label]) => label));
+  const four = lay(barCategories);
   const twelve = lay(Array.from({ length: 12 }, (_, i) => `Region ${i + 1}`));
 
   assert.deepEqual(twelve.outer, four.outer);

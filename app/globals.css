@@ -1640,10 +1640,9 @@ button { color: inherit; }
 
 /* Height and baseline come from scale.value, never from a percentage of
    the sample maximum. */
+/* The transpose: the band supplies left/width. See .bar-item__fill. */
 .column-item__fill {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: block;
   border-radius: 2px 2px 0 0;
 }
@@ -1687,10 +1686,12 @@ button { color: inherit; }
 
 /* Start and length come from scale.value, never from a percentage of the
    sample maximum. */
+/* Position and thickness both come from the series band, which the
+   renderer computes from ChartLayout and clusteredSeriesBands. CSS used to
+   centre a lone bar in its slot; with real series each band has its own
+   offset, and centring would stack them on top of one another. */
 .bar-item__fill {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   display: block;
   border-radius: 2px;
 }

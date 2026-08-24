@@ -15,7 +15,8 @@ import {
   ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
-import { areaPath, linePath, markerShape } from "../../lib/lineGeometry";
+import {
+  seriesPointPercents, areaPath, linePath, markerShape } from "../../lib/lineGeometry";
 import {
   categoryCentre,
   categoryPercent,
@@ -24,7 +25,13 @@ import {
   LINE_CHART_BOX,
   valueFraction,
 } from "./cartesianLayout";
-import { LINE_DATA_MAX, lineCategoryLabels, linePointValues } from "../../lib/previewSampleData";
+import {
+  LINE_DATA_MAX,
+  VALUE_SCALE,
+  lineCategoryLabels,
+  lineFixture,
+  seriesColor,
+} from "../../lib/previewSampleData";
 import { chartMarker, svgDashArray } from "./chartPrimitives";
 import type { ResolvedLineChartStyle } from "../../lib/lineChartProperties";
 
@@ -55,11 +62,29 @@ type ConstantLineStyle = {
   dataLabelVerticalPosition: string | number;
 };
 
-type Props = { lineChartStyle: ResolvedLineChartStyle };
+type Props = { lineChartStyle: ResolvedLineChartStyle; palette: string[] };
 
-export function LineChartPreview({ lineChartStyle }: Props) {
+export function LineChartPreview({ lineChartStyle, palette }: Props) {
+  /**
+   * The series every single-series overlay belongs to.
+   *
+   * Forecast, anomaly detection, error bars and the area fill are bound to
+   * one series here rather than repeated across all three. That is a
+   * deliberate limit of this fixture, not a claim about Power BI: which of
+   * them survive a Legend binding, and against which series they are then
+   * evaluated, has not been established, and drawing a forecast on every
+   * line would assert something unverified.
+   */
+  const primarySeries = lineFixture.series[0];
+  const linePointValues = primarySeries.values;
   const lineLegendNode = (
-    <ChartLegend legend={lineChartStyle.legend} items={[{ label: "Applications", color: lineChartStyle.dataPoint.fill }]} />
+    <ChartLegend
+      legend={lineChartStyle.legend}
+      items={lineFixture.series.map((series, index) => ({
+        label: series.label,
+        color: seriesColor(palette, index, lineChartStyle.dataPoint.fill),
+      }))}
+    />
   );
   const lineLegendAtBottom = legendIsAfterPlot(lineChartStyle.legend.position);
   const lineLegendVertical = legendIsVertical(lineChartStyle.legend.position);
@@ -92,16 +117,26 @@ export function LineChartPreview({ lineChartStyle }: Props) {
    */
   const linePointCoords = linePointValues.map((value, index) => ({
     x: categoryCentre(layout, index, pointCount) - plot.x,
-    y: layout.scale.value(value * 1000) - plot.y,
+    y: layout.scale.value(value * VALUE_SCALE) - plot.y,
   }));
-  /** The same points as percentages, for the HTML overlays. One conversion. */
-  const pointPercent = (index: number) => {
+
+  /**
+   * The two scales every series shares. Passing these as closures is what
+   * stops a series acquiring its own geometry: `seriesPointPercents` gets
+   * the same pair for all three, and only the values differ.
+   */
+  const categoryCentrePercent = (index: number) => {
     const slot = categoryPercent(layout, index, pointCount);
-    return {
-      left: slot.offset + slot.size / 2,
-      top: (1 - valueFraction(layout, linePointValues[index] * 1000)) * 100,
-    };
+    return slot.offset + slot.size / 2;
   };
+  const valueFractionOf = (value: number) => valueFraction(layout, value * VALUE_SCALE);
+
+  /** Every series' points as plot percentages, for the HTML overlays. */
+  const seriesPercents = lineFixture.series.map((series) =>
+    seriesPointPercents(series.values, categoryCentrePercent, valueFractionOf),
+  );
+  /** The primary series' points, which the single-series overlays use. */
+  const pointPercent = (index: number) => seriesPercents[0][index];
 
   /**
    * The same point, as the {x,y} percentages chartMarker positions with.
@@ -112,6 +147,11 @@ export function LineChartPreview({ lineChartStyle }: Props) {
    */
   const pointMarkerPoint = (index: number) => {
     const { left, top } = pointPercent(index);
+    return { x: left, y: top };
+  };
+  /** The same, for any series. Markers sit on the path they belong to. */
+  const seriesMarkerPoint = (seriesIndex: number, index: number) => {
+    const { left, top } = seriesPercents[seriesIndex][index];
     return { x: left, y: top };
   };
   /**
@@ -141,6 +181,47 @@ export function LineChartPreview({ lineChartStyle }: Props) {
     stepAlignment: lineStyles.interpolationStep,
   });
   const lineDashStyle = mapLineStyle(lineStyles.lineStyle);
+
+  /**
+   * Stroke geometry is a property of the visual, not of a series: nothing
+   * in the theme addresses a single line's join or cap. So these are
+   * resolved once and applied to every path, and only the colour varies
+   * by series.
+   */
+  const strokeDasharray = String(lineStyles.strokeDashArray) || svgDashArray(lineDashStyle);
+  const strokeLinejoin = (["round", "bevel", "miter"] as const).includes(
+    String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter",
+  )
+    ? (String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter")
+    : ("round" as const);
+  const strokeLinecap =
+    String(lineStyles.strokeDashCap).toLowerCase() === "flat" ? ("butt" as const) : ("round" as const);
+
+  /**
+   * Every series, through the same scales.
+   *
+   * One ChartLayout, one category scale, one value scale — a series only
+   * supplies its own values. Drawing the primary path a second time with
+   * an offset would make the extra lines decoration rather than data, and
+   * nothing about the value axis would be testable against them.
+   */
+  const seriesPaths = lineFixture.series.map((series, seriesIndex) => {
+    const coords = series.values.map((value, index) => ({
+      x: categoryCentre(layout, index, pointCount) - plot.x,
+      y: layout.scale.value(value * VALUE_SCALE) - plot.y,
+    }));
+    return {
+      series,
+      seriesIndex,
+      coords,
+      d: linePath(coords, {
+        smooth: lineInterpolation === "smooth",
+        step: lineInterpolation === "step",
+        stepAlignment: lineStyles.interpolationStep,
+      }),
+      color: seriesColor(palette, seriesIndex, lineStyles.strokeColor || lineChartStyle.dataPoint.fill),
+    };
+  });
   const lineAreaColor = lineStyles.areaMatchStrokeColor ? lineChartStyle.dataPoint.fill : lineStyles.areaColor;
   // lineChartType decides whether the series is drawn as a plain line or
   // filled down to the baseline as an area/stacked area.
@@ -347,7 +428,7 @@ export function LineChartPreview({ lineChartStyle }: Props) {
           }}
         />
       )}
-      Applications
+      {primarySeries.label}
     </span>
   );
 
@@ -512,6 +593,21 @@ export function LineChartPreview({ lineChartStyle }: Props) {
                     stroke="none"
                   />
                 )}
+                {/* Secondary series: one path each, same scales, no overlays. */}
+                {lineStyles.strokeShow &&
+                  seriesPaths.slice(1).map((entry) => (
+                    <path
+                      key={entry.series.key}
+                      d={entry.d}
+                      fill="none"
+                      stroke={hexWithAlpha(entry.color, lineStyles.strokeTransparency)}
+                      strokeWidth={lineStyles.strokeWidth}
+                      strokeDasharray={strokeDasharray}
+                      strokeLinejoin={strokeLinejoin}
+                      strokeLinecap={strokeLinecap}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
                 {lineStyles.strokeShow && (
                   <path
                     d={linePathD}
@@ -520,13 +616,9 @@ export function LineChartPreview({ lineChartStyle }: Props) {
                     strokeWidth={lineStyles.strokeWidth}
                     // An explicit dash array wins over the named line style,
                     // matching how Power BI treats the advanced setting.
-                    strokeDasharray={String(lineStyles.strokeDashArray) || svgDashArray(lineDashStyle)}
-                    strokeLinejoin={
-                      ["round", "bevel", "miter"].includes(String(lineStyles.strokeLineJoin).toLowerCase())
-                        ? (String(lineStyles.strokeLineJoin).toLowerCase() as "round" | "bevel" | "miter")
-                        : "round"
-                    }
-                    strokeLinecap={String(lineStyles.strokeDashCap).toLowerCase() === "flat" ? "butt" : "round"}
+                    strokeDasharray={strokeDasharray}
+                    strokeLinejoin={strokeLinejoin}
+                    strokeLinecap={strokeLinecap}
                     vectorEffect="non-scaling-stroke"
                   />
                 )}
@@ -544,23 +636,32 @@ export function LineChartPreview({ lineChartStyle }: Props) {
                 {forecastNode}
               </svg>
               {anomalyMarkerNode}
+              {/* Every series gets markers at its own points. The colour
+                  follows the same palette identity as its path and its
+                  legend swatch, so a marker is attributable to a series
+                  rather than all fifteen sharing the primary colour. */}
               {lineShowMarkers &&
-                linePointValues.map((_, index) => {
-                  const markerFill = hexWithAlpha(lineMarkerColor, lineChartStyle.markers.transparency);
+                lineFixture.series.flatMap((series, seriesIndex) => {
+                  const seriesMarkerColor = seriesColor(palette, seriesIndex, lineMarkerColor);
+                  const markerFill = hexWithAlpha(seriesMarkerColor, lineChartStyle.markers.transparency);
                   const markerStroke = lineChartStyle.markers.borderShow
                     ? hexWithAlpha(
-                        lineChartStyle.markers.borderColorMatchFill ? lineMarkerColor : lineChartStyle.markers.borderColor,
+                        lineChartStyle.markers.borderColorMatchFill
+                          ? seriesMarkerColor
+                          : lineChartStyle.markers.borderColor,
                         lineChartStyle.markers.borderTransparency,
                       )
                     : "none";
-                  return chartMarker(
-                    index,
-                    lineMarker,
-                    pointMarkerPoint(index),
-                    markerFill,
-                    markerStroke,
-                    lineChartStyle.markers.borderWidth,
-                    lineChartStyle.markers.rotation,
+                  return series.values.map((_, index) =>
+                    chartMarker(
+                      `${series.key}-${index}`,
+                      lineMarker,
+                      seriesMarkerPoint(seriesIndex, index),
+                      markerFill,
+                      markerStroke,
+                      lineChartStyle.markers.borderWidth,
+                      lineChartStyle.markers.rotation,
+                    ),
                   );
                 })}
               {lineChartStyle.trend.show && (
