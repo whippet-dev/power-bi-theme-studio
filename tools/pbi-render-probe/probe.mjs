@@ -383,7 +383,12 @@ const SCRIPTS = {
       push(el, 'html');
     }
 
+    const themeFingerprint = {
+      palette: [...new Set([...visual.querySelectorAll('svg rect.bar')].map((b) => getComputedStyle(b).fill))].slice(0, 8),
+    };
+
     return {
+      themeFingerprint,
       visual: { w: num(vr.width), h: num(vr.height) },
       plotAttr: { w: plotW, h: plotH },
       plotRect: pr ? { x: num(pr.x - vr.x), y: num(pr.y - vr.y), w: num(pr.width), h: num(pr.height) } : null,
@@ -439,8 +444,25 @@ const SCRIPTS = {
       });
     }
 
+    // Which report theme is active. Power BI does not name it in the DOM,
+    // but the resolved palette and title face identify it well enough to
+    // tell two captures apart -- and recording it is not optional. A whole
+    // measurement set was once taken without noting the theme, and Power
+    // BI's responsive layout turns out to differ between themes, so every
+    // size-dependent conclusion drawn from it had to be re-scoped.
+    const themeFingerprint = (() => {
+      const fills = [...new Set([...visual.querySelectorAll('svg rect.bar')].map((b) => getComputedStyle(b).fill))];
+      const titleEl = visual.querySelector('[class*="title"]');
+      return {
+        palette: fills.slice(0, 8),
+        titleFontFamily: titleEl ? getComputedStyle(titleEl).fontFamily : null,
+        titleFontSize: titleEl ? getComputedStyle(titleEl).fontSize : null,
+      };
+    })();
+
     return {
       context: {
+        themeFingerprint,
         zoom: num(zoom),
         devicePixelRatio: window.devicePixelRatio,
         viewportWidth: window.innerWidth,
@@ -650,6 +672,7 @@ async function main() {
       if (t.error) process.stdout.write(t.error + "\n");
       else {
         console.log(`visual ${t.visual.w}x${t.visual.h}  plot attr ${t.plotAttr.w}x${t.plotAttr.h}  legendTop ${t.legendTop}`);
+        console.log(`palette ${(t.themeFingerprint.palette || []).join('  ')}`);
         for (const e of t.entries) {
           console.log(
             `  ${e.role.padEnd(18)} ${e.kind.padEnd(4)} ${JSON.stringify(e.text).padEnd(24)} ` +

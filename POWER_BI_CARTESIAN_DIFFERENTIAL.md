@@ -6,6 +6,27 @@ below is evidence, not a licence to edit.*
 Both halves were measured the same way — CDP against a live renderer — so
 neither side is an estimate.
 
+> ## ⚠ Read this before using any native figure
+>
+> **Every native measurement in this document was taken under Power BI's
+> Fluent report theme.** Theme Studio's differential baseline is Classic
+> 2026, so these are not like-for-like.
+>
+> That was a methodology failure on my part: the report theme was never
+> recorded, and "default formatting" was treated as though it were
+> theme-neutral. It is not. Manual observation has since established that
+> Power BI's **responsive layout behaviour differs by theme** — under Fluent
+> a shallow visual reduces to one visible category and scrolls, while under
+> both Classic themes it crams all four in.
+>
+> So a report theme changes more than colours, fonts and default formatting
+> values: it changes how the renderer responds to available space. Nothing
+> size-responsive measured here may be generalised to "Power BI" until it
+> has been repeated under Classic.
+>
+> Findings are graded accordingly in §6. The Fluent results are kept — they
+> are a real and important behaviour, not an error to delete.
+
 ---
 
 ## 1. Environment
@@ -17,7 +38,9 @@ neither side is an estimate.
 | Theme Studio | dev server, measured through Edge 151 on CDP port 9223 |
 | `devicePixelRatio` | 1 on both |
 | Report zoom | **100%** (`matrix(1,0,0,1,0,0)` on `div.vcBody`) |
-| Theme Studio base | Classic 2026 |
+| **Native report theme** | **Fluent** — for every native measurement below |
+| Native palette fingerprint | `#118DFF` / `#12239E` / `#E66C37`, DIN-stack title |
+| Theme Studio base | Classic 2026 — **not the same theme as the native side** |
 
 Measuring Theme Studio through a real browser's CDP rather than the in-app
 preview pane is what makes the painted-pixel half of this possible at all.
@@ -174,26 +197,48 @@ Theme Studio is the *more* conservative of the two, not 5× heavier. The
 earlier 4.3%-vs-22.5% figure was measuring the difference between a square
 visual and a 2.9:1 one, not a difference between the products.
 
+> **Carries a Fluent caveat.** The 29.6% is a ratio to a plot whose height
+> was itself set by Fluent's decision to scroll, and to a 12px label that
+> may be Fluent's responsive sizing. Under Classic, with four categories
+> crammed in, both numbers may differ. The *direction* of the correction to
+> §5.4 stands regardless — the original figure was an aspect artefact — but
+> the 29.6% itself is `FLUENT-SPECIFIC`.
+
 **2. Power BI resizes its axis text with the visual.** 14px at 600×600,
 **12px at 600×206** — same theme, same default formatting, only the height
 changed. The title stayed at 20px, so this is specific to the axis and
 legend roles rather than a global scale. Theme Studio's sizes are fixed by
 the resolved theme and do not respond to the box at all.
 
+> **`FLUENT-SPECIFIC` until retested.** Both sizes were measured under
+> Fluent. Given that Fluent and Classic demonstrably differ in their
+> response to available space, the axis-text scaling cannot be assumed to
+> carry over to Classic either.
+
 *(Two states are not a curve. Whether this is a continuous function of
 size, a small set of breakpoints, or an "Auto" formatting default is
 `UNKNOWN` — it needs several authored sizes to establish.)*
 
-**3. Power BI refuses to compress; it scrolls.** With 54px of plot and four
-categories it has 13.50px each, below its own 16px label line — so it draws
-**one** category, keeps `svgScrollable` (558 × 62) for the rest, and leaves
-nine of twelve bars unrendered. Theme Studio draws all four at 21.54px
-against a 19.4px label: tighter, but above its floor.
+**3. Under Fluent, Power BI refuses to compress; it scrolls.** With 54px of
+plot and four categories it has 13.50px each, below its own 16px label line
+— so it draws **one** category, keeps `svgScrollable` (558 × 62) for the
+rest, and leaves nine of twelve bars unrendered. Theme Studio draws all four
+at 21.54px against a 19.4px label: tighter, but above its floor.
 
-That is Task 9's backlog row 9 measured rather than predicted, and it
-reframes what "category density" means. The native answer is not smaller
-bars but fewer of them plus a scrollbar — a different behaviour, not a
-different constant.
+> **`FLUENT-SPECIFIC`.** Manual observation under both Classic themes shows
+> the opposite: Classic crams all four categories and twelve bars into the
+> same space rather than reducing to one. So this is not "what Power BI
+> does" — it is what Fluent does, and Classic behaves the way Theme Studio
+> already does.
+>
+> This matters more than the measurement it came from. A report theme is
+> usually thought of as colours, fonts and default formatting values; here
+> it changes the renderer's **response to available space**. Any future
+> density work has to name the theme it targets.
+
+Whether *either* behaviour is what Theme Studio should adopt is now open,
+and the Classic result — matching what Theme Studio already does — is the
+one that matters for its Classic 2026 baseline.
 
 **Unchanged across both sizes:** `paddingInner` exactly 0.100000, a third
 independent confirmation that the band model is invariant to visual size.
@@ -267,10 +312,15 @@ refuted — only shown not to hold under the hero transform.
 | Axis maximum is a nice-number rounding | `STRONGLY-SUPPORTED` — one data point (46→50) plus `Le = 20` px/tick |
 | Tick density is width-driven | `INFERENCE` — `bestTickCount = min(domainSpan, pixelSpan / 20)` read from the bundle; the nice-interval selection was not isolated |
 | Category `innerPadding` ≈ 55.2% | `INFERENCE` — outer padding unknown |
-| Power BI axis text is 12px at 600×206 and 14px at 600×600 | `PROVEN-EXPERIMENT` (§5.8) |
-| Power BI drops categories and scrolls rather than compressing | `PROVEN-EXPERIMENT` (§5.8) |
-| Theme Studio's text is *lighter* than native at matched aspect | `PROVEN-EXPERIMENT` (§5.8) |
-| The rule behind Power BI's responsive axis text | `UNKNOWN` — two sizes sampled |
+| **Fluent** axis text is 12px at 600×206 and 14px at 600×600 | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
+| **Fluent** drops categories and scrolls rather than compressing | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
+| **Classic** crams all four categories instead | `STRONGLY-SUPPORTED` — manual observation, not yet instrumented |
+| Report theme changes responsive layout, not just styling | `PROVEN-EXPERIMENT` — the two behaviours differ |
+| Theme Studio's text is lighter than native at matched aspect | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
+| The rule behind Fluent's responsive axis text | `UNKNOWN` — two sizes sampled |
+| Whether Classic scales axis text with size at all | `UNKNOWN` — not measured |
+| Whether the axis maximum rule is theme-dependent | `UNKNOWN` — only measured under Fluent |
+| Whether `paddingInner` 0.1 holds under Classic | `UNKNOWN` — three Fluent measurements agree |
 | Theme Studio snapping in the untransformed case | `UNKNOWN` |
 
 ---
@@ -349,6 +399,13 @@ twelve relevant lines and no noise.
 
 ## 8. Unresolved
 
+0. **The whole native dataset needs repeating under Classic 2026.** This is
+   now the top priority and blocks every size-responsive conclusion. Needed
+   at 600×206 and at Theme Studio's exact 372×128: axis and legend font
+   sizes, plot geometry, categories and bars rendered, `svgScrollable`
+   dimensions, band geometry. Classic 2018 as well, if cheap, to see whether
+   both Classic bases share one density behaviour.
+
 1. **Untransformed Theme Studio painting** — the open half of §5.7.
 2. **The nice-number rule.** One sample (46 → 50). Distinguishing 1/2/5×10ⁿ
    from other families needs several data maxima, each requiring a manual data
@@ -369,14 +426,14 @@ Ranked by evidence strength × visible effect. None is done here.
 
 1. **Automatic axis maximum (nice numbers).** Changes every cartesian preview's
    scale and removes the `11.5K` tick labels. Needs §8.2 first.
-2. **Category density behaviour.** §5.8 shows the native answer to a crowded
-   category axis is to draw fewer categories and scroll, not to shrink them.
-   Theme Studio compresses instead. This is a behaviour to adopt, not a
-   constant to retune, and it supersedes the box-aspect candidate that stood
-   here before §5.8 was measured.
+2. ~~**Category density behaviour.**~~ **Withdrawn.** It rested on Fluent-only
+   evidence. Classic — Theme Studio's actual baseline — crams all four
+   categories, which is what Theme Studio already does, so there may be
+   nothing to adopt here at all. Re-open only after the Classic measurement.
 
-2b. **Responsive axis typography.** Power BI scales axis and legend text with
-   the visual; Theme Studio does not. Needs the rule established first.
+2b. ~~**Responsive axis typography.**~~ **Withdrawn** for the same reason:
+   measured only under Fluent, and Fluent is demonstrably not representative
+   of Classic for size-responsive behaviour.
 3. **`estimateText` calibration.** ~0.50 em rather than 0.55, or a real
    measurement. Well evidenced, small, affects every gutter.
 4. **Tick count.** Width-driven rather than a fixed 4.
