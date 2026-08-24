@@ -22,9 +22,12 @@ Two tools, deliberately separated:
 The controller is attached to an application holding someone's unsaved report,
 so the restraints are structural rather than advisory:
 
-- **Allowlisted semantic actions only.** `setVisualSize`, `setSeriesGap`,
-  `readState`. There is no "click at x,y", no "evaluate this", no selector
-  argument — a caller cannot express an action nobody reviewed.
+- **Allowlisted semantic actions only.** `setVisualSize`, `setBaseTheme`,
+  `setSeriesGap`, `readState`. There is no "click at x,y", no "evaluate
+  this", no selector argument — a caller cannot express an action nobody
+  reviewed. Each entry also declares whether it is actually implemented, so
+  an allowlisted-but-undriveable action refuses rather than silently doing
+  nothing.
 - **It refuses to mutate anything it cannot positively identify** as the
   synthetic lab visual: the four fixture categories and three series. An
   unrecognised report is a hard stop, not a warning.
@@ -46,6 +49,7 @@ Power BI must already be running with the debug port — see `README.md`.
 ```bash
 node experimentRunner.mjs --list
 node experimentRunner.mjs --experiment classic-size-sweep --out ./output/sweep
+node experimentRunner.mjs --experiment theme-size-matrix --out ./output/matrix
 ```
 
 Output is gitignored. It contains Power BI's own rendering.
@@ -125,9 +129,12 @@ full state it was measured under.
 
 ## What remains manual
 
-- **Theme switching.** Not automated — see `POWER_BI_CARTESIAN_DIFFERENTIAL.md`.
-  Report themes change responsive layout behaviour, so a sweep must state its
-  theme; the controller records a palette fingerprint with every measurement
-  so a result can never be filed under the wrong theme.
 - **Authoring the report.** One-off, and out of proportion to automate.
 - **Report zoom.** Not needed so far; every measurement is taken at 100%.
+- **Data edits.** Changing the fixture's values is out of scope by design.
+
+Theme switching **is** automated, through the Theme pane's own Base theme
+control. Report themes change responsive layout behaviour and not just
+styling, so every result carries the theme read back from that control
+immediately before it was measured — a variant that cannot be verified is
+failed rather than filed under a theme it might not have been rendered in.

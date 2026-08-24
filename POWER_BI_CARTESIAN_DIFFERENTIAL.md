@@ -223,6 +223,11 @@ the resolved theme and do not respond to the box at all.
 size, a small set of breakpoints, or an "Auto" formatting default is
 `UNKNOWN` — it needs several authored sizes to establish.)*
 
+*(§5.13 adds four more Fluent sizes: 14px at 600 × 600 and 12px at all five
+smaller tested sizes. The change is now **bracketed** between 600 and 300
+height rather than merely observed, but six samples still do not establish
+the rule.)*
+
 **3. Under Fluent, Power BI refuses to compress; it scrolls.** With 54px of
 plot and four categories it has 13.50px each, below its own 16px label line
 — so it draws **one** category, keeps `svgScrollable` (558 × 62) for the
@@ -388,8 +393,17 @@ either:
 
 These call for completely different work — (a) is a fallback correction,
 (b) is a new responsive behaviour — and they cannot be told apart without a
-**large** Classic visual. `UNKNOWN` until then, and no implementation should
-be chosen on the strength of a guess between them.
+~~**large** Classic visual. `UNKNOWN` until then, and no implementation should
+be chosen on the strength of a guess between them.~~
+
+> **Superseded — it is (a).** Large Classic visuals have since been measured:
+> §5.11 (600 × 600), §5.12 (twelve sizes) and §5.13 (six sizes under each of
+> two Classic bases). Classic 2026's category axis label is **12px at every
+> tested size**, from 600 × 600 down to 372 × 128, so it is a default rather
+> than a size-responsive value, and Theme Studio's 10pt/13.3333px fallback is
+> one point too large. That is §9 candidate 1, still not implemented here.
+> (Legend and axis *titles* do respond to height under Classic 2026 — the
+> category label is the part that does not.)
 
 ### 5.11 Classic at 600 × 600 — the Classic dataset completed
 
@@ -509,8 +523,13 @@ sweep tested one visual type, one dataset and one formatting state, and the
 true threshold lies somewhere between 400 × 225 and 450 × 250 rather than at
 either sampled point.
 
-Theme Studio's box is **372 × 128**, where native Classic draws 6 bars, 2
-categories, no legend and no value labels. Theme Studio draws all twelve
+§5.13 adds a second caveat: the "complete furniture set" is itself
+theme-resolved. Classic 2018 renders no axis titles at any size, so what
+counts as complete differs by theme, and this threshold is **Classic 2026's**
+against this fixture.
+
+Theme Studio's box is **372 × 128**, where native Classic 2026 draws 6 bars,
+2 categories, no legend and no value labels. Theme Studio draws all twelve
 bars, four categories, a legend and five value labels in that space.
 
 So there are two coherent directions, and this measurement is what makes
@@ -519,16 +538,32 @@ them a choice rather than a guess:
 - **grow the preview box** toward the 400–450 × 225–250 region, where native
   still shows everything Theme Studio shows; or
 - **adopt progressive decluttering**, and shed furniture at the same points
-  Classic does.
+  **Classic 2026** does — §5.13 measured Classic 2018 shedding at different
+  points, so there is no single "what Classic does" to copy.
 
 Neither is implemented. Both now have a measured basis.
 
 ### 5.13 Unattended theme × size matrix — 18 variants, no human
 
 Three base themes × six sizes, run by the lab controller with the theme
-switched through Power BI's own Base theme control and **verified by reading
-that control back** before any result was filed. Gap 10, 100% zoom, same
-fixture throughout. Restored and verified at the end.
+switched through Power BI's own Base theme control. **Every variant rereads
+that control immediately before it is measured**, and a variant whose reread
+is not the requested theme is failed rather than filed. Verifying once per
+theme and reusing the answer across its six sizes would attest to the theme
+at the top of the group rather than to the theme each measurement was taken
+under — a weaker guarantee than it sounds, and mislabelled measurements are
+what made an earlier dataset unusable. Gap 10, 100% zoom, same fixture
+throughout. Restored and verified at the end.
+
+The theme is still only *switched* when it changes, so the six sizes of a
+theme are measured without re-rendering the report between them. Only the
+reread repeats, and it is cheap next to a theme switch.
+
+**Run twice.** The matrix was first collected with the theme verified once
+per theme group, then re-collected end to end with the per-variant reread
+described above. 433 scalar measurements across the 18 variants, **zero
+differences**, all 18 verified against the control, restoration clean both
+times. The table below is the second run.
 
 | size | Classic 2026 | Classic 2018 | Fluent 2 |
 |---|---|---|---|
@@ -592,11 +627,22 @@ But that reading does not survive contact with the numbers. Classic 2018
 carries the **least** furniture (no axis titles, smallest text) and the
 **largest** plot, yet sheds **hardest** at 372×128 — 3 bars where Classic
 2026 keeps 6. Less to draw and more room to draw it in, and it still gives
-up sooner. Something beyond the resolved defaults differs.
+up sooner.
 
-That is as far as this evidence goes: it rules out the simple explanation
-without establishing what replaces it. `INFERENCE`, and a good candidate
-for the next controlled experiment.
+So the difference **cannot be explained by the measured typography, visible
+furniture and available plot area alone**. It does not follow that the cause
+lies outside theme-resolved defaults generally, and this evidence cannot
+show that: a minimum category thickness, a density or scroll threshold, a
+padding or layout default — any value a theme resolves and hands to a common
+renderer — would produce exactly this pattern, and none of them was measured
+here.
+
+Whether the remaining cause is another theme-resolved default or genuinely
+theme-conditional renderer logic **remains unknown**.
+
+`INFERENCE / UNKNOWN CAUSE`. The mechanism is deliberately deferred: it
+needs a controlled experiment varying one resolved default at a time, which
+is a different piece of work from this diagnostic.
 
 #### For Theme Studio
 
@@ -669,10 +715,10 @@ refuted — only shown not to hold under the hero transform.
 | Category `innerPadding` ≈ 55.2% | `INFERENCE` — outer padding unknown |
 | **Fluent** axis text is 12px at 600×206 and 14px at 600×600 | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
 | **Fluent** drops categories and scrolls rather than compressing | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
-| **Classic** crams all four categories instead | `STRONGLY-SUPPORTED` — manual observation, not yet instrumented |
+| **Classic 2026** crams all four categories at 600×206 instead | `PROVEN-EXPERIMENT` (§5.12) — instrumented; the original manual observation covered both Classic bases, but 2018 has not been measured at that exact size |
 | Report theme changes responsive layout, not just styling | `PROVEN-EXPERIMENT` — the two behaviours differ |
 | Theme Studio's text is lighter than native at matched aspect | `PROVEN-EXPERIMENT`, **`FLUENT-ONLY`** (§5.8) |
-| The rule behind Fluent's responsive axis text | `UNKNOWN` — two sizes sampled |
+| The rule behind Fluent's responsive axis text | `UNKNOWN` — six sizes sampled (§5.13); the change is bracketed between 600 and 300 height, but the rule is not established |
 | Classic renders 12px axis text at both 600×206 and 372×128 | `PROVEN-EXPERIMENT` |
 | Classic sheds legend, value labels and categories as the box shrinks | `PROVEN-EXPERIMENT` (§5.10) |
 | Theme Studio draws ~2× the furniture of native Classic at the same size | `PROVEN-EXPERIMENT` (§5.10) |
@@ -684,7 +730,8 @@ refuted — only shown not to hold under the hero transform.
 | Classic 2018 renders no axis titles and uses 10.667px labels | `PROVEN-EXPERIMENT` (§5.13) |
 | Classic 2018 sheds hardest despite carrying least furniture | `PROVEN-EXPERIMENT` (§5.13) |
 | `paddingInner` = 0.1 across 3 themes × 6 sizes | `PROVEN-EXPERIMENT` (§5.13) |
-| Whether shedding thresholds are a theme-conditional algorithm or resolved defaults | `INFERENCE` — the simple explanation is ruled out, the replacement is not established |
+| Shedding differs by theme beyond what measured typography, furniture and plot area explain | `INFERENCE` (§5.13) — those three are ruled out as a complete explanation |
+| Whether the remaining cause is another theme-resolved default or theme-conditional renderer logic | `UNKNOWN` — unmeasured defaults (minimum category thickness, density or scroll thresholds, padding) would produce the same pattern |
 | Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
 | The automatic axis maximum rule is theme-invariant (46→50 both themes) | `PROVEN-EXPERIMENT` |
 | Category `innerPadding` is theme-dependent: Classic 23.33%, Fluent 55.2% at the same size | `PROVEN-EXPERIMENT` |
@@ -770,8 +817,10 @@ twelve relevant lines and no noise.
 ## 8. Unresolved
 
 0. ~~**Repeat the native dataset under Classic.**~~ **Done** — §5.9, §5.10,
-   §5.11 cover 600×600, 600×206 and 372×128. Classic 2018 remains untested,
-   so whether both Classic bases share one density behaviour is still open.
+   §5.11 cover 600×600, 600×206 and 372×128. ~~Classic 2018 remains untested,
+   so whether both Classic bases share one density behaviour is still open.~~
+   **Superseded by §5.13:** Classic 2018 is now measured at six sizes, and the
+   two Classic bases do **not** share one density behaviour.
 
 1. **Untransformed Theme Studio painting** — the open half of §5.7.
 2. **The nice-number rule.** One sample (46 → 50). Distinguishing 1/2/5×10ⁿ
@@ -784,6 +833,12 @@ twelve relevant lines and no noise.
 5. **Native axis titles and data labels** — not measurable in the default
    state; needs a controlled formatting change.
 6. **Legend dimensions** — not comparable until sides match.
+7. **What makes Classic 2018 shed earliest** (§5.13). Measured typography,
+   visible furniture and plot area do not explain it. Whether an unmeasured
+   theme-resolved default (minimum category thickness, a density or scroll
+   threshold, padding) or theme-conditional renderer logic is responsible is
+   open, and deliberately deferred: it needs one resolved default varied at a
+   time.
 
 ---
 
@@ -809,10 +864,19 @@ Ranked by evidence strength × visible effect. None is done here.
    like-for-like divergence found, and it is a behaviour rather than a
    constant. Note this is **not** Fluent's scroll-to-one-category — Classic
    sheds furniture instead, which is the behaviour matching our baseline.
+   Scope it to **Classic 2026** specifically: §5.13 shows the two Classic
+   bases shed at different points, so "match Classic" is not one behaviour.
 
-2b. ~~**Responsive axis typography.**~~ **Withdrawn** for the same reason:
+2b. ~~**Responsive axis typography.** **Withdrawn** for the same reason:
    measured only under Fluent, and Fluent is demonstrably not representative
-   of Classic for size-responsive behaviour.
+   of Classic for size-responsive behaviour.~~ **The withdrawal reason is
+   superseded by §5.12 and §5.13**, which measured responsive typography under
+   all three themes: Classic 2026 holds the category label at 12px while
+   shrinking legend and axis titles at a height threshold, Classic 2018 shows
+   none at all, and Fluent shrinks the category label. It is no longer
+   unmeasured — but it is theme-specific, so it is a per-theme behaviour rather
+   than one rule. Still not implemented, and still ranked below the constants
+   above it.
 3. **`estimateText` calibration.** ~0.50 em rather than 0.55, or a real
    measurement. Well evidenced, small, affects every gutter.
 4. **Tick count.** Width-driven rather than a fixed 4.

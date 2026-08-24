@@ -147,9 +147,10 @@ export async function runExperiment(spec, { port = 9222, out = null } = {}) {
  *
  * Themes are the outer loop because switching one re-resolves every default
  * and re-renders from scratch, where a resize only re-lays out. Every result
- * carries the theme read back from the control, and a variant whose verified
- * theme is not the requested one is failed rather than filed -- silently
- * mislabelling a measurement is what made an earlier dataset unusable.
+ * carries the theme read back from Power BI's own control immediately before
+ * that result was measured, and a variant whose reread is not the requested
+ * theme is failed rather than filed -- silently mislabelling a measurement is
+ * what made an earlier dataset unusable.
  */
 export const MATRIX = {
   name: "theme-size-matrix",
@@ -165,59 +166,72 @@ export const MATRIX = {
   baseline: { gap: 10 },
 };
 
-export async function runMatrix(spec, { port = 9222, out = null } = {}) {
+/**
+ * `controller` is injectable so the loop's provenance rules can be tested
+ * without Power BI: which theme a result may be filed under, and what happens
+ * when the control disagrees, are decisions worth proving.
+ *
+ * @param {{ name: string, themes: string[], sizes: object[], baseline?: object }} spec
+ * @param {{ port?: number, out?: string | null, controller?: any }} [options]
+ */
+export async function runMatrix(spec, { port = 9222, out = null, controller = null } = {}) {
   const variants = expandMatrix(spec);
-  const controller = new LabController({ port });
+  const lab = controller ?? new LabController({ port });
   const results = [];
   let restoration = null;
 
-  await controller.open();
+  await lab.open();
   try {
-    let currentTheme = null;
-    let verifiedTheme = null;
+    // What the theme is BELIEVED to be. Used only to decide whether a switch
+    // is needed -- never to label a result.
+    let appliedTheme = null;
     for (const variant of variants) {
-      if (variant.theme !== currentTheme) {
-        process.stdout.write(`
-=== ${variant.theme} ===
-`);
-        const applied = await controller.setBaseTheme(variant.theme);
-        verifiedTheme = applied.theme;
-        currentTheme = variant.theme;
-      }
-      const check = checkVariantTheme(variant.theme, verifiedTheme);
       const size = `${variant.width}x${variant.height}`;
-      if (!check.ok) {
-        process.stdout.write(`  ${size}  FAILED: ${check.reason}
-`);
-        results.push({ theme: variant.theme, size, error: check.reason });
-        continue;
+      if (variant.theme !== appliedTheme) {
+        process.stdout.write(`\n=== ${variant.theme} ===\n`);
+        await lab.setBaseTheme(variant.theme);
+        appliedTheme = variant.theme;
       }
       try {
-        await controller.setVisualSize(variant.width, variant.height);
-        const m = await controller.measure();
+        await lab.setVisualSize(variant.width, variant.height);
+
+        // Reread the control for EVERY variant, immediately before measuring.
+        // Verifying once per theme and reusing that answer across six sizes
+        // would attest to the theme at the top of the group rather than to the
+        // theme this measurement was taken under, which is a weaker claim than
+        // it sounds. Nothing happens between this read and the measure below.
+        const verifiedTheme = await lab.readBaseTheme();
+        const check = checkVariantTheme(variant.theme, verifiedTheme);
+        if (!check.ok) {
+          // The belief is wrong, so force a fresh switch for the next variant
+          // rather than compounding it.
+          appliedTheme = null;
+          process.stdout.write(`  ${size}  FAILED: ${check.reason}\n`);
+          results.push({ theme: variant.theme, verifiedTheme, size, error: check.reason });
+          continue;
+        }
+
+        const m = await lab.measure();
         results.push({ theme: variant.theme, verifiedTheme, size, measurement: m });
         process.stdout.write(
           `  ${size.padEnd(9)} plot ${String(m.plotWidth).padStart(4)}x${String(Math.round(m.plotHeight)).padEnd(4)} ` +
             `bars ${String(m.barsRendered).padStart(2)} cats ${m.categoriesRendered} ` +
             `catPx ${m.categoryLabelFontPx} legend ${m.legendVisible ? m.legendFontPx : "none"} ` +
             `valLbl ${m.valueLabelCount} axisTitle ${m.categoryAxisTitleVisible ? m.axisTitleFontPx : "none"} ` +
-            `padInner ${m.paddingInner}
-`,
+            `padInner ${m.paddingInner}\n`,
         );
       } catch (error) {
-        process.stdout.write(`  ${size}  FAILED: ${error.message}
-`);
+        process.stdout.write(`  ${size}  FAILED: ${error.message}\n`);
         results.push({ theme: variant.theme, size, error: error.message });
       }
     }
   } finally {
-    restoration = await controller.restore();
-    controller.close();
+    restoration = await lab.restore();
+    lab.close();
   }
 
   const report = { experiment: spec.name, runAt: new Date().toISOString(), results, restoration };
-  if (out) console.log(`
-wrote ${await writeJson(out, `${spec.name}.json`, report)}`);
+  if (out) console.log(`\nwrote ${await writeJson(out, `${spec.name}.json`, report)}`);
   if (!restoration.restored) process.exitCode = 1;
   return report;
 }
@@ -229,6 +243,7 @@ async function main() {
     for (const [key, spec] of Object.entries(EXPERIMENTS)) {
       console.log(`  ${key.padEnd(20)} ${spec.variants.length} variants  ${spec.description}`);
     }
+    console.log(`  ${"theme-size-matrix".padEnd(20)} ${MATRIX.themes.length * MATRIX.sizes.length} variants  Every base theme at every size, each result verified against the theme control.`);
     console.log("\nfields captured per variant:\n  " + REPORT_FIELDS.join(", "));
     return;
   }
