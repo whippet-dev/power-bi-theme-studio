@@ -16,7 +16,13 @@
 
 import { pathToFileURL } from "node:url";
 import { LabController, writeJson } from "./lab-controller.mjs";
-import { detectBreakpoints, expandExperiment, summariseBreakpoints } from "./labActions.mjs";
+import {
+  checkVariantTheme,
+  detectBreakpoints,
+  expandExperiment,
+  expandMatrix,
+  summariseBreakpoints,
+} from "./labActions.mjs";
 
 /**
  * Built-in experiments. Declarative on purpose: a new sweep should be a data
@@ -136,6 +142,86 @@ export async function runExperiment(spec, { port = 9222, out = null } = {}) {
   return report;
 }
 
+/**
+ * The theme x size matrix.
+ *
+ * Themes are the outer loop because switching one re-resolves every default
+ * and re-renders from scratch, where a resize only re-lays out. Every result
+ * carries the theme read back from the control, and a variant whose verified
+ * theme is not the requested one is failed rather than filed -- silently
+ * mislabelling a measurement is what made an earlier dataset unusable.
+ */
+export const MATRIX = {
+  name: "theme-size-matrix",
+  themes: ["Classic 2026", "Classic 2018", "Fluent 2"],
+  sizes: [
+    { width: 600, height: 600 },
+    { width: 600, height: 300 },
+    { width: 600, height: 250 },
+    { width: 450, height: 250 },
+    { width: 400, height: 225 },
+    { width: 372, height: 128 },
+  ],
+  baseline: { gap: 10 },
+};
+
+export async function runMatrix(spec, { port = 9222, out = null } = {}) {
+  const variants = expandMatrix(spec);
+  const controller = new LabController({ port });
+  const results = [];
+  let restoration = null;
+
+  await controller.open();
+  try {
+    let currentTheme = null;
+    let verifiedTheme = null;
+    for (const variant of variants) {
+      if (variant.theme !== currentTheme) {
+        process.stdout.write(`
+=== ${variant.theme} ===
+`);
+        const applied = await controller.setBaseTheme(variant.theme);
+        verifiedTheme = applied.theme;
+        currentTheme = variant.theme;
+      }
+      const check = checkVariantTheme(variant.theme, verifiedTheme);
+      const size = `${variant.width}x${variant.height}`;
+      if (!check.ok) {
+        process.stdout.write(`  ${size}  FAILED: ${check.reason}
+`);
+        results.push({ theme: variant.theme, size, error: check.reason });
+        continue;
+      }
+      try {
+        await controller.setVisualSize(variant.width, variant.height);
+        const m = await controller.measure();
+        results.push({ theme: variant.theme, verifiedTheme, size, measurement: m });
+        process.stdout.write(
+          `  ${size.padEnd(9)} plot ${String(m.plotWidth).padStart(4)}x${String(Math.round(m.plotHeight)).padEnd(4)} ` +
+            `bars ${String(m.barsRendered).padStart(2)} cats ${m.categoriesRendered} ` +
+            `catPx ${m.categoryLabelFontPx} legend ${m.legendVisible ? m.legendFontPx : "none"} ` +
+            `valLbl ${m.valueLabelCount} axisTitle ${m.categoryAxisTitleVisible ? m.axisTitleFontPx : "none"} ` +
+            `padInner ${m.paddingInner}
+`,
+        );
+      } catch (error) {
+        process.stdout.write(`  ${size}  FAILED: ${error.message}
+`);
+        results.push({ theme: variant.theme, size, error: error.message });
+      }
+    }
+  } finally {
+    restoration = await controller.restore();
+    controller.close();
+  }
+
+  const report = { experiment: spec.name, runAt: new Date().toISOString(), results, restoration };
+  if (out) console.log(`
+wrote ${await writeJson(out, `${spec.name}.json`, report)}`);
+  if (!restoration.restored) process.exitCode = 1;
+  return report;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.list || !args.experiment) {
@@ -144,6 +230,10 @@ async function main() {
       console.log(`  ${key.padEnd(20)} ${spec.variants.length} variants  ${spec.description}`);
     }
     console.log("\nfields captured per variant:\n  " + REPORT_FIELDS.join(", "));
+    return;
+  }
+  if (args.experiment === "theme-size-matrix") {
+    await runMatrix(MATRIX, { port: args.port, out: args.out });
     return;
   }
   const spec = EXPERIMENTS[args.experiment];

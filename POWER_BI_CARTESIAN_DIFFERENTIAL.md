@@ -523,6 +523,87 @@ them a choice rather than a guess:
 
 Neither is implemented. Both now have a measured basis.
 
+### 5.13 Unattended theme × size matrix — 18 variants, no human
+
+Three base themes × six sizes, run by the lab controller with the theme
+switched through Power BI's own Base theme control and **verified by reading
+that control back** before any result was filed. Gap 10, 100% zoom, same
+fixture throughout. Restored and verified at the end.
+
+| size | Classic 2026 | Classic 2018 | Fluent 2 |
+|---|---|---|---|
+| 600×600 | 486×486, 12 bars, 4 cats | 515×516, 12, 4 | 471×443, 12, 4 |
+| 600×300 | 486×186, 12, 4 | 515×216, 12, 4 | 483×148, 12, 4 |
+| 600×250 | 490×141, 12, 4 | 515×166, 12, 4 | 483×98, 12, 4 |
+| 450×250 | 340×141, 12, 4 | 365×166, 12, 4 | 333×98, 12, 4 |
+| 400×225 | 290×97, 12, 4 | 315×141, 12, 4 | 275×73, **6, 2** |
+| 372×128 | 256×61, **6, 2** | 279×44, **3, 1** | 247×52, **3, 1** |
+
+Typography, across all six sizes of each theme:
+
+| | category label | legend | axis titles |
+|---|---|---|---|
+| Classic 2026 | **12px** throughout | 13.333 → 12 at height 250 | **rendered**, 16 → 12 at height 250 |
+| Classic 2018 | **10.667px** throughout | **10.667px** throughout | **never rendered** |
+| Fluent 2 | **14px** at 600×600, 12 below | 14 → 12 | **never rendered** |
+
+#### The two Classic themes do NOT share density behaviour
+
+This was the open question, and the answer is no. Classic 2018 differs from
+Classic 2026 more than it resembles it:
+
+- **no axis titles at all**, where 2026 renders both;
+- category labels at **10.667px (8pt)** against 2026's 12px (9pt);
+- **six** value labels where 2026 draws three;
+- a **larger plot** at every size (515×516 vs 486×486 at 600×600), which
+  follows from not spending space on axis titles;
+- and it sheds *harder* at the smallest size — down to **3 bars and one
+  category** where 2026 keeps 6 and 2.
+
+On shedding behaviour Classic 2018 is closer to Fluent 2 than to Classic
+2026. "The Classic themes behave one way and Fluent another" is not true.
+
+#### Responsive typography is theme-specific too
+
+Classic 2026 holds its category label fixed while shrinking legend and axis
+titles at a height threshold. Classic 2018 shows **no responsive typography
+at all** across the tested range. Fluent 2 shrinks its category label
+between 600 and 300 height, which neither Classic does.
+
+#### `paddingInner` = 0.1 in all eighteen variants
+
+Three themes, six sizes, every one exactly 0.100000. Together with the gap
+experiment (§7.1, and its automated repeat) this is the most heavily
+confirmed finding in the investigation, and the one Theme Studio already
+implements correctly.
+
+#### Theme-resolved default, or different algorithm?
+
+Worth separating, and the matrix does not fully separate them.
+
+Axis-title visibility and font sizes are plainly **theme-resolved defaults**:
+a theme sets them, and the same renderer then draws what it was told. The
+*shedding thresholds* are less clear. A theme that renders axis titles and
+larger text has less room left, so it may shed earlier for entirely
+ordinary reasons — which would make one algorithm with different inputs,
+not a theme-conditional algorithm.
+
+But that reading does not survive contact with the numbers. Classic 2018
+carries the **least** furniture (no axis titles, smallest text) and the
+**largest** plot, yet sheds **hardest** at 372×128 — 3 bars where Classic
+2026 keeps 6. Less to draw and more room to draw it in, and it still gives
+up sooner. Something beyond the resolved defaults differs.
+
+That is as far as this evidence goes: it rules out the simple explanation
+without establishing what replaces it. `INFERENCE`, and a good candidate
+for the next controlled experiment.
+
+#### For Theme Studio
+
+Its baseline is Classic 2026, which renders axis titles and holds its
+category label at 12px — so the earlier findings against that theme stand,
+and the fallback comparisons in §5.10 and §5.11 are unaffected.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -599,6 +680,11 @@ refuted — only shown not to hold under the hero transform.
 | Classic legend and axis titles shrink at a height threshold between 250 and 300 | `PROVEN-EXPERIMENT` (§5.12) |
 | Classic sheds furniture in order: value labels, then legend, then categories | `PROVEN-EXPERIMENT` (§5.12) |
 | 450×250 is the smallest **tested** size retaining the full native furniture set, for this visual and fixture | `PROVEN-EXPERIMENT` (§5.12) |
+| Classic 2026 and Classic 2018 do **not** share density behaviour | `PROVEN-EXPERIMENT` (§5.13) |
+| Classic 2018 renders no axis titles and uses 10.667px labels | `PROVEN-EXPERIMENT` (§5.13) |
+| Classic 2018 sheds hardest despite carrying least furniture | `PROVEN-EXPERIMENT` (§5.13) |
+| `paddingInner` = 0.1 across 3 themes × 6 sizes | `PROVEN-EXPERIMENT` (§5.13) |
+| Whether shedding thresholds are a theme-conditional algorithm or resolved defaults | `INFERENCE` — the simple explanation is ruled out, the replacement is not established |
 | Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
 | The automatic axis maximum rule is theme-invariant (46→50 both themes) | `PROVEN-EXPERIMENT` |
 | Category `innerPadding` is theme-dependent: Classic 23.33%, Fluent 55.2% at the same size | `PROVEN-EXPERIMENT` |
