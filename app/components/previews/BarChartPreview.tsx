@@ -15,19 +15,29 @@ import {
   ZoomSliders,
 } from "../ChartParts";
 import { constantLineGeometry } from "../../lib/constantLine";
-import { BAR_DATA_MAX, barCategories } from "../../lib/previewSampleData";
+import {
+  CLUSTERED_DATA_MAX,
+  VALUE_SCALE,
+  barCategories,
+  cartesianFixture,
+  seriesColor,
+} from "../../lib/previewSampleData";
+import { clusteredSeriesBands } from "../../lib/seriesBands";
 import { BAR_CHART_BOX, categoryPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
-import { barThickness } from "./chartPrimitives";
 import type { ResolvedBarChartStyle } from "../../lib/barChartProperties";
 
-type Props = { barChartStyle: ResolvedBarChartStyle };
+type Props = { barChartStyle: ResolvedBarChartStyle; palette: string[] };
 
-export function BarChartPreview({ barChartStyle }: Props) {
-  // Series shown in every cartesian chart's legend. Clustered charts show
-  // one series; the stacked variants show the two they actually draw.
-  const singleSeries = [{ label: "Applications", color: barChartStyle.dataPoint.fill }];
+export function BarChartPreview({ barChartStyle, palette }: Props) {
+  // The legend describes the series the chart actually draws. It used to
+  // carry one synthetic "Applications" entry while the chart drew one bar,
+  // which made the legend properties unreviewable against a real cluster.
+  const legendItems = cartesianFixture.series.map((series, index) => ({
+    label: series.label,
+    color: seriesColor(palette, index, barChartStyle.dataPoint.fill),
+  }));
 
-  const legendNode = <ChartLegend legend={barChartStyle.legend} items={singleSeries} />;
+  const legendNode = <ChartLegend legend={barChartStyle.legend} items={legendItems} />;
   const legendAtBottom = legendIsAfterPlot(barChartStyle.legend.position);
   const legendVertical = legendIsVertical(barChartStyle.legend.position);
 
@@ -40,11 +50,25 @@ export function BarChartPreview({ barChartStyle }: Props) {
     orientation: "horizontal",
     categoryAxis: barChartStyle.categoryAxis,
     valueAxis: barChartStyle.valueAxis,
-    categories: barCategories.map(([label]) => label),
-    dataMax: BAR_DATA_MAX,
+    categories: barCategories,
+    // Clustered: each series is drawn from the baseline, so the axis has to
+    // reach the largest single value, not the category total a stacked
+    // chart would accumulate.
+    dataMax: CLUSTERED_DATA_MAX,
     innerPadding: barChartStyle.categoryAxis.innerPadding,
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: "Region",
+  });
+
+  // One band per series, as percentages of a category slot. `innerPadding`
+  // has already been taken off by ChartLayout, which is the same order Power
+  // BI applies: `categoryWidth = categoryThickness * (1 - innerPaddingRatio)`,
+  // then the series band scale runs across that.
+  const seriesBands = clusteredSeriesBands({
+    extent: 100,
+    seriesCount: cartesianFixture.series.length,
+    gapSize: barChartStyle.layout.clusteredGapSize,
+    overlaps: barChartStyle.layout.clusteredGapOverlaps,
   });
 
   const categoryGutter = layout.categoryAxis?.width ?? 0;
@@ -63,7 +87,7 @@ export function BarChartPreview({ barChartStyle }: Props) {
    * two mounts cannot disagree about where the line is.
    */
   const referenceLine = barChartStyle.referenceLine;
-  const referenceGeometry = constantLineGeometry(referenceLine, layout, barChartStyle.valueAxis, BAR_DATA_MAX);
+  const referenceGeometry = constantLineGeometry(referenceLine, layout, barChartStyle.valueAxis, CLUSTERED_DATA_MAX);
   const referenceLineAt = (layer: "back" | "front") => (
     <ConstantLine
       line={referenceLine}
@@ -111,56 +135,67 @@ export function BarChartPreview({ barChartStyle }: Props) {
                 />
               )}
 
-              {barCategories.map(([label, value], index) => {
+              {barCategories.map((label, index) => {
                 const { offset: top, size: height } = categoryPercent(layout, index, barCategories.length);
-                const endPct = valueFraction(layout, value * 1000) * 100;
-                const width = Math.abs(endPct - zeroPct);
-                const left = Math.min(endPct, zeroPct);
                 return (
                   <span className="bar-item" key={label} style={{ top: `${top}%`, height: `${height}%` }}>
-                    <span
-                      className="bar-item__fill"
-                      style={{
-                        left: `${left}%`,
-                        width: `${width}%`,
-                        // Gap size thins the bar within its slot; 0 keeps the
-                        // Power BI default rather than collapsing the bar.
-                        height: barThickness(barChartStyle.layout.clusteredGapSize),
-                        backgroundColor: hexWithAlpha(barChartStyle.dataPoint.fill, barChartStyle.dataPoint.fillTransparency),
-                        border: barChartStyle.dataPoint.borderShow
-                          ? `${barChartStyle.dataPoint.borderSize}px solid ${hexWithAlpha(
-                              barChartStyle.dataPoint.borderColorMatchFill ? barChartStyle.dataPoint.fill : barChartStyle.dataPoint.borderColor,
-                              barChartStyle.dataPoint.borderTransparency,
-                            )}`
-                          : undefined,
-                        // "Outline only" draws the border and drops the fill.
-                        ...(barChartStyle.dataPoint.borderOutlineOnly ? { backgroundColor: "transparent" } : {}),
-                      }}
-                    />
-                    {index === 0 && barChartStyle.error.enabled && barChartStyle.error.barShow && (
-                      <span
-                        className="bar-item__error"
-                        aria-hidden="true"
-                        title="Error bars are enabled — representative indicator, not a data-fit range"
-                        style={{ left: `${endPct}%` }}
-                      >
-                        <span
-                          style={{
-                            height: `${barChartStyle.error.barWidth}px`,
-                            backgroundColor: barChartStyle.error.barColor,
-                            border: `${barChartStyle.error.barBorderSize}px solid ${barChartStyle.error.barBorderColor}`,
-                          }}
-                        />
-                      </span>
-                    )}
-                    {labelVisibleAt(index, barCategories.length, barChartStyle.labels.labelDensity) && (
-                      <span
-                        className={`bar-item__value${labelIsInside(barChartStyle.labels.labelPosition) ? " bar-item__value--inside" : ""}`}
-                        style={{ left: `${endPct}%` }}
-                      >
-                        <DataLabel labels={barChartStyle.labels} category={label} value={value * 1000} detail={value * 12} />
-                      </span>
-                    )}
+                    {cartesianFixture.series.map((series, seriesIndex) => {
+                      // Bands are percentages of this category slot, so the
+                      // slot's own geometry stays with ChartLayout and only
+                      // the subdivision lives here.
+                      const band = seriesBands[seriesIndex];
+                      const value = series.values[index] ?? 0;
+                      const endPct = valueFraction(layout, value * VALUE_SCALE) * 100;
+                      const width = Math.abs(endPct - zeroPct);
+                      const left = Math.min(endPct, zeroPct);
+                      const fill = seriesColor(palette, seriesIndex, barChartStyle.dataPoint.fill);
+                      return (
+                        <span key={series.key}>
+                          <span
+                            className="bar-item__fill"
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              top: `${band.offset}%`,
+                              height: `${band.size}%`,
+                              backgroundColor: hexWithAlpha(fill, barChartStyle.dataPoint.fillTransparency),
+                              border: barChartStyle.dataPoint.borderShow
+                                ? `${barChartStyle.dataPoint.borderSize}px solid ${hexWithAlpha(
+                                    barChartStyle.dataPoint.borderColorMatchFill ? fill : barChartStyle.dataPoint.borderColor,
+                                    barChartStyle.dataPoint.borderTransparency,
+                                  )}`
+                                : undefined,
+                              // "Outline only" draws the border and drops the fill.
+                              ...(barChartStyle.dataPoint.borderOutlineOnly ? { backgroundColor: "transparent" } : {}),
+                            }}
+                          />
+                          {index === 0 && seriesIndex === 0 && barChartStyle.error.enabled && barChartStyle.error.barShow && (
+                            <span
+                              className="bar-item__error"
+                              aria-hidden="true"
+                              title="Error bars are enabled — representative indicator, not a data-fit range"
+                              style={{ left: `${endPct}%`, top: `${band.offset + band.size / 2}%` }}
+                            >
+                              <span
+                                style={{
+                                  height: `${barChartStyle.error.barWidth}px`,
+                                  backgroundColor: barChartStyle.error.barColor,
+                                  border: `${barChartStyle.error.barBorderSize}px solid ${barChartStyle.error.barBorderColor}`,
+                                }}
+                              />
+                            </span>
+                          )}
+                          {labelVisibleAt(index, barCategories.length, barChartStyle.labels.labelDensity) && (
+                            <span
+                              className={`bar-item__value${labelIsInside(barChartStyle.labels.labelPosition) ? " bar-item__value--inside" : ""}`}
+                              style={{ left: `${endPct}%`, top: `${band.offset + band.size / 2}%` }}
+                            >
+                              <DataLabel labels={barChartStyle.labels} category={series.label} value={value * VALUE_SCALE} detail={value * 12} />
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </span>
                 );
               })}
@@ -171,7 +206,7 @@ export function BarChartPreview({ barChartStyle }: Props) {
             <CategoryAxisGutter
               axis={barChartStyle.categoryAxis}
               layout={layout}
-              categories={barCategories.map(([label]) => label)}
+              categories={barCategories}
               offset={valueGutter}
               titleFallback="Region"
             />

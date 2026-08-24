@@ -11,26 +11,30 @@ import {
   ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
-import { BAR_DATA_MAX, barCategories, stackedSegmentColor, stackedSegmentShare } from "../../lib/previewSampleData";
+import {
+  STACKED_DATA_MAX,
+  VALUE_SCALE,
+  barCategories,
+  cartesianFixture,
+  categoryValues,
+  seriesColor,
+} from "../../lib/previewSampleData";
+import { stackSegments } from "../../lib/seriesBands";
 import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
-import { barThickness } from "./chartPrimitives";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
 type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[] };
 
 export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: Props) {
-  // Was a single `stackedSegment` shared with the stacked bar chart in the
-  // old VisualGallery body. Same expression, same palette, now computed
-  // per component so neither can reach into the other's locals.
-  const stackedSegment = stackedSegmentColor(palette);
-
+  // The transpose of the stacked bar chart, from the same fixture series
+  // and the same palette slots, so a swatch means the same thing in both.
   const stackedColumnLegendNode = (
     <ChartLegend
       legend={stackedColumnChartStyle.legend}
-      items={[
-        { label: "Approved", color: stackedColumnChartStyle.dataPoint.fill },
-        { label: "In review", color: stackedSegment },
-      ]}
+      items={cartesianFixture.series.map((series, index) => ({
+        label: series.label,
+        color: seriesColor(palette, index, stackedColumnChartStyle.dataPoint.fill),
+      }))}
     />
   );
   const stackedColumnLegendAtBottom = legendIsAfterPlot(stackedColumnChartStyle.legend.position);
@@ -44,8 +48,8 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
     orientation: "vertical",
     categoryAxis: stackedColumnChartStyle.categoryAxis,
     valueAxis: stackedColumnChartStyle.valueAxis,
-    categories: barCategories.map(([label]) => label),
-    dataMax: BAR_DATA_MAX,
+    categories: barCategories,
+    dataMax: STACKED_DATA_MAX,
     innerPadding: stackedColumnChartStyle.categoryAxis.innerPadding,
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: "Region",
@@ -53,7 +57,6 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
 
   const valueGutter = layout.valueAxis?.width ?? 0;
   const categoryGutter = layout.categoryAxis?.height ?? 0;
-  const zeroPct = valueFraction(layout, 0) * 100;
 
   return (
     <span
@@ -89,11 +92,11 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
                 />
               )}
 
-              {barCategories.map(([label, value], index) => {
+              {barCategories.map((label, index) => {
                 const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
-                const topPct = valueFraction(layout, value * 1000) * 100;
-                const height = Math.abs(topPct - zeroPct);
-                const bottom = Math.min(topPct, zeroPct);
+                const segments = stackSegments(categoryValues(cartesianFixture, index));
+                const total = segments.length ? segments[segments.length - 1].end : 0;
+                const topPct = valueFraction(layout, total * VALUE_SCALE) * 100;
                 return (
                   <span className="column-item" key={label} style={{ left: `${left}%`, width: `${width}%` }}>
                     {stackedColumnChartStyle.totals.show && (
@@ -113,29 +116,39 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
                         }}
                       >
                         {formatValue(
-                          value * 1000,
+                          total * VALUE_SCALE,
                           stackedColumnChartStyle.totals.labelDisplayUnits,
                           stackedColumnChartStyle.totals.labelPrecision,
                         )}
                       </span>
                     )}
+                    {segments.map((segment, seriesIndex) => {
+                      const startPct = valueFraction(layout, segment.start * VALUE_SCALE) * 100;
+                      const stopPct = valueFraction(layout, segment.end * VALUE_SCALE) * 100;
+                      const series = cartesianFixture.series[seriesIndex];
+                      return (
                     <span
+                      key={series.key}
                       className="column-item__fill"
                       style={{
-                        bottom: `${bottom}%`,
-                        height: `${height}%`,
-                        width: barThickness(stackedColumnChartStyle.layout.stackedGapSize),
+                        bottom: `${Math.min(startPct, stopPct)}%`,
+                        height: `${Math.abs(stopPct - startPct)}%`,
+                        // Full category band: Power BI's stack thickness is
+                        // a single-band `categoryBandScale.bandwidth()`.
+                        // `stackedGapSize` displaces segments along the
+                        // VALUE axis, and only under `stackedGapExplodes`,
+                        // which this app does not model.
+                        left: 0,
+                        width: "100%",
                         opacity: 1 - stackedColumnChartStyle.dataPoint.fillTransparency / 100,
-                        // The 62% split stays exactly as it was: a known
-                        // fiction (RENDERER_AUDIT §4.2), and sample-data work
-                        // for a later phase. T7 only fixes where the column
-                        // sits, not what it claims to contain.
-                        background: `linear-gradient(to top, ${stackedColumnChartStyle.dataPoint.fill} 0%, ${stackedColumnChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegment} ${stackedSegmentShare}%, ${stackedSegment} 100%)`,
+                        backgroundColor: seriesColor(palette, seriesIndex, stackedColumnChartStyle.dataPoint.fill),
                         border: stackedColumnChartStyle.dataPoint.borderShow
                           ? `${stackedColumnChartStyle.dataPoint.borderSize}px solid ${stackedColumnChartStyle.dataPoint.borderColor}`
                           : undefined,
                       }}
                     />
+                      );
+                    })}
                     {index === 0 && stackedColumnChartStyle.error.enabled && stackedColumnChartStyle.error.barShow && (
                       <span
                         className="column-item__error"
@@ -160,7 +173,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
             <CategoryAxisGutter
               axis={stackedColumnChartStyle.categoryAxis}
               layout={layout}
-              categories={barCategories.map(([label]) => label)}
+              categories={barCategories}
               offset={valueGutter}
               titleFallback="Region"
             />

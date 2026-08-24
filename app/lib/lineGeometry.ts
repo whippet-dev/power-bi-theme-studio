@@ -99,3 +99,29 @@ export function markerShape(shape: string, size: number): MarkerShape {
       return { kind: "circle", r };
   }
 }
+
+/**
+ * One series' points as percentages of the plot, for the HTML overlays that
+ * sit on top of the SVG (markers, labels, leaders).
+ *
+ * Takes the scales as functions rather than a `ChartLayout` so it stays pure
+ * and stays honest: every series is handed the SAME two closures, so a series
+ * cannot end up on its own scale. That is the property worth protecting here
+ * — the line chart has one ChartLayout, one category scale and one value
+ * scale, and only the values differ.
+ *
+ * Callers derive marker positions from this rather than repeating the
+ * conversion, so a marker cannot drift from the path it belongs to.
+ */
+export function seriesPointPercents(
+  values: readonly number[],
+  categoryCentrePercent: (index: number) => number,
+  valueFraction: (value: number) => number,
+): Array<{ left: number; top: number }> {
+  return values.map((value, index) => ({
+    left: categoryCentrePercent(index),
+    // Percentages run down from the plot's top edge; the value fraction runs
+    // up from its floor, so one of them has to be inverted exactly once.
+    top: (1 - valueFraction(value)) * 100,
+  }));
+}

@@ -98,18 +98,3 @@ export function chartMarker(
   );
 }
 
-/**
- * A bar or column's thickness, as a share of the category slot
- * `scale.category` gives it. Power BI's gap is the share of each slot left
- * empty, so a larger gap means a thinner mark; 0 keeps the built-in default
- * rather than a full-width one.
- *
- * BAR_VALUE_AXIS_INSET used to live here too — `{ start: 68 + 8, end: 8 + 28 }`,
- * hand-copied from `.bar-row`'s grid template so gridlines could be inset to
- * the track column. T8 deleted it: the bar chart no longer derives geometry
- * from a CSS grid, so there is no second source of truth left to copy.
- */
-export function barThickness(gapSize: number): string {
-  const gap = Math.max(0, Math.min(90, gapSize || 20));
-  return `${100 - gap}%`;
-}

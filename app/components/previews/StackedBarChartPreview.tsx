@@ -10,21 +10,28 @@ import {
   ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
-import { BAR_DATA_MAX, barCategories, stackedSegmentColor, stackedSegmentShare } from "../../lib/previewSampleData";
+import {
+  STACKED_DATA_MAX,
+  VALUE_SCALE,
+  barCategories,
+  cartesianFixture,
+  categoryValues,
+  seriesColor,
+} from "../../lib/previewSampleData";
+import { stackSegments } from "../../lib/seriesBands";
 import { BAR_CHART_BOX, categoryPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
-import { barThickness } from "./chartPrimitives";
 import type { ResolvedStackedBarChartStyle } from "../../lib/stackedBarChartProperties";
 
 type Props = { stackedBarChartStyle: ResolvedStackedBarChartStyle; palette: string[] };
 
 export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props) {
-  const stackedSegment = stackedSegmentColor(palette);
-
-  // Stacked charts genuinely draw two series, so their legend lists both.
-  const stackedBarSeries = [
-    { label: "Approved", color: stackedBarChartStyle.dataPoint.fill },
-    { label: "In review", color: stackedSegment },
-  ];
+  // Every legend entry has a segment and every segment has an entry: both
+  // come from the same fixture series, in the same order, with the same
+  // palette slots the clustered charts use.
+  const stackedBarSeries = cartesianFixture.series.map((series, index) => ({
+    label: series.label,
+    color: seriesColor(palette, index, stackedBarChartStyle.dataPoint.fill),
+  }));
   const stackedBarLegendNode = <ChartLegend legend={stackedBarChartStyle.legend} items={stackedBarSeries} />;
   const stackedBarLegendAtBottom = legendIsAfterPlot(stackedBarChartStyle.legend.position);
   const stackedBarLegendVertical = legendIsVertical(stackedBarChartStyle.legend.position);
@@ -37,8 +44,8 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
     orientation: "horizontal",
     categoryAxis: stackedBarChartStyle.categoryAxis,
     valueAxis: stackedBarChartStyle.valueAxis,
-    categories: barCategories.map(([label]) => label),
-    dataMax: BAR_DATA_MAX,
+    categories: barCategories,
+    dataMax: STACKED_DATA_MAX,
     innerPadding: stackedBarChartStyle.categoryAxis.innerPadding,
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: "Region",
@@ -46,7 +53,6 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
 
   const categoryGutter = layout.categoryAxis?.width ?? 0;
   const valueGutter = layout.valueAxis?.height ?? 0;
-  const zeroPct = valueFraction(layout, 0) * 100;
 
   return (
     <span
@@ -82,30 +88,44 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
                 />
               )}
 
-              {barCategories.map(([label, value], index) => {
+              {barCategories.map((label, index) => {
                 const { offset: top, size: height } = categoryPercent(layout, index, barCategories.length);
-                const endPct = valueFraction(layout, value * 1000) * 100;
-                const width = Math.abs(endPct - zeroPct);
-                const left = Math.min(endPct, zeroPct);
+                // Real segments from real values. The stack runs from zero
+                // to the category total, and each series owns the span
+                // between the running total before it and after it.
+                const segments = stackSegments(categoryValues(cartesianFixture, index));
+                const total = segments.length ? segments[segments.length - 1].end : 0;
+                const endPct = valueFraction(layout, total * VALUE_SCALE) * 100;
                 return (
                   <span className="bar-item" key={label} style={{ top: `${top}%`, height: `${height}%` }}>
-                    <span
-                      className="bar-item__fill"
-                      style={{
-                        left: `${left}%`,
-                        width: `${width}%`,
-                        height: barThickness(stackedBarChartStyle.layout.stackedGapSize),
-                        opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
-                        // The 62% split stays exactly as it was: a known
-                        // fiction (RENDERER_AUDIT §4.2), and sample-data work
-                        // for a later phase. T8 fixes where the bar starts
-                        // and ends, not what it claims to contain.
-                        background: `linear-gradient(to right, ${stackedBarChartStyle.dataPoint.fill} 0%, ${stackedBarChartStyle.dataPoint.fill} ${stackedSegmentShare}%, ${stackedSegment} ${stackedSegmentShare}%, ${stackedSegment} 100%)`,
-                        border: stackedBarChartStyle.dataPoint.borderShow
-                          ? `${stackedBarChartStyle.dataPoint.borderSize}px solid ${stackedBarChartStyle.dataPoint.borderColor}`
-                          : undefined,
-                      }}
-                    />
+                    {segments.map((segment, seriesIndex) => {
+                      const startPct = valueFraction(layout, segment.start * VALUE_SCALE) * 100;
+                      const stopPct = valueFraction(layout, segment.end * VALUE_SCALE) * 100;
+                      const series = cartesianFixture.series[seriesIndex];
+                      return (
+                        <span
+                          key={series.key}
+                          className="bar-item__fill"
+                          style={{
+                            left: `${Math.min(startPct, stopPct)}%`,
+                            width: `${Math.abs(stopPct - startPct)}%`,
+                            // The stack fills its category band. Power BI's
+                            // stack thickness is `categoryBandScale.bandwidth()`
+                            // over a single band, so it is the whole slot;
+                            // `stackedGapSize` displaces segments along the
+                            // VALUE axis and only when `stackedGapExplodes`
+                            // is on, which this app does not model.
+                            top: 0,
+                            height: "100%",
+                            opacity: 1 - stackedBarChartStyle.dataPoint.fillTransparency / 100,
+                            backgroundColor: seriesColor(palette, seriesIndex, stackedBarChartStyle.dataPoint.fill),
+                            border: stackedBarChartStyle.dataPoint.borderShow
+                              ? `${stackedBarChartStyle.dataPoint.borderSize}px solid ${stackedBarChartStyle.dataPoint.borderColor}`
+                              : undefined,
+                          }}
+                        />
+                      );
+                    })}
                     {index === 0 && stackedBarChartStyle.error.enabled && stackedBarChartStyle.error.barShow && (
                       <span
                         className="bar-item__error"
@@ -128,7 +148,7 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
                         style={{ ...dataLabelStyle(stackedBarChartStyle.totals), left: `${endPct}%` }}
                       >
                         {formatValue(
-                          value * 1000,
+                          total * VALUE_SCALE,
                           stackedBarChartStyle.totals.labelDisplayUnits,
                           stackedBarChartStyle.totals.labelPrecision,
                         )}
@@ -142,7 +162,7 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
             <CategoryAxisGutter
               axis={stackedBarChartStyle.categoryAxis}
               layout={layout}
-              categories={barCategories.map(([label]) => label)}
+              categories={barCategories}
               offset={valueGutter}
               titleFallback="Region"
             />

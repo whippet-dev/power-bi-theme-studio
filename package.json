@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "start": "vite preview",
-    "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.mjs\"",
+    "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.tsx\" \"tests/**/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist"
   },
   "dependencies": {

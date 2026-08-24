@@ -842,19 +842,19 @@ export function VisualGallery({
     </span>
   );
 
-  const barContent = <BarChartPreview barChartStyle={barChartStyle} />;
+  const barContent = <BarChartPreview barChartStyle={barChartStyle} palette={palette} />;
 
 
   const stackedBarContent = <StackedBarChartPreview stackedBarChartStyle={stackedBarChartStyle} palette={palette} />;
 
 
-  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} />;
+  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} />;
 
 
   const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} />;
 
 
-  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} />;
+  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} />;
   // The line chart's small-multiples wrapper lives with the other four in
   // the descriptors below, so these three stay here rather than moving
   // into the component. Same values, read straight off the resolved style.

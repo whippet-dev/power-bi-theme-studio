@@ -11,16 +11,31 @@ import {
   ValueAxisGutter,
   ZoomSliders,
 } from "../ChartParts";
-import { BAR_DATA_MAX, barCategories } from "../../lib/previewSampleData";
+import {
+  CLUSTERED_DATA_MAX,
+  VALUE_SCALE,
+  barCategories,
+  cartesianFixture,
+  seriesColor,
+} from "../../lib/previewSampleData";
+import { clusteredSeriesBands } from "../../lib/seriesBands";
 import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
-import { barThickness } from "./chartPrimitives";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
-type Props = { columnChartStyle: ResolvedColumnChartStyle };
+type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[] };
 
-export function ColumnChartPreview({ columnChartStyle }: Props) {
+export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
+  // Same series, same colours and the same band model as the clustered
+  // bar chart. This chart is its transpose, so it must not compute its
+  // own version of either.
   const columnLegendNode = (
-    <ChartLegend legend={columnChartStyle.legend} items={[{ label: "Applications", color: columnChartStyle.dataPoint.fill }]} />
+    <ChartLegend
+      legend={columnChartStyle.legend}
+      items={cartesianFixture.series.map((series, index) => ({
+        label: series.label,
+        color: seriesColor(palette, index, columnChartStyle.dataPoint.fill),
+      }))}
+    />
   );
   const columnLegendAtBottom = legendIsAfterPlot(columnChartStyle.legend.position);
   const columnLegendVertical = legendIsVertical(columnChartStyle.legend.position);
@@ -34,14 +49,23 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
     orientation: "vertical",
     categoryAxis: columnChartStyle.categoryAxis,
     valueAxis: columnChartStyle.valueAxis,
-    categories: barCategories.map(([label]) => label),
-    dataMax: BAR_DATA_MAX,
+    categories: barCategories,
+    dataMax: CLUSTERED_DATA_MAX,
     innerPadding: columnChartStyle.categoryAxis.innerPadding,
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: "Region",
   });
 
   const valueGutter = layout.valueAxis?.width ?? 0;
+
+  // One band per series across a category slot, identical to the bar
+  // chart's; only the axis it is applied to differs.
+  const seriesBands = clusteredSeriesBands({
+    extent: 100,
+    seriesCount: cartesianFixture.series.length,
+    gapSize: columnChartStyle.layout.clusteredGapSize,
+    overlaps: columnChartStyle.layout.clusteredGapOverlaps,
+  });
   const categoryGutter = layout.categoryAxis?.height ?? 0;
   // Zero's height above the plot floor, as a percentage of the plot. Every
   // column and the error indicator measure from this, so the baseline is
@@ -101,16 +125,23 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
                 />
               )}
 
-              {barCategories.map(([label, value], index) => {
+              {barCategories.map((label, index) => {
                 const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
-                const topPct = valueFraction(layout, value * 1000) * 100;
-                const height = Math.abs(topPct - zeroPct);
-                const bottom = Math.min(topPct, zeroPct);
                 return (
                   <span className="column-item" key={label} style={{ left: `${left}%`, width: `${width}%` }}>
+                    {cartesianFixture.series.map((series, seriesIndex) => {
+                      const band = seriesBands[seriesIndex];
+                      const value = series.values[index] ?? 0;
+                      const topPct = valueFraction(layout, value * VALUE_SCALE) * 100;
+                      const height = Math.abs(topPct - zeroPct);
+                      const bottom = Math.min(topPct, zeroPct);
+                      const fill = seriesColor(palette, seriesIndex, columnChartStyle.dataPoint.fill);
+                      const centre = band.offset + band.size / 2;
+                      return (
+                        <span key={series.key}>
                     {labelVisibleAt(index, barCategories.length, columnChartStyle.labels.labelDensity) && (
-                      <span className="column-item__value" style={{ bottom: `${topPct}%` }}>
-                        <DataLabel labels={columnChartStyle.labels} category={label} value={value * 1000} detail={value * 12} />
+                      <span className="column-item__value" style={{ bottom: `${topPct}%`, left: `${centre}%` }}>
+                        <DataLabel labels={columnChartStyle.labels} category={series.label} value={value * VALUE_SCALE} detail={value * 12} />
                       </span>
                     )}
                     <span
@@ -118,19 +149,20 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
                       style={{
                         bottom: `${bottom}%`,
                         height: `${height}%`,
-                        width: barThickness(columnChartStyle.layout.clusteredGapSize),
-                        backgroundColor: hexWithAlpha(columnChartStyle.dataPoint.fill, columnChartStyle.dataPoint.fillTransparency),
+                        left: `${band.offset}%`,
+                        width: `${band.size}%`,
+                        backgroundColor: hexWithAlpha(fill, columnChartStyle.dataPoint.fillTransparency),
                         border: columnChartStyle.dataPoint.borderShow
                           ? `${columnChartStyle.dataPoint.borderSize}px solid ${columnChartStyle.dataPoint.borderColor}`
                           : undefined,
                       }}
                     />
-                    {index === 0 && columnChartStyle.error.enabled && columnChartStyle.error.barShow && (
+                    {index === 0 && seriesIndex === 0 && columnChartStyle.error.enabled && columnChartStyle.error.barShow && (
                       <span
                         className="column-item__error"
                         aria-hidden="true"
                         title="Error bars are enabled — representative indicator, not a data-fit range"
-                        style={{ bottom: `${topPct}%` }}
+                        style={{ bottom: `${topPct}%`, left: `${centre}%` }}
                       >
                         <span
                           style={{
@@ -141,6 +173,9 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
                         />
                       </span>
                     )}
+                        </span>
+                      );
+                    })}
                   </span>
                 );
               })}
@@ -149,7 +184,7 @@ export function ColumnChartPreview({ columnChartStyle }: Props) {
             <CategoryAxisGutter
               axis={columnChartStyle.categoryAxis}
               layout={layout}
-              categories={barCategories.map(([label]) => label)}
+              categories={barCategories}
               offset={valueGutter}
               titleFallback="Region"
             />
