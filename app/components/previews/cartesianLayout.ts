@@ -1,10 +1,10 @@
 import {
   computeChartLayout,
+  estimateText,
   type AxisLayoutStyle,
   type CartesianOrientation,
   type ChartLayout,
   type Rect,
-
   type TextMeasure,
 } from "../../lib/chartLayout";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
@@ -31,11 +31,69 @@ import { formatValue } from "../ChartParts";
  */
 
 /**
+ * ## The natural chart boxes
+ *
+ * Each cartesian preview is drawn into a fixed rectangle and the engine
+ * carves the axis gutters out of it. *Fixed* is the deliberate part, and it
+ * is how Power BI's own container behaves: `getVisualViewport` in the
+ * Desktop bundle (2.157.879.0, 26.08) takes the container's authored width
+ * and height as INPUTS and returns `width - padding` and `height - padding
+ * - title - subtitle - divider - banners`. Formatting only ever subtracts.
+ * Nothing in that path measures content and grows the container back, and
+ * the bundle has no auto-size-to-content route for a visual at all.
+ *
+ * So these boxes must not react to the theme. A larger axis font widens the
+ * gutter and shrinks the plot — that is the consequence a theme preview
+ * exists to show, and growing the box to cancel it out would hide the very
+ * thing the user is looking at. Category count is fixed for the same
+ * reason: adding categories to a Power BI bar chart makes the bars
+ * thinner, it does not make the visual taller.
+ *
+ * What a fixed box does owe is enough room that the shipped themes stay
+ * legible inside it. That floor is `minimumPlotHeight`: every division of
+ * the plot — a category row on a bar chart, a tick interval on a column or
+ * line chart — must be at least one line of the labels stacked down it.
+ * Which axis those come from follows from the orientation: a bar chart's
+ * rows are its CATEGORY labels, while a column or line chart's height is
+ * divided by its VALUE axis's tick labels and its categories run along the
+ * width.
+ * `tests/cartesianBoxes.test.ts` holds every shipped base to it, so the
+ * next typography change fails a test instead of quietly compressing the
+ * plot. That is how the bar chart's 84 came to be a third too short. It was
+ * sized against undersized fallback typography; text-class inheritance then
+ * corrected where that typography comes from, and the proven point-to-pixel
+ * conversion materially raised the text budget the gutters spend. Both were
+ * right, and nothing was watching the remainder. (Font-face aliases did not
+ * contribute: `estimateText` ignores the family, so alias expansion moves no
+ * gutter — see the audit's §4.6.)
+ */
+
+/**
+ * The floor the three boxes are chosen against: `divisions` slices of plot,
+ * each at least one line of text at `axisLabelFontSizeCssPx` — which must
+ * be the size of the axis whose labels divide the HEIGHT, not whichever
+ * axis is nearest to hand. See the note above.
+ *
+ * Deliberately NOT called on the layout path. Making a box depend on the
+ * measurements taken inside it is the circularity described above; this
+ * exists so that the rule the comments claim and the rule the tests
+ * enforce are one expression rather than two that can drift.
+ */
+export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: number): number {
+  return divisions * estimateText("", axisLabelFontSizeCssPx, "").height;
+}
+
+/**
  * The column chart's natural chart box. Replaces `.column-preview__plot`'s
  * `height: 128px`, which CSS owned and the geometry could not see. Same
  * total footprint as before; the difference is that the engine now carves
  * the axis gutters *out* of it, where the old CSS let the category labels
  * eat into the plot the value axis was measured against.
+ *
+ * Re-checked, not merely inherited: 128 clears `minimumPlotHeight` in every
+ * measured condition, leaving 84.4-86.2 units of plot and so a 21.1-21.6
+ * unit tick interval against a 16.2-18.9 unit value-axis line. The
+ * fixed-box model asks nothing of it, so it stands.
  *
  * Width is nominal: only in-plot fractions are taken from it, so the chart
  * stays fluid. Height is real and is applied to the rendered box.
@@ -48,12 +106,23 @@ export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
  * minmax(80px,1fr) 28px`, with the value axis inset by a TypeScript
  * constant hand-copied from it (RENDERER_AUDIT §2.3).
  *
- * 84 rather than the column chart's 128 because a bar chart's four rows
- * read across, not up: the old layout gave them ~57px of plot, and this
- * keeps the visual footprint close while letting the engine own the
- * gutters. Width is nominal, as above.
+ * 128, the same as the column chart: a clustered bar is the transpose of a
+ * clustered column over the same four categories, so an equal footprint is
+ * the expected answer rather than a coincidence, and 128 is already proven
+ * to fit both the hero and the thumbnail because the column charts render
+ * at it today.
+ *
+ * It replaces 84, which was back-computed to preserve the pre-engine
+ * layout's ~57px of plot — the one thing a fixed box must not do. By
+ * time the gutters carried real text-class families at real pixel sizes,
+ * 84 left the four rows 40.4-42.2 units of plot across the shipped bases:
+ * a 10.1-10.6 unit slot for a label needing 18.0-18.9, so every row was
+ * shorter than its own text. 128 clears `minimumPlotHeight` in each
+ * measured condition with room to spare.
+ *
+ * Width is nominal, as above.
  */
-export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 84 };
+export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
 
 /**
  * The line chart's natural chart box. Replaces `.line-preview__plot`'s
@@ -63,9 +132,15 @@ export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 84 };
  * 97%. The engine now owns both axes and the SVG draws in the plot's
  * coordinates (RENDERER_AUDIT §4.5).
  *
- * 150 rather than the column chart's 128 because the line's plot used to
- * be 120 with its tick labels overlaying the space to its left; giving the
- * value axis a real gutter needs that space back.
+ * 150 was arrived at by growing the box to give a new gutter its space
+ * back — the compensating move the model above rejects, applied once by
+ * hand before there was a model to reject it. The number survives on its
+ * own merits rather than on that reasoning: it leaves 106.4-108.2 units of
+ * plot, a 26.6-27.1 unit tick interval against a 16.2-18.9 unit value-axis
+ * line, and so clears `minimumPlotHeight` by the widest margin of the three.
+ * The line chart also has the most in-plot furniture to keep clear of — markers,
+ * series labels and their leaders — which is the reason to keep the extra
+ * height now that plot preservation is no longer one.
  *
  * Width is nominal, as above: the rendered box is CSS-fluid (measured at
  * 370 natural units), and every consumer of it — slot centres, gridline
