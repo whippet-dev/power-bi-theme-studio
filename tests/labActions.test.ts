@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   ALLOWED_ACTIONS,
   ActionError,
+  NotImplementedError,
+  requireImplemented,
   SUPPORTED_BASE_THEMES,
   checkVariantTheme,
   expandMatrix,
@@ -404,4 +406,55 @@ test("the summary groups transitions by field", () => {
   const text = summariseBreakpoints(detectBreakpoints(sweep));
   assert.match(text, /legendVisible:/);
   assert.match(text, /600x206 → 372x128/);
+});
+
+// ---------------------------------------------------------------------------
+// The identity boundary has to hold for the whole session, not just open()
+// ---------------------------------------------------------------------------
+
+test("a sentinel that disappears mid-session stops being the lab", () => {
+  // The runtime locator mirrors this rule: exactly one match, or nothing.
+  // Falling back to the first cartesian visual would mutate something
+  // nobody identified, which is the one thing the controller must not do.
+  const gone = { ...LAB, sentinel: "" };
+  assert.equal(identifyLabEnvironment(gone).ok, false);
+  assert.equal(selectLabVisual([gone]).ok, false);
+  assert.equal(selectLabVisual([gone, OTHER_CARTESIAN]).ok, false,
+    "and must not fall back to the other cartesian visual");
+});
+
+test("a second matching visual appearing mid-session is a refusal", () => {
+  const result = selectLabVisual([LAB, { ...LAB, width: 400 }]);
+  assert.equal(result.ok, false);
+  assert.equal(result.visual, undefined, "no visual may be returned when ambiguous");
+});
+
+test("no matching visual leaves nothing to operate on", () => {
+  const result = selectLabVisual([OTHER_CARTESIAN, { ...OTHER_CARTESIAN }]);
+  assert.equal(result.ok, false);
+  assert.equal(result.visual, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Declared is not the same as working
+// ---------------------------------------------------------------------------
+
+test("every allowlisted action declares whether it is implemented", () => {
+  // Being on the allowlist means reviewed and permitted, not working. An
+  // action that validates cleanly and then does nothing is worse than one
+  // that refuses: a suite would file measurements as though it had applied.
+  for (const [name, spec] of Object.entries(ALLOWED_ACTIONS)) {
+    assert.equal(typeof spec.implemented, "boolean", `${name} must declare implemented`);
+  }
+});
+
+test("an unimplemented action refuses loudly rather than silently passing", () => {
+  const declaredOnly = Object.entries(ALLOWED_ACTIONS).filter(([, s]) => s.implemented === false);
+  for (const [name] of declaredOnly) {
+    assert.throws(() => requireImplemented(name), NotImplementedError, name);
+  }
+  // Implemented ones pass through.
+  for (const [name, spec] of Object.entries(ALLOWED_ACTIONS)) {
+    if (spec.implemented) assert.equal(requireImplemented(name), true, name);
+  }
 });

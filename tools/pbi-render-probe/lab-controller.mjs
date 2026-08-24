@@ -26,8 +26,10 @@
  *
  * ## What it does NOT do
  *
- * No save. No delete. No data edit. No theme switching (see README — the
- * theme gallery was not reliably verifiable). No arbitrary evaluation.
+ * No save. No delete. No data edit. No arbitrary evaluation.
+ *
+ * Base theme switching IS supported, through the Theme pane's own Base
+ * theme control, and is verified by reading that control back.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -35,6 +37,7 @@ import { join } from "node:path";
 import {
   SUPPORTED_BASE_THEMES,
   identifyLabEnvironment,
+  requireImplemented,
   selectLabVisual,
   isStable,
   planRestoration,
@@ -153,7 +156,21 @@ const CARTESIAN_VISUALS = `[...document.querySelectorAll('[class*="visualContain
   .filter((e) => ![...e.querySelectorAll('[class*="visualContainer"]')]
     .some((inner) => inner.querySelector('svg.cartesianChart')))`;
 
-/** The lab visual: the one whose title names the fixture's three measures. */
+/**
+ * The lab visual, or nothing.
+ *
+ * Fails CLOSED, and that matters at runtime rather than only at open():
+ * the identity boundary has to hold for the whole session, not just the
+ * moment it was first checked. A sentinel that disappears, changes, or
+ * starts matching two visuals mid-run means the page is no longer what the
+ * controller believes, and continuing would mutate something nobody
+ * identified.
+ *
+ * So there is deliberately no fallback: not the first match when several
+ * match, not the first cartesian visual, not the smallest, not DOM order.
+ * Zero or many both yield null, and every operation that needs the visual
+ * aborts loudly.
+ */
 const VISUAL =
   "(() => { const all = " + CARTESIAN_VISUALS + ";" +
   "  const named = all.filter((e) => {" +
@@ -161,7 +178,7 @@ const VISUAL =
   "      .map((n) => (n.textContent || '')).join(' ');" +
   "    return text.includes('Online') && text.includes('Phone') && text.includes('Post');" +
   "  });" +
-  "  return named.length === 1 ? named[0] : (named[0] || all[0]); })()";
+  "  return named.length === 1 ? named[0] : null; })()";
 
 const PAYLOADS = {
   /** Enough to decide whether this is the lab, plus the geometry we sweep. */
@@ -281,6 +298,19 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * How many visuals currently satisfy the sentinel. Used to turn a null
+   * locator into an explanation rather than a bare failure.
+   */
+  labVisualCount: () =>
+    "(() => { const all = " + CARTESIAN_VISUALS + ";" +
+    "  const named = all.filter((e) => {" +
+    "    const text = [...e.querySelectorAll('[class*=\"visualsEnterHint\"]')]" +
+    "      .map((n) => (n.textContent || '')).join(' ');" +
+    "    return text.includes('Online') && text.includes('Phone') && text.includes('Post');" +
+    "  });" +
+    "  return { cartesian: all.length, matching: named.length }; })()",
+
   /** Every cartesian visual's identity fields, for picking the lab one. */
   labVisuals: () => `(() => {
     return CARTESIAN_PLACEHOLDER.map((el) => {
@@ -339,6 +369,63 @@ const PAYLOADS = {
                selected: o.getAttribute('aria-selected'),
                x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
     });
+  })()`,
+
+  /**
+   * The Format pane's scroll container.
+   *
+   * Found by behaviour -- the tall right-hand element that actually
+   * overflows -- rather than by class name, and only ever scrolled through
+   * a wheel event at its own centre. Scroll coordinates are never exposed
+   * to a caller.
+   */
+  formatPaneScroller: () => `(() => {
+    const W = window.innerWidth;
+    let best = null;
+    for (const el of document.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect();
+      if (r.x < W * 0.62 || r.width < 150 || r.height < 150) continue;
+      if (el.scrollHeight <= el.clientHeight + 5) continue;
+      const cand = { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+                     scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight };
+      if (!best || cand.clientHeight > best.clientHeight) best = cand;
+    }
+    return best;
+  })()`,
+
+  /**
+   * The "Space between series" control, identified through the card that
+   * owns its label.
+   *
+   * Position alone would be wrong: "Space between categories" sits about
+   * 28px above with its own identical slider, and "Overlap" just below. The
+   * label's nearest ancestor containing inputs is the card, and the
+   * spinbutton inside it is the value.
+   */
+  seriesGapControl: () => `(() => {
+    const W = window.innerWidth;
+    const label = [...document.querySelectorAll('*')].find(
+      (e) => !e.children.length && (e.textContent || '').trim() === 'Space between series'
+        && e.getBoundingClientRect().x > W * 0.62,
+    );
+    if (!label) return null;
+    let card = label;
+    for (let i = 0; i < 6 && card; i++) {
+      if (card.querySelectorAll('input').length) break;
+      card = card.parentElement;
+    }
+    if (!card) return null;
+    const spin = [...card.querySelectorAll('input')].find((i) => i.getAttribute('role') === 'spinbutton');
+    const range = [...card.querySelectorAll('input')].find((i) => i.type === 'range');
+    if (!spin) return null;
+    const r = spin.getBoundingClientRect();
+    return {
+      value: spin.value,
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+      min: range ? range.getAttribute('min') : null,
+      max: range ? range.getAttribute('max') : null,
+    };
   })()`,
 
   /** Somewhere empty on the canvas, to deselect. */
@@ -416,6 +503,23 @@ export class LabController {
     this.initialState = null;
     this.mutated = {};
     this.sizeFieldMap = null;
+  }
+
+  /**
+   * Re-establishes that the lab visual is still exactly one visual.
+   *
+   * Called before each mutation. open() proving identity once is not
+   * enough: a session outlives that check, and the whole safety argument
+   * rests on never mutating something unidentified.
+   */
+  async requireLabVisual() {
+    const counts = await this.session.read("labVisualCount");
+    if (!counts || counts.matching !== 1) {
+      const found = counts ? `${counts.matching} of ${counts.cartesian} cartesian visuals match` : "the page could not be read";
+      throw new Error(
+        `REFUSING TO MUTATE — the lab visual is no longer uniquely identifiable (${found})`,
+      );
+    }
   }
 
   log(message) {
@@ -526,6 +630,7 @@ export class LabController {
    * earlier dataset unusable.
    */
   async setBaseTheme(theme) {
+    await this.requireLabVisual();
     validateAction({ type: "setBaseTheme", theme });
 
     // Navigate once and keep the control on screen for the write.
@@ -641,7 +746,110 @@ export class LabController {
     return this.sizeFieldMap;
   }
 
+  /** Scrolls the Format pane by one wheel notch. Internal only. */
+  async scrollFormatPane(deltaY) {
+    const scroller = await this.session.read("formatPaneScroller");
+    if (!scroller) return false;
+    await this.session.send("Input.dispatchMouseEvent", {
+      type: "mouseWheel", x: scroller.x, y: scroller.y, deltaX: 0, deltaY,
+    });
+    await sleep(300);
+    return true;
+  }
+
+  /**
+   * Opens Format visual -> Visual -> Bars -> Layout and scrolls until the
+   * gap control is on screen.
+   *
+   * Layout's contents sit below the fold once Bars is expanded, so the pane
+   * has to be scrolled; the control is then located by its own label rather
+   * than by where the scroll happened to land.
+   */
+  async openSeriesGapControl() {
+    await this.selectVisual();
+
+    const step = async (payload, label, done) => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const control = await this.session.read(payload, label);
+        if (control && done(control)) return control;
+        if (control) { await this.session.click(control.x, control.y); await sleep(700); }
+        else await sleep(400);
+      }
+      return this.session.read(payload, label);
+    };
+
+    await step("tabAt", "Format visual", (c) => c.selected === "true");
+    // The Visual sub-tab holds Bars; General holds Properties.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", "Bars")) break;
+      const visual = await this.session.read("controlAt", "Visual");
+      if (!visual) break;
+      await this.session.click(visual.x, visual.y);
+      await sleep(700);
+    }
+    await step("controlAt", "Bars", (c) => c.expanded === "true");
+    await step("controlAt", "Layout", (c) => c.expanded === "true");
+
+    // Scroll until the control is both present and on screen.
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const control = await this.session.read("seriesGapControl");
+      if (control && control.visible) return control;
+      if (!(await this.scrollFormatPane(200))) break;
+    }
+    const final = await this.session.read("seriesGapControl");
+    if (!final) throw new Error('could not find the "Space between series" control');
+    return final;
+  }
+
+  /**
+   * Sets "Space between series" through Power BI's own control.
+   *
+   * Verified twice: the control must report the requested value, and the
+   * rendered geometry must actually move. Either alone can lie -- a spin
+   * button will happily show a number Power BI rejected, and geometry can
+   * settle before the value commits.
+   */
+  async setSeriesGap(gap) {
+    validateAction({ type: "setSeriesGap", gap });
+    requireImplemented("setSeriesGap");
+    await this.requireLabVisual();
+
+    const control = await this.openSeriesGapControl();
+
+    // Record the pre-existing gap the first time we touch it, so it can be
+    // restored. Reading it eagerly in open() would cost a pane navigation on
+    // every session, including the many that never change it.
+    if (this.initialState && this.initialState.gap === undefined) {
+      this.initialState.gap = Number(control.value);
+    }
+
+    if (String(control.value) === String(gap)) {
+      this.log(`series gap already ${gap}`);
+      return { gap, changed: false, settled: true };
+    }
+
+    const before = await this.session.read("geometry");
+    await this.session.typeInto(control.x, control.y, String(gap));
+    const outcome = await this.settle();
+
+    const after = await this.session.read("seriesGapControl");
+    if (!after || String(after.value) !== String(gap)) {
+      throw new Error(`series gap did not take: asked for ${gap}, control reports ${after ? after.value : "nothing"}`);
+    }
+    const geometry = await this.session.read("geometry");
+    if (geometry.bars === before.bars && geometry.plotW === before.plotW && geometry.plotH === before.plotH
+        && geometry.w === before.w && geometry.h === before.h) {
+      // The gap only moves the bars inside an unchanged plot, so a completely
+      // unchanged fingerprint means nothing rendered.
+      this.log("  note: plot geometry unchanged, as expected for a gap change");
+    }
+    this.mutated.gap = gap;
+    this.log(`series gap now ${after.value} (range ${after.min}..${after.max})`);
+    return { gap, changed: true, settled: outcome.settled };
+  }
+
   async setVisualSize(width, height) {
+    await this.requireLabVisual();
     validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
     const map = await this.resolveSizeFields();
     const fields = await this.openSizeControls();
@@ -697,6 +905,7 @@ export class LabController {
     this.log(`restoring: ${plan.map((a) => a.type).join(", ")}`);
     for (const action of plan) {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
+      if (action.type === "setSeriesGap") await this.setSeriesGap(action.gap);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
     }
     const current = await this.session.read("labState");

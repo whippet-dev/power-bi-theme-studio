@@ -21,11 +21,29 @@
  * an action nobody reviewed.
  */
 export const ALLOWED_ACTIONS = Object.freeze({
-  setVisualSize: { params: ["width", "height"], mutates: true },
-  setBaseTheme: { params: ["theme"], mutates: true },
-  setSeriesGap: { params: ["gap"], mutates: true },
-  readState: { params: [], mutates: false },
+  setVisualSize: { params: ["width", "height"], mutates: true, implemented: true },
+  setBaseTheme: { params: ["theme"], mutates: true, implemented: true },
+  setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
+  readState: { params: [], mutates: false, implemented: true },
 });
+
+/**
+ * Declared but not yet driveable through the live UI.
+ *
+ * Being on the allowlist means "reviewed and permitted", not "working".
+ * An action that validates cleanly and then does nothing is worse than one
+ * that refuses, because a suite would record measurements as though the
+ * setting had changed.
+ */
+export class NotImplementedError extends Error {}
+
+export function requireImplemented(type) {
+  const spec = ALLOWED_ACTIONS[type];
+  if (spec && spec.implemented === false) {
+    throw new NotImplementedError(`NOT_IMPLEMENTED: "${type}" is allowlisted but has no live implementation yet`);
+  }
+  return true;
+}
 
 /**
  * The Base theme options this Desktop build actually exposes, read from the
