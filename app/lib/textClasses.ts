@@ -26,6 +26,7 @@
  * this chart draw?".
  */
 
+import { themeFontFamilyToCss } from "./fontFamilies";
 import { resolveColorValue, themeRoots, type ThemeSource } from "./properties";
 import type { PowerBITheme } from "./theme";
 
@@ -68,7 +69,20 @@ export type TextClassSource =
   | "derived-default";
 
 export type ResolvedTextClass = {
+  /** Exactly what the theme says. The editor and the exporter read this. */
   fontFamily: string;
+  /**
+   * The family Power BI would actually render, i.e. `fontFamily` after the
+   * alias table where — and only where — Power BI applies it.
+   *
+   * `applyTextClassDefaults` aliases the four PRIMARY classes' `fontFace`
+   * and nothing else. A secondary that inherits its primary therefore
+   * inherits the already-expanded string, while a secondary that declares
+   * its own face keeps it literal. Those two cases produce different CSS
+   * from the same raw value, which is why the effective family has to be
+   * carried rather than recomputed from the string later.
+   */
+  cssFontFamily: string;
   fontSize: number;
   /** Only the bold/semibold classes carry one; undefined means unspecified. */
   fontWeight: string | undefined;
@@ -279,6 +293,11 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
   const ownFace = layered(ownCustom, ownBase, "fontFace", readFace, roots);
   const primaryFace = layered(primaryCustom, primaryBase, "fontFace", readFace, roots);
   const fontFamily = ownFace?.value ?? primaryFace?.value ?? builtIn.fontFace;
+  // Aliased only when the family is the primary's — either because this IS
+  // a primary class, or because a secondary inherited it. A face the
+  // secondary declared itself never reaches Power BI's lookup.
+  const aliasApplies = rule === undefined || ownFace === undefined;
+  const cssFontFamily = aliasApplies ? themeFontFamilyToCss(fontFamily) : fontFamily;
   const fontFamilySource: TextClassSource = ownFace
     ? ownFace.fromCustom
       ? "custom-class"
@@ -351,6 +370,7 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
 
   return {
     fontFamily,
+    cssFontFamily,
     fontSize,
     fontWeight,
     color,

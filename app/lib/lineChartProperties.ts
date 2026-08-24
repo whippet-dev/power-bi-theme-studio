@@ -9,6 +9,7 @@ import {
   textProp,
   isGroupSetBy,
 } from "./properties";
+import { effectiveFontFamily } from "./fontFamilies";
 import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
@@ -594,6 +595,8 @@ export type ResolvedLineChartStyle = {
     concatenateLabels: boolean;
     end: string;
     fontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    fontFamilyCss: string;
     fontSize: number;
     invertAxis: boolean;
     italic: boolean;
@@ -618,6 +621,8 @@ export type ResolvedLineChartStyle = {
     titleBold: boolean;
     titleColor: string;
     titleFontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    titleFontFamilyCss: string;
     titleFontSize: number;
     titleItalic: boolean;
     titleText: string;
@@ -629,6 +634,8 @@ export type ResolvedLineChartStyle = {
     bold: boolean;
     end: string;
     fontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    fontFamilyCss: string;
     fontSize: number;
     invertAxis: boolean;
     italic: boolean;
@@ -654,6 +661,8 @@ export type ResolvedLineChartStyle = {
     titleBold: boolean;
     titleColor: string;
     titleFontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    titleFontFamilyCss: string;
     titleFontSize: number;
     titleItalic: boolean;
     titleText: string;
@@ -687,6 +696,8 @@ export type ResolvedLineChartStyle = {
     show: boolean;
     bold: boolean;
     fontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    fontFamilyCss: string;
     fontSize: number;
     italic: boolean;
     labelColor: string;
@@ -708,6 +719,8 @@ export type ResolvedLineChartStyle = {
     enableTitleDataLabel: boolean;
     enableValueDataLabel: boolean;
     fontFamily: string;
+    /** Effective render family; never written back to the theme. */
+    fontFamilyCss: string;
     fontSize: number;
     horizontalAlignment: string | number;
     italic: boolean;
@@ -1045,6 +1058,19 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
   const referenceLineLabelText = resolveTextRole(theme, "referenceLineLabel");
   const valueAxisLabelText = resolveTextRole(theme, "valueAxisLabel");
   const valueAxisTitleText = resolveTextRole(theme, "valueAxisTitle");
+  /**
+   * Each family in both forms: the raw theme value the editor reads, and
+   * the family the preview paints. They differ only by provenance — an
+   * explicit `visualStyles` family stays literal, because Power BI's own
+   * visual-property reader never consults the alias table, while one that
+   * falls through to a text class carries that class's expanded stack.
+   */
+  const catLabelFamily = effectiveFontFamily(theme, p.categoryAxis.fontFamily, categoryAxisLabelText);
+  const catTitleFamily = effectiveFontFamily(theme, p.categoryAxis.titleFontFamily, categoryAxisTitleText);
+  const valLabelFamily = effectiveFontFamily(theme, p.valueAxis.fontFamily, valueAxisLabelText);
+  const valTitleFamily = effectiveFontFamily(theme, p.valueAxis.titleFontFamily, valueAxisTitleText);
+  const legendFamily = effectiveFontFamily(theme, p.legend.fontFamily, legendText);
+  const dataLabelFamily = effectiveFontFamily(theme, p.labels.fontFamily, dataLabelText);
   return {
     usesSmallMultiples: isGroupSetBy(theme, "lineChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
@@ -1100,7 +1126,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       bold: resolvePropertyValue(theme, p.categoryAxis.bold, false),
       concatenateLabels: resolvePropertyValue(theme, p.categoryAxis.concatenateLabels, false),
       end: resolvePropertyValue(theme, p.categoryAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.categoryAxis.fontFamily, categoryAxisLabelText.fontFamily),
+      fontFamily: catLabelFamily.value,
+      fontFamilyCss: catLabelFamily.css,
       fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, categoryAxisLabelText.fontSize),
       invertAxis: resolvePropertyValue(theme, p.categoryAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.categoryAxis.italic, false),
@@ -1124,7 +1151,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       gridlineTransparency: resolvePropertyValue(theme, p.categoryAxis.gridlineTransparency, 0),
       titleBold: resolvePropertyValue(theme, p.categoryAxis.titleBold, false),
       titleColor: resolvePropertyValue(theme, p.categoryAxis.titleColor, categoryAxisTitleText.color),
-      titleFontFamily: resolvePropertyValue(theme, p.categoryAxis.titleFontFamily, categoryAxisTitleText.fontFamily),
+      titleFontFamily: catTitleFamily.value,
+      titleFontFamilyCss: catTitleFamily.css,
       titleFontSize: resolvePropertyValue(theme, p.categoryAxis.titleFontSize, categoryAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.categoryAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.categoryAxis.titleText, ""),
@@ -1135,7 +1163,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       axisStyle: resolvePropertyValue(theme, p.valueAxis.axisStyle, "showTitleOnly"),
       bold: resolvePropertyValue(theme, p.valueAxis.bold, false),
       end: resolvePropertyValue(theme, p.valueAxis.end, ""),
-      fontFamily: resolvePropertyValue(theme, p.valueAxis.fontFamily, valueAxisLabelText.fontFamily),
+      fontFamily: valLabelFamily.value,
+      fontFamilyCss: valLabelFamily.css,
       fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
       invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.valueAxis.italic, false),
@@ -1162,7 +1191,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
       titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
       titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, valueAxisTitleText.color),
-      titleFontFamily: resolvePropertyValue(theme, p.valueAxis.titleFontFamily, valueAxisTitleText.fontFamily),
+      titleFontFamily: valTitleFamily.value,
+      titleFontFamilyCss: valTitleFamily.css,
       titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, valueAxisTitleText.fontSize),
       titleItalic: resolvePropertyValue(theme, p.valueAxis.titleItalic, false),
       titleText: resolvePropertyValue(theme, p.valueAxis.titleText, ""),
@@ -1195,7 +1225,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
     legend: {
       show: resolvePropertyValue(theme, p.legend.show, true),
       bold: resolvePropertyValue(theme, p.legend.bold, false),
-      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, legendText.fontFamily),
+      fontFamily: legendFamily.value,
+      fontFamilyCss: legendFamily.css,
       fontSize: resolvePropertyValue(theme, p.legend.fontSize, legendText.fontSize),
       italic: resolvePropertyValue(theme, p.legend.italic, false),
       labelColor: resolvePropertyValue(theme, p.legend.labelColor, legendText.color),
@@ -1218,7 +1249,8 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       // The value is a data label's default content; title and detail are
       // additions to it, not replacements for it.
       enableValueDataLabel: resolvePropertyValue(theme, p.labels.enableValueDataLabel, true),
-      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, dataLabelText.fontFamily),
+      fontFamily: dataLabelFamily.value,
+      fontFamilyCss: dataLabelFamily.css,
       fontSize: resolvePropertyValue(theme, p.labels.fontSize, dataLabelText.fontSize),
       horizontalAlignment: resolvePropertyValue(theme, p.labels.horizontalAlignment, "left"),
       italic: resolvePropertyValue(theme, p.labels.italic, false),

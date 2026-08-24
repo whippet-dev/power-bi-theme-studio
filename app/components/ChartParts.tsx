@@ -27,6 +27,13 @@ export type LegendStyle = {
   titleText: string;
   labelColor: string;
   fontFamily: string;
+  /**
+   * The family the preview should paint. Supplied by the style model, which
+   * is the only layer that knows whether the value came from `visualStyles`
+   * (literal) or from a text class (already expanded). Absent for the text
+   * that has no text-class role yet, where the raw family is correct.
+   */
+  fontFamilyCss?: string;
   fontSize: number;
   bold: boolean;
   italic: boolean;
@@ -38,6 +45,13 @@ export type AxisStyle = {
   show: boolean;
   labelColor: string;
   fontFamily: string;
+  /**
+   * The family the preview should paint. Supplied by the style model, which
+   * is the only layer that knows whether the value came from `visualStyles`
+   * (literal) or from a text class (already expanded). Absent for the text
+   * that has no text-class role yet, where the raw family is correct.
+   */
+  fontFamilyCss?: string;
   fontSize: number;
   bold: boolean;
   italic: boolean;
@@ -46,6 +60,13 @@ export type AxisStyle = {
   titleText: string;
   titleColor: string;
   titleFontFamily: string;
+  /**
+   * The family the preview should paint. Supplied by the style model, which
+   * is the only layer that knows whether the value came from `visualStyles`
+   * (literal) or from a text class (already expanded). Absent for the text
+   * that has no text-class role yet, where the raw family is correct.
+   */
+  titleFontFamilyCss?: string;
   titleFontSize: number;
   titleBold: boolean;
   titleItalic: boolean;
@@ -84,6 +105,7 @@ export function textStyle(source: {
   labelColor?: string;
   color?: string;
   fontFamily: string;
+  fontFamilyCss?: string;
   fontSize: number;
   bold: boolean;
   italic: boolean;
@@ -91,7 +113,7 @@ export function textStyle(source: {
 }): CSSProperties {
   return {
     color: source.labelColor ?? source.color,
-    fontFamily: source.fontFamily || undefined,
+    fontFamily: (source.fontFamilyCss ?? source.fontFamily) || undefined,
     fontSize: themeFontSizeToCssPx(source.fontSize),
     fontWeight: source.bold ? 700 : 400,
     fontStyle: source.italic ? "italic" : "normal",
@@ -102,7 +124,7 @@ export function textStyle(source: {
 export function axisTitleStyle(axis: AxisStyle): CSSProperties {
   return {
     color: axis.titleColor,
-    fontFamily: axis.titleFontFamily || undefined,
+    fontFamily: (axis.titleFontFamilyCss ?? axis.titleFontFamily) || undefined,
     fontSize: themeFontSizeToCssPx(axis.titleFontSize),
     fontWeight: axis.titleBold ? 700 : 400,
     fontStyle: axis.titleItalic ? "italic" : "normal",
@@ -184,6 +206,13 @@ export type DataLabelStyle = {
   show: boolean;
   color: string;
   fontFamily: string;
+  /**
+   * The family the preview should paint. Supplied by the style model, which
+   * is the only layer that knows whether the value came from `visualStyles`
+   * (literal) or from a text class (already expanded). Absent for the text
+   * that has no text-class role yet, where the raw family is correct.
+   */
+  fontFamilyCss?: string;
   fontSize: number;
   bold: boolean;
   italic: boolean;
@@ -233,6 +262,7 @@ export type DataLabelStyle = {
 function labelPartStyle(part: {
   color: string;
   fontFamily: string;
+  fontFamilyCss?: string;
   fontSize: number;
   bold: boolean;
   italic: boolean;
@@ -241,7 +271,7 @@ function labelPartStyle(part: {
 }): CSSProperties {
   return {
     color: hexWithAlpha(part.color, part.transparency),
-    fontFamily: part.fontFamily || undefined,
+    fontFamily: (part.fontFamilyCss ?? part.fontFamily) || undefined,
     fontSize: themeFontSizeToCssPx(part.fontSize),
     fontWeight: part.bold ? 700 : 400,
     fontStyle: part.italic ? "italic" : "normal",

@@ -4,6 +4,8 @@ import {
   type CartesianOrientation,
   type ChartLayout,
   type Rect,
+
+  type TextMeasure,
 } from "../../lib/chartLayout";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import { formatValue } from "../ChartParts";
@@ -83,6 +85,13 @@ export type CartesianLayoutInput = {
   /** Used when the axis declares no title text, matching the renderer's own fallbacks. */
   valueAxisTitleFallback?: string;
   categoryAxisTitleFallback?: string;
+  /**
+   * Overrides the engine's deterministic measurer. Production never passes
+   * one — this exists so a test can observe WHICH font the measurement
+   * boundary is handed. Today's `estimateText` ignores the family, so no
+   * assertion about geometry could catch a family going astray here.
+   */
+  measureText?: TextMeasure;
 };
 
 /**
@@ -96,11 +105,29 @@ export type CartesianLayoutInput = {
  * Only the two the engine measures with are converted; everything else is
  * passed through, so this cannot quietly change an unrelated field.
  */
-function inCssPixels<T extends { fontSize: number; titleFontSize: number }>(axis: T): T {
+function inCssPixels<
+  T extends {
+    fontSize: number;
+    titleFontSize: number;
+    fontFamily: string;
+    titleFontFamily: string;
+    fontFamilyCss?: string;
+    titleFontFamilyCss?: string;
+  },
+>(axis: T): T {
   return {
     ...axis,
     fontSize: themeFontSizeToCssPx(axis.fontSize),
     titleFontSize: themeFontSizeToCssPx(axis.titleFontSize),
+    // The engine hands the family to `measureText`, so it must receive the
+    // same family the browser paints — the style model's effective value,
+    // never a re-derivation from the string, which cannot tell an explicit
+    // `visualStyles` family from an inherited text-class one. Today's
+    // `estimateText` ignores the family, so this changes no number; the
+    // boundary exists so a future measurer cannot silently disagree with
+    // the renderer.
+    fontFamily: axis.fontFamilyCss ?? axis.fontFamily,
+    titleFontFamily: axis.titleFontFamilyCss ?? axis.titleFontFamily,
   };
 }
 
@@ -113,6 +140,7 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     categories,
     dataMax,
     innerPadding = 0,
+    measureText,
     valueAxisTitleFallback = "",
     categoryAxisTitleFallback = "",
   } = input;
@@ -137,6 +165,7 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     categories,
     dataMax,
     innerPadding,
+    ...(measureText ? { measureText } : {}),
     // The gutter must be as wide as the label the renderer draws, so the
     // engine is handed the renderer's own formatter.
     formatTick: (value) => formatValue(value, valueAxis.labelDisplayUnits, valueAxis.labelPrecision),
