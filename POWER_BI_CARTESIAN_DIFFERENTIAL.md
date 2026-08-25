@@ -1351,16 +1351,129 @@ finds the card, resolves the exact Title toggle and mutates.
 
 #### What still does not
 
-The reverse direction, repeatedly. Once the Title group has been expanded,
-navigating back to Bars → Layout fails to find the gap sliders, and a
-second title mutation in the same session fails where a fresh session
-succeeds every time. The pane state one mutation leaves behind is not a
-state the navigator can currently start from.
+~~The reverse direction, repeatedly.~~ **Diagnosed and fixed in §5.23** —
+and it was not virtualisation at all.
 
-That is a specific, reproducible symptom rather than flakiness, and it is
-the whole of what stands between here and the isolated label sweep. Until
-it is fixed the label-side constants stay fitted, and §5.21's model stays
-at Classification **B**.
+### 5.23 "Layout" is not a unique name
+
+The second semantic action failed where the first succeeded, and the cause
+turned out to be embarrassingly simple once the pane was instrumented
+rather than guessed at.
+
+#### What the instrumentation ruled out
+
+Six checkpoints through the failing sequence, capturing the scroller, the
+mounted cards and groups, which are expanded, and where focus is:
+
+| hypothesis | verdict | the observable |
+|---|---|---|
+| stale scroller identity | **refuted** | same element and box at every checkpoint, one candidate throughout |
+| rewind never reaches the start | **refuted** | `scrollTop` 0 at checkpoint D |
+| focus trapped in the expanded group | **refuted** | focus is on `body` at the moment of failure |
+| Y-axis card stays expanded | **supported** — but not for the reason assumed |
+| Title group stays expanded | **supported** — same |
+
+The Bars card was **mounted and on screen** when the lookup for it
+"failed". Nothing was missing.
+
+#### The actual cause
+
+**Bars has a `Layout` group. So does Y-axis.**
+
+A fresh pane has Y-axis collapsed, so only Bars' Layout is mounted and a
+global lookup by name is accidentally right. Leave the Y-axis card expanded
+from a previous action and a second `Layout` mounts — the lookup silently
+resolves the wrong card's group, expands it, and then cannot find a slider
+that was never going to be inside it.
+
+Group headings are now resolved **within the card that owns them**, which
+is the containment rule the toggle lookup already used. It was applied to
+toggles and not to groups, and the gap held exactly one bug.
+
+#### The second bug behind it
+
+Visibility was judged against the **window**. A control scrolled above the
+Format pane is still inside the viewport — it is simply not inside its own
+scroll container — so it counted as visible, the click went to whatever was
+painted at those coordinates, and the toggle reported its old value. That
+is the "reports false, asked for true" failure. Visibility is now measured
+against the control's own scroller, and scrolling moves towards the target
+in that same frame.
+
+#### The contract
+
+Actions normalise at **both** ends: they seek what they need on entry, and
+collapse the card they expanded on exit, so no action inherits an expanded
+card from the one before it. That is authoring UI state only — no
+formatting value is touched.
+
+**Torture test: 36 checks, two full cycles, one session, zero failures.**
+Series gap → title off → category spacing → identity → title on, repeated,
+with `Y-axis/Layout` and `Bars/Layout` now resolving independently and the
+negative cases still refusing.
+
+### 5.24 The label side, measured in isolation
+
+With the pane composable, the sweep that has been blocked since §5.20 runs:
+title OFF, 600 × 600, spacing 20, gap 10, six theme label sizes, all
+uncapped and untruncated.
+
+| theme | category label | widest ink | gutter | gutter − ink |
+|---:|---:|---:|---:|---:|
+| 8pt | 9.6px | 49.145 | **63** | 13.855 |
+| 10pt | 12px | 61.432 | **76** | 14.568 |
+| 12pt | 14.4px | 72.718 | **89** | 16.282 |
+| 14pt | 16.8px | 84.957 | **102** | 17.043 |
+| 16pt | 19.2px | 97.291 | **115** | 17.709 |
+| 20pt | 24px | 121.000 | **141** | 20.000 |
+
+The gutter column is the result. Every value is an **integer**, and the
+differences are 13, 13, 13, 13, 26 against label steps of 2.4, 2.4, 2.4,
+2.4, 4.8 — a slope of exactly **65/12 = 5.41667 per label pixel** at both
+step sizes. So
+
+```
+gutter(title hidden) = 11 + 5.41667 × labelFontPx
+```
+
+exact at all six. Since canvas measures "North West" at 5.0415 px per font
+pixel, that decomposes as `measuredWidth + 11 + 0.375 × labelPx` — the
+same numbers §5.21 fitted, now measured against six sizes with the title
+removed from the equation instead of three with it included.
+
+#### And why that is still not a mechanism
+
+One string cannot separate the two readings. For a fixed label, "measured
+text plus a font-proportional gap" and "a pure multiple of the font size"
+are the same line. The truncated states rule out the second — a capped
+label changes the gutter while the font does not — so the allocation is
+text-dependent. But the split between *text measurement* and *axis gap*
+remains unresolved with this fixture's four category names.
+
+#### What the runtime says
+
+Power BI's tick-label margin is
+
+> `getAxisTickLabelMargins(...)` → `maxWidth = max over labels of
+> textWidthMeasurer(label, fontProperties)`
+
+with **no padding and no allowance added**. So the extra `11 + 0.375 ×
+labelPx` is not inside the label-margin calculation at all; it belongs to
+the axis geometry around it, or to whatever `textWidthMeasurer` returns
+over the ink. That narrows the search considerably and rules out the
+"margin adds padding" reading, but it does not yet name the term.
+
+The cap composition, by contrast, is now read directly from the same
+function's caller:
+
+> `leftMargin = min(max(overflow, maxWidth), yMarginLimit)`
+
+which is exactly `min(natural, viewportWidth × maxMarginFactor)` from
+§5.20, no longer inferred. `PROVEN-RUNTIME`.
+
+**Classification: B.** The relationship is now measured rather than fitted,
+the cap is proven, and the title term is proven — but `0.375 × labelPx`
+still has no named owner, and the gate for A requires one.
 
 ### 5.5 Text measurement
 
@@ -1452,7 +1565,11 @@ refuted — only shown not to hold under the hero transform.
 | `maxMarginFactor` caps the label margin at `viewportWidth × factor`, default 0.25 | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.20) — three widths |
 | The category axis title costs `titleFontPx + 5` | `PROVEN-EXPERIMENT` (§5.21) — on/off at two title sizes, round trip reproduced |
 | The gutter with the title hidden is the same at 600×250 and 600×600 | `PROVEN-EXPERIMENT` (§5.21) |
-| The label side is `measuredWidth + 11 + 0.375 × labelPx` | `INFERENCE` (§5.21) — reproduces every state, but two constants fitted to three label sizes |
+| The label side is `measuredWidth + 11 + 0.375 × labelPx` | `PROVEN-EXPERIMENT` (§5.24) — six uncapped sizes, title hidden, exact integers on a single line |
+| What the `0.375 × labelPx` term IS | `UNKNOWN` (§5.24) — one fixture string cannot separate text measurement from axis gap |
+| The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
+| `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
+| Format-pane group names repeat across cards (`Layout` in Bars and Y-axis) | `PROVEN-EXPERIMENT` (§5.23) |
 | Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
 | Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
 | The series gap cannot move the category scale | `PROVEN-EXPERIMENT` (§5.18) — 3 gaps × 3 spacings, width invariant |
