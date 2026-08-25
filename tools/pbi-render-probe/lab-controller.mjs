@@ -1032,6 +1032,94 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * Power BI Desktop's OWN canvas text metrics, for the fixture's strings.
+   *
+   * Read-only, and the point is the font rather than the canvas: Desktop
+   * has `wf_segoe-ui_normal` loaded and our browser does not, so measuring
+   * the same string in the two places gives different answers. Power BI's
+   * layout calls `canvasCtx.measureText` (§5.27), so measuring here — in the
+   * page that owns the font — gives the width its axis code actually used.
+   *
+   * The font is taken from a rendered category label rather than assumed,
+   * and the strings and sizes are the fixture's own. Nothing is drawn,
+   * nothing is mutated, and no font data leaves the process.
+   */
+  desktopTextWidths: () => `(() => { try {
+    const n4 = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(4) : null);
+    const el = ${VISUAL};
+    if (!el) return { error: 'no lab visual' };
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const label = [...el.querySelectorAll('svg text')]
+      .find((t) => own(t) && barLeft !== null && t.getBoundingClientRect().right <= barLeft + 2
+        && !/wf_standard-font/.test(getComputedStyle(t).fontFamily));
+    if (!label) return { error: 'no category label to read the font from' };
+    const cs = getComputedStyle(label);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { error: 'no 2d context' };
+
+    const fontAt = (px) => [cs.fontStyle, cs.fontVariant, cs.fontWeight, px + 'px', cs.fontFamily]
+      .filter((part) => part && part !== 'normal').join(' ');
+
+    const STRINGS = ['London', 'North West', 'NW', 'Scotland', 'Wales', 'Loughborough'];
+    const SIZES = [9.6, 12, 14.4, 16.8, 19.2, 24];
+
+    const atTwelve = {};
+    ctx.font = fontAt(12);
+    const fontTwelve = ctx.font;
+    for (const text of STRINGS) atTwelve[text] = n4(ctx.measureText(text).width);
+
+    // The rendered CSS stack puts "Segoe UI" first, but Power BI's own
+    // textProperties need not use that order - and if it resolves to the web
+    // font instead, the metrics differ. Measure the plausible stacks so the
+    // question is settled by numbers rather than by assumption.
+    const STACKS = {
+      computed: cs.fontFamily,
+      webFontFirst: 'wf_segoe-ui_normal, "Segoe UI", helvetica, arial, sans-serif',
+      webFontOnly: 'wf_segoe-ui_normal',
+      installedOnly: '"Segoe UI"',
+      sansSerif: 'sans-serif',
+    };
+    const byStack = {};
+    for (const [name, family] of Object.entries(STACKS)) {
+      ctx.font = '12px ' + family;
+      byStack[name] = { resolved: ctx.font, widths: {} };
+      for (const text of STRINGS) byStack[name].widths[text] = n4(ctx.measureText(text).width);
+    }
+
+    const northWestBySize = {};
+    for (const px of SIZES) {
+      ctx.font = fontAt(px);
+      northWestBySize[px] = n4(ctx.measureText('North West').width);
+    }
+
+    return {
+      font: {
+        family: cs.fontFamily,
+        size: cs.fontSize,
+        weight: cs.fontWeight,
+        style: cs.fontStyle,
+        variant: cs.fontVariant,
+        letterSpacing: cs.letterSpacing,
+        canvasFontStringAt12: fontTwelve,
+        accepted: fontTwelve === fontAt(12),
+      },
+      atTwelve,
+      northWestBySize,
+      byStack,
+      renderedLabel: own(label),
+    };
+  } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');

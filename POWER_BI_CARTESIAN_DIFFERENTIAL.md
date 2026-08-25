@@ -1740,6 +1740,87 @@ the anchor is a fixed 9px; the title is `titleFontPx + 5`. What remains
 unowned is the font-proportional part of the chart-edge allocation, and the
 ~1.5px between our text measurement and Power BI's.
 
+### 5.29 Desktop measures exactly what we measure
+
+§5.28 attributed a ~1.5px residual to font substitution: Desktop has
+`wf_segoe-ui_normal` loaded, our browser falls back to installed Segoe UI,
+so the two might measure the same string differently. If true, the fitted
+`0.375 × fontPx` coefficient would be part layout and part our own
+measurement error, and encoding it would bake that error into ChartLayout.
+
+That is worth being wrong about, so it was measured rather than argued:
+an offscreen canvas **inside Desktop's own WebView**, using the font read
+off a rendered category label.
+
+#### The font, read not assumed
+
+```
+family        "Segoe UI", wf_segoe-ui_normal, helvetica, arial, sans-serif
+size          12px       weight 400       style normal
+letterSpacing normal      (so the measurer's letterSpacing term is 0)
+```
+
+#### The widths, at 12px
+
+| stack | Scotland | North West | Loughborough |
+|---|---:|---:|---:|
+| as rendered | 45.8848 | 60.4980 | 79.2656 |
+| `wf_segoe-ui_normal` first | 45.8848 | 60.4980 | 79.2656 |
+| `wf_segoe-ui_normal` only | 45.8848 | 60.4980 | 79.2656 |
+| installed `"Segoe UI"` only | 45.8848 | 60.4980 | 79.2656 |
+| `sans-serif` (control) | 46.6992 | 59.7949 | 77.4082 |
+| **our browser** | **45.8848** | **60.4980** | **79.2656** |
+
+**Identical to four decimal places.** The web font and the installed font
+have the same metrics here, and the `sans-serif` row proves the measurement
+is sensitive enough to have shown a difference if there were one.
+
+**The font-substitution explanation is refuted.** Our canvas measurement
+*is* Power BI's canvas measurement.
+
+#### Which kills the `31/6` candidate
+
+The candidate needed Desktop to measure "North West" as `(31/6) × fontPx`.
+It does not:
+
+| fontPx | Desktop canvas | `(31/6) × px` | diff |
+|---:|---:|---:|---:|
+| 9.6 | 48.3984 | 49.600 | −1.202 |
+| 12 | 60.4980 | 62.000 | −1.502 |
+| 14.4 | 72.5976 | 74.400 | −1.802 |
+| 16.8 | 84.6468 | 86.800 | −2.153 |
+| 19.2 | 96.7968 | 99.200 | −2.403 |
+| 24 | 120.9961 | 124.000 | −3.004 |
+
+The gap grows as exactly `0.125 × fontPx`, which is the difference between
+the candidate's implied 5.1667 px-per-font-px and the real 5.0415. So
+`2 + 0.25 × fontPx` fails by 1.2 to 3.0px, and **`2 + 0.375 × fontPx`
+survives**: against Desktop's own widths the six title-off states give
+allowances of 5.6016, 6.5020, 7.4024, 8.3532, 9.2032 and 11.0039 against
+predictions of 5.600, 6.500, 7.400, 8.300, 9.200 and 11.000 — every one
+within **0.053px**.
+
+#### But the allowance depends on the string, and that is real
+
+At a fixed 12px, across the three fixture variants:
+
+| widest | Desktop canvas | gutter | allowance |
+|---|---:|---:|---:|
+| Scotland | 45.8848 | 81 | **5.1152** |
+| North West | 60.4980 | 97 | **6.5020** |
+| Loughborough | 79.2656 | 116 | **6.7344** |
+
+Spread **1.619px** at one font size, with the font question now closed. So
+this is not our measurement error — it is the allowance itself varying with
+the label, and no simple rounding rule fits all three (the implied margins
+are exactly 51, 67 and 86, but neither `ceil(w) + 5` nor `ceil(w + 5)`
+produces that set).
+
+**Outcome C for the candidate; Classification stays B.** The model is
+exact along the font-size axis and drifts up to 1.6px when the widest
+label changes — which is now the single remaining unknown, and it is a
+layout behaviour rather than a metrics artefact.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1840,7 +1921,11 @@ refuted — only shown not to hold under the hero transform.
 | Where that allocation sits geometrically | `UNKNOWN` (§5.27) |
 | The gutter responds to TEXT WIDTH, not just font size | `PROVEN-EXPERIMENT` (§5.28) — three strings at one font size, slope ≈ 1 |
 | Canvas `measureText` in our browser is not exactly Power BI's measured width | `PROVEN-EXPERIMENT` (§5.28) — residual spreads 1.6px across three strings |
-| The discrepancy is font substitution, not a missing layout term | `STRONGLY-SUPPORTED` (§5.28) — per-string differences are erratic, and §5.27 fixes the mechanism |
+| ~~The discrepancy is font substitution~~ | **REFUTED** (§5.29) — Desktop's own canvas returns identical widths to ours, to four decimals |
+| Desktop's canvas widths equal ours for every Segoe stack | `PROVEN-EXPERIMENT` (§5.29) — measured inside Desktop's WebView |
+| `2 + 0.25 × fontPx` as the chart-edge allowance | **REFUTED** (§5.29) — fails by 1.2 to 3.0px against Desktop's own widths |
+| `2 + 0.375 × fontPx` fits the six title-off states | `PROVEN-EXPERIMENT` (§5.29) — ≤0.053px against Desktop's own widths |
+| The allowance varies with the label string at fixed font size | `PROVEN-EXPERIMENT` (§5.29) — 1.619px of spread across three strings |
 | The native label margin is an integer number of pixels | `STRONGLY-SUPPORTED` (§5.28) — implied margins 46/62/81 from three strings |
 | The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
 | `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
