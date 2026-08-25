@@ -874,12 +874,19 @@ Two things worth recording rather than acting on:
   `cartesianOuterPaddingControl` feature switch and does not appear in the
   Format pane of this build. It is modelled here as scale behaviour, not
   added to the theme editor.
-- The bundle's thickness helper is `available / max(1, count + 2 × ratio)`,
+- ~~The bundle's thickness helper is `available / max(1, count + 2 × ratio)`,
   with no inner-padding term. That is a *candidate* thickness used while
   fitting; the scale Power BI actually renders includes the inner padding,
-  as the twelve states show. Reading the minified source suggested one
-  formula and the experiment settled a different one — which is the order
-  those two should be trusted in.
+  as the twelve states show.~~
+
+  > **Corrected in §5.18.** That helper is not a candidate and is not
+  > inconsistent with the measured step: it computes a different quantity.
+  > `available / (count + 2 × pOuter)` is the category **thickness**, which
+  > sizes marks; the band scale's **step**, which positions them, does
+  > carry the inner padding. Both rules are true and feed different stages
+  > of the renderer. Reading a formula that did not match the measurement
+  > and concluding the formula was the wrong one was the error — the
+  > right conclusion was that it answered a different question.
 
 #### The rule, stated independently
 
@@ -895,16 +902,17 @@ native's leading edge is exactly `pOuter × step` at every measured state,
 which centring cannot produce — centring would put it at
 `pOuter × step + (step − band) / 2`.
 
-#### What this does not explain
+#### What this does not explain — answered in §5.18
 
 The drawn cluster of bars is slightly narrower than `step × (1 − pInner)`,
 and by a margin that grows with the spacing: at spacing 20 the band measures
 0.7667 of a step against the 0.80 the declared property implies, and at 50
-it is 0.4479 against 0.50. The category scale is unaffected — solving for
-`pOuter` with the **declared** inner padding is what gives 0.4000 at every
-state — so this belongs to the series scale inside the band, not here. It
-is the same declared-versus-effective gap recorded in §5.14, now measured
-across six values instead of one.
+it is 0.4479 against 0.50.
+
+> **Resolved.** Not a series-scale effect and not a declared-versus-
+> effective discrepancy: the mark is sized from the category **thickness**,
+> a third quantity that carries no inner padding, rather than from the
+> positioning band. §5.18 predicts all twelve of these numbers exactly.
 
 ### 5.17 The category scale, verified in Theme Studio
 
@@ -935,19 +943,176 @@ figure read back from `getBoundingClientRect` and divided by 1.5 cannot
 resolve better than about 0.001 of a step. The pure scale is exact — the
 unit tests assert 4.6000 and 0.4000 with a 1e-9 tolerance.
 
-#### The residual that remains
+#### The residual that remained — closed in §5.19
 
 `band ÷ step` is 0.799 against native's 0.767, and the two rows below it
 follow from that one: Theme Studio's series scale divides a slightly wider
-band, so its series step and bar thickness are proportionally larger. This
-is the declared-versus-effective inner padding recorded in §5.14 and now
-measured at six spacings in §5.16 — Theme Studio uses the property Power BI
-reports (20), and Power BI's own bands come out narrower than that property
-implies. It belongs to the series scale inside the category band, and
-deliberately did not move here.
+band, so its series step and bar thickness are proportionally larger.
+
+> The reading here — that this was the series scale, and a
+> declared-versus-effective discrepancy in the inner padding — was wrong.
+> §5.18 shows the mark is sized from a **category thickness** that carries
+> no inner padding, which is a third quantity; §5.19 measures the result
+> after implementing it.
 
 Nothing else moved: the plot rectangle, both gutters, the axis typography
 and the series `paddingInner` are identical before and after.
+
+### 5.18 Three quantities, not one — step, thickness and width
+
+§5.16 left one residual: the drawn cluster was narrower than the
+positioning band, by a margin that grew with the category spacing. It was
+filed as a series-scale problem. It was not one.
+
+#### The missing abstraction
+
+Power BI keeps **three** numbers where Theme Studio kept one:
+
+| | formula | what it does |
+|---|---|---|
+| **step** | `plot / (count − pInner + 2 × pOuter)` | where a category sits |
+| **thickness** | `plot / (count + 2 × pOuter)` | — |
+| **width** | `thickness × (1 − pInner)` | how much of it a mark fills |
+
+The thickness has **no inner-padding term at all**. That is why the mark is
+not the band: a band scale takes the inner padding out of the step and then
+gives it back by widening the step, so `step > thickness` whenever the
+spacing is non-zero. The mark never sees that widening.
+
+#### Checked against the twelve states already measured
+
+Before running anything new, the §5.16 sweep was re-solved with the
+three-quantity model. Predicting **both** the step and the cluster extent
+for all twelve states, from the plot extent alone:
+
+| | worst error |
+|---|---:|
+| category step | 5.3e-5 |
+| category width | 5.0e-5 |
+
+Both are the four-decimal rounding in the capture. The thickness came out
+constant at **29.375** across all six spacings at 450×250 and **38.6806**
+at 600×300 — which is the whole claim in one number, since the step moved
+over the same range and the thickness did not.
+
+#### The runtime distinguishes them too
+
+Power BI Desktop's cartesian bundle builds the positioning scale literally
+as
+
+> `d3.scaleBand().range([0, pixelSpan]).paddingInner(innerPaddingRatio).paddingOuter(outerPaddingRatio)`
+
+which is exactly the step and leading edge measured in §5.16, and computes
+the thickness in a separate helper as `available / max(1, count + 2 ×
+ratio)`. The mark extent is `categoryThickness × (1 − innerPaddingRatio)`,
+already transcribed in `app/lib/seriesBands.ts` from an earlier pass, and it
+is what the clustered-series scale divides. `PROVEN-RUNTIME` for the
+distinction; the numbers below are `PROVEN-EXPERIMENT`.
+
+#### The orthogonal experiment — nine states, designed to falsify
+
+Rather than another sweep along one axis, both levels were varied
+independently: category spacing 0/20/50 × series gap 0/10/40, Classic 2026,
+Clustered bar, 450×250, unattended. The prediction chain runs plot → step →
+thickness → width → `clusteredSeriesBands` → series step and bar thickness,
+**with no fitted parameter** — the series model is the one already in the
+repository, handed the predicted width.
+
+| spacing | gap | step native / predicted | thickness | width native / predicted | series step native / predicted | bar native / predicted |
+|---:|---:|---|---:|---|---|---|
+| 0 | 0 | 29.3750 / 29.3750 | 29.3750 | 29.3750 / 29.3750 | 9.792 / 9.7917 | 9.792 / 9.7917 |
+| 0 | 10 | 29.3750 / 29.3750 | 29.3750 | 29.3750 / 29.3750 | 10.129 / 10.1293 | 9.116 / 9.1164 |
+| 0 | 40 | 29.3750 / 29.3750 | 29.3750 | 29.3750 / 29.3750 | 11.298 / 11.2981 | 6.779 / 6.7788 |
+| 20 | 0 | 30.6522 / 30.6522 | 29.3750 | 23.5000 / 23.5000 | 7.833 / 7.8333 | 7.833 / 7.8333 |
+| 20 | 10 | 30.6522 / 30.6522 | 29.3750 | 23.5000 / 23.5000 | 8.103 / 8.1034 | 7.293 / 7.2931 |
+| 20 | 40 | 30.6522 / 30.6522 | 29.3750 | 23.5000 / 23.5000 | 9.038 / 9.0385 | 5.423 / 5.4231 |
+| 50 | 0 | 32.7907 / 32.7907 | 29.3750 | 14.6875 / 14.6875 | 4.896 / 4.8958 | 4.896 / 4.8958 |
+| 50 | 10 | 32.7907 / 32.7907 | 29.3750 | 14.6875 / 14.6875 | 5.065 / 5.0647 | 4.558 / 4.5582 |
+| 50 | 40 | 32.7907 / 32.7907 | 29.3750 | 14.6875 / 14.6875 | 5.649 / 5.6490 | 3.389 / 3.3894 |
+
+Worst absolute errors: step **0**, width **0**, series step **5e-4**, bar
+**4e-4**. The last two are the three-decimal rounding the capture applies.
+
+**Classification: A — exact.**
+
+#### The independence held
+
+The falsification test was whether the series gap could move the category
+scale. It cannot:
+
+| spacing | category width across gaps 0/10/40 | step |
+|---:|---|---|
+| 0 | 29.375, 29.375, 29.375 | 29.3750 |
+| 20 | 23.5, 23.5, 23.5 | 30.6522 |
+| 50 | 14.6875, 14.6875, 14.6875 | 32.7907 |
+
+One value per spacing, unchanged by the gap — while the series step and bar
+thickness moved with it at every spacing. The two levels are genuinely
+independent, and the category scale does not know the gap exists.
+
+#### The whole category-axis chain, stated independently
+
+```
+pOuter    = categoryAxisVisible ? 0.4 : 0
+step      = plot / max(1, count − pInner + 2 × pOuter)   // positions
+start(i)  = plotStart + pOuter × step + i × step
+thickness = plot / max(1, count + 2 × pOuter)            // sizes
+width     = thickness × (1 − pInner)
+series    = clusteredSeriesBands(width, seriesCount, gap)
+```
+
+The mark is anchored at the band **start**, not centred in it: native's
+leading edge is `0.4 × step` at every one of the twenty-one states measured
+across §5.16 and here, which centring cannot produce.
+
+### 5.19 The category axis, closed
+
+Theme Studio measured in the browser before and after the three-quantity
+change, at its natural preview size, Classic 2026, spacing 20, gap 10.
+Normalised by the category step throughout.
+
+| | before | after | native |
+|---|---:|---:|---:|
+| plot ÷ step | 4.5975 | **4.5975** | 4.6000 |
+| leading edge ÷ step | 0.3992 | **0.3992** | 0.4000 |
+| **category width ÷ step** | 0.7992 | **0.7658** | **0.7667** |
+| series step ÷ step | 0.2750 | **0.2633** | 0.2644 |
+| bar thickness ÷ step | 0.2475 | **0.2375** | 0.2379 |
+| trailing edge ÷ step | 0.4008 | **0.4342** | 0.4333 |
+| series `paddingInner` | 0.1 | 0.098 | 0.1 |
+
+Positioning did not move, which was the requirement: `plot ÷ step` and the
+leading edge are identical before and after. Only the mark extent changed,
+and the series step and bar thickness followed it through the existing
+series model without being touched.
+
+The `paddingInner` row reads 0.098 rather than 0.100 for the same reason
+the other rows land in the third decimal: the bars are 4.4px at this
+preview size, so a ratio read back from `getBoundingClientRect` cannot
+resolve better than about 0.002. The model is exact — the unit tests assert
+the gap ratio at 1e-9.
+
+#### Native acceptance
+
+The shipped scale is asserted against all nine native states in
+`tests/categoryWidth.test.ts`: for each, the category step and category
+width come from `ChartLayout`, the series step and bar thickness from
+`clusteredSeriesBands` fed that width, and all four are compared with what
+Power BI drew. They agree to the capture's three decimals.
+
+**The category-axis rectangular mark geometry is recovered for this
+fixture** — Clustered Bar, Classic 2026, four categories, across three
+category spacings and three series gaps. That is a statement about this
+fixture and this visual, not about Power BI's cartesian layout generally:
+Line is untested and untouched, and no other visual type, theme or category
+count has been measured.
+
+#### What is left on the category axis
+
+Nothing measured. The remaining cartesian deltas are elsewhere: the fixed
+non-plot axis width (native spends 110–114px where the widest label needs
+60.5px), responsive typography, and the shedding behaviour — all deferred,
+and none of them a category-scale question.
 
 ### 5.5 Text measurement
 
@@ -1032,6 +1197,11 @@ refuted — only shown not to hold under the hero transform.
 | Power BI's "Space between categories" default is **20**, read from its own control | `PROVEN-RUNTIME` (§5.14) |
 | The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
 | Native category outer padding = **0.4 × step** at each end | `PROVEN-EXPERIMENT` (§5.16) — 12 states, two independent derivations, zero spread |
+| Category **thickness** = `plot / (count + 2 × pOuter)`, with no inner-padding term | `PROVEN-EXPERIMENT` (§5.18) — constant across six spacings at two sizes |
+| Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
+| Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
+| The series gap cannot move the category scale | `PROVEN-EXPERIMENT` (§5.18) — 3 gaps × 3 spacings, width invariant |
+| The positioning scale is a d3 `scaleBand` with both paddings | `PROVEN-RUNTIME` (§5.18) |
 | The category scale is a band scale: `step = plot / (count − pInner + 2 × pOuter)` | `PROVEN-EXPERIMENT` (§5.16) — predicts plot/step at six inner paddings |
 | Category bands sit flush at the start of their step, not centred | `PROVEN-EXPERIMENT` (§5.16) |
 | A hidden category axis takes outer padding 0 | `PROVEN-RUNTIME` (§5.16) — read from the bundle, not measured |

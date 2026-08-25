@@ -19,7 +19,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { BAR_CHART_BOX, categoryPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedStackedBarChartStyle } from "../../lib/stackedBarChartProperties";
 
 type Props = { stackedBarChartStyle: ResolvedStackedBarChartStyle; palette: string[] };
@@ -89,7 +89,11 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
               )}
 
               {barCategories.map((label, index) => {
-                const { offset: top, size: height } = categoryPercent(layout, index, barCategories.length);
+                // The mark's thickness is the category WIDTH, which is not the
+                // positioning band: Power BI derives it from a category
+                // thickness that carries no inner padding at all. stacked: one band, so the whole bar takes the category width.
+                const { offset: top } = categoryPercent(layout, index, barCategories.length);
+                const height = categoryWidthPercent(layout, barCategories.length);
                 // Real segments from real values. The stack runs from zero
                 // to the category total, and each series owns the span
                 // between the running total before it and after it.

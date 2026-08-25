@@ -110,11 +110,34 @@ export type ChartScale = {
    */
   value: (value: number) => number;
   /**
-   * The slot for one category, along the category axis — a y for a
-   * horizontal chart, an x for a vertical one. `size` already has the
-   * inner padding removed.
+   * Where one category **sits**: its band on the category axis — a y for a
+   * horizontal chart, an x for a vertical one.
+   *
+   * This is the positioning band of Power BI's category scale, which is a
+   * d3 `scaleBand` with the inner and outer paddings applied. Use it for
+   * anything that follows the scale: category labels, gridlines, a line
+   * chart's points.
+   *
+   * **Not** the size of a rectangular mark — see `categoryWidth`, which is
+   * a different and smaller quantity whenever the inner padding is
+   * non-zero.
    */
   category: (index: number, count: number) => { start: number; size: number };
+  /**
+   * How much of a category a rectangular mark **fills**, starting at that
+   * category's band start.
+   *
+   * Power BI derives this from a *category thickness* that has no inner
+   * padding term at all — `plot / (count + 2 × pOuter)` — and only then
+   * removes the inner padding. So it is not `band.size`: with four
+   * categories at 20% spacing the band is 0.800 of a step and the mark is
+   * 0.767 of one. Measured across nine native states in §5.18.
+   *
+   * Same for every category, so it takes only the count. Clustered charts
+   * hand it to `clusteredSeriesBands` as the extent to subdivide; stacked
+   * charts use it as the whole bar's thickness.
+   */
+  categoryWidth: (count: number) => number;
   /**
    * The tick values, in plot order: `ticks[i]` belongs at the i-th
    * gridline counting from the plot's origin edge. `value(ticks[i])`
@@ -236,6 +259,20 @@ export function clampedValueCoordinate(layout: ChartLayout, value: number): numb
   const origin = vertical ? layout.plot.y : layout.plot.x;
   const extent = vertical ? layout.plot.height : layout.plot.width;
   return Math.max(0, Math.min(extent, layout.scale.value(value) - origin));
+}
+
+/**
+ * The rectangular mark extent as a percentage of the category axis.
+ *
+ * The counterpart to `categoryPercent`'s `offset`: a bar starts where the
+ * band starts and is this long. Deliberately a separate call, so a
+ * renderer cannot reach for a positioning size when it wants a mark size.
+ */
+export function categoryWidthPercent(layout: ChartLayout, count: number): number {
+  const { plot } = layout;
+  const total = layout.orientation === "vertical" ? plot.width : plot.height;
+  if (total <= 0) return 0;
+  return (layout.scale.categoryWidth(count) / total) * 100;
 }
 
 /** A category slot as offset/size percentages along the category axis. */
@@ -479,16 +516,34 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
   // behind, because the two read the slots separately.
   const categoryInverted = Boolean(categoryAxis.invertAxis);
 
+  const categoryExtent = vertical ? plot.width : plot.height;
+  const categoryOrigin = vertical ? plot.x : plot.y;
+  const pInner = Math.max(0, Math.min(100, innerPadding)) / 100;
+  // A hidden category axis takes no outer padding, which is the rule Power
+  // BI's own bundle states; the measured states all had the axis visible,
+  // so that half is runtime-corroborated rather than measured here.
+  const pOuter = categoryAxis.show ? CATEGORY_OUTER_PADDING : 0;
+
+  /**
+   * The mark extent, which is NOT the band size.
+   *
+   * Power BI computes a category *thickness* with no inner-padding term,
+   * then removes the inner padding from that. The band, by contrast, is
+   * the step less the inner padding — and the step is larger than the
+   * thickness whenever the inner padding is non-zero, because the band
+   * scale gives back the padding it took. Nine native states confirm the
+   * two are distinct and that this one is what the series scale divides.
+   */
+  const categoryWidth = (count: number): number => {
+    if (count <= 0) return 0;
+    const thickness = categoryExtent / Math.max(1, count + 2 * pOuter);
+    return Math.max(0, thickness * (1 - pInner));
+  };
+
   const category = (index: number, count: number): { start: number; size: number } => {
-    if (count <= 0) return { start: vertical ? plot.x : plot.y, size: 0 };
-    const total = vertical ? plot.width : plot.height;
-    const origin = vertical ? plot.x : plot.y;
-    const pInner = Math.max(0, Math.min(100, innerPadding)) / 100;
-    // A hidden category axis takes no outer padding, which is the rule
-    // Power BI's own bundle states; the twelve measured states all had the
-    // axis visible, so that half is runtime-corroborated rather than
-    // measured here.
-    const pOuter = categoryAxis.show ? CATEGORY_OUTER_PADDING : 0;
+    if (count <= 0) return { start: categoryOrigin, size: 0 };
+    const total = categoryExtent;
+    const origin = categoryOrigin;
     // Band-scale semantics, matching native: the step absorbs the inner
     // padding once and the outer padding twice, so the plot holds
     // `count - pInner + 2 * pOuter` steps. The guard mirrors Power BI's own
@@ -516,6 +571,6 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     categoryAxis: categoryAxisRect,
     valueAxis: valueAxisRect,
     plot,
-    scale: { value, category, ticks },
+    scale: { value, category, categoryWidth, ticks },
   };
 }
