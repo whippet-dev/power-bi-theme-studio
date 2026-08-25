@@ -205,10 +205,14 @@ const SLIDER_CONTROL = (label) => `(() => {
     const range = [...card.querySelectorAll('input')].find((i) => i.type === 'range');
     if (!spin) return null;
     const r = spin.getBoundingClientRect();
+    let scroller = spin.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
     return {
       value: spin.value,
       x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
-      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
       min: range ? range.getAttribute('min') : null,
       max: range ? range.getAttribute('max') : null,
     };
@@ -732,13 +736,20 @@ const PAYLOADS = {
     const toggle = toggles[0];
     const input = toggle.querySelector('input');
     const r = toggle.getBoundingClientRect();
+    // Inside its SCROLLER, not inside the window: a control scrolled above
+    // the pane is still in the viewport, and clicking it hits whatever is
+    // painted there instead - which reports success and changes nothing.
+    let scroller = toggle.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
     return {
       ok: true,
       ownerTag: owner.tagName.toLowerCase(),
       ownerClass: String(owner.className || '').slice(0, 40),
       checked: input ? (input.getAttribute('aria-checked') ?? String(input.checked)) : null,
       x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
-      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
     };
   })()`,
   /**
@@ -764,6 +775,127 @@ const PAYLOADS = {
         w: Math.round(r.width), h: Math.round(r.height),
       }))
       .filter((e) => e.name);
+  })()`,
+
+  /**
+   * A snapshot of the Format pane's navigable state.
+   *
+   * Read-only, and scoped to what explains navigation: which cards and
+   * groups are mounted, which are expanded, where the scroller is and
+   * whether it is even the same element as last time. Enough to answer
+   * "what does a second action start from that a first does not" without
+   * reading anything about the person signed in.
+   */
+  paneState: () => `(() => {
+    const W = window.innerWidth;
+    const n = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
+    const inPane = (r) => r.x > W * 0.62;
+
+    const scrollers = [...document.querySelectorAll('*')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ el, r }) => inPane(r) && r.width > 150 && r.height > 150
+        && el.scrollHeight > el.clientHeight + 5);
+    const tallest = scrollers.sort((a, b) => b.el.clientHeight - a.el.clientHeight)[0];
+
+    const headings = (root, selector) => [...root.querySelectorAll(selector)]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => inPane(r) && r.width > 2 && r.height > 2);
+
+    const cards = headings(document, 'formatting-card').map(({ el }) => {
+      const header = el.querySelector('[role=button],button');
+      return {
+        name: header ? (header.getAttribute('aria-label') || header.textContent || '').trim().slice(0, 24) : null,
+        expanded: header ? header.getAttribute('aria-expanded') : null,
+        groups: el.querySelectorAll('formatting-group').length,
+        top: n(el.getBoundingClientRect().top),
+      };
+    }).filter((c) => c.name);
+
+    const groups = headings(document, 'formatting-group').map(({ el }) => {
+      const header = el.querySelector('[role=button],button');
+      return {
+        name: header ? (header.getAttribute('aria-label') || header.textContent || '').trim().slice(0, 24) : null,
+        expanded: header ? header.getAttribute('aria-expanded') : null,
+        card: (() => {
+          const owner = el.closest('formatting-card');
+          const h = owner && owner.querySelector('[role=button],button');
+          return h ? (h.getAttribute('aria-label') || h.textContent || '').trim().slice(0, 24) : null;
+        })(),
+        top: n(el.getBoundingClientRect().top),
+      };
+    }).filter((g) => g.name);
+
+    const active = document.activeElement;
+    const formatTab = [...document.querySelectorAll('[role=tab]')]
+      .find((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === 'Format visual'));
+
+    return {
+      scroller: tallest ? {
+        tag: tallest.el.tagName.toLowerCase(),
+        cls: String(tallest.el.className || '').slice(0, 44),
+        scrollTop: n(tallest.el.scrollTop),
+        scrollHeight: n(tallest.el.scrollHeight),
+        clientHeight: n(tallest.el.clientHeight),
+        top: n(tallest.r.top), left: n(tallest.r.left),
+        candidates: scrollers.length,
+      } : null,
+      cards: cards.map((c) => c.name + (c.expanded === 'true' ? '*' : '') + '@' + c.top),
+      expandedCards: cards.filter((c) => c.expanded === 'true').map((c) => c.name),
+      groups: groups.map((g) => g.card + '/' + g.name + (g.expanded === 'true' ? '*' : '') + '@' + g.top),
+      expandedGroups: groups.filter((g) => g.expanded === 'true').map((g) => g.card + '/' + g.name),
+      focus: active ? {
+        tag: active.tagName.toLowerCase(),
+        role: active.getAttribute('role'),
+        inPane: inPane(active.getBoundingClientRect()),
+        top: n(active.getBoundingClientRect().top),
+      } : null,
+      formatTabSelected: formatTab ? formatTab.getAttribute('aria-selected') : null,
+    };
+  })()`,
+
+  /**
+   * A formatting group's header, scoped to the card that owns it.
+   *
+   * This is the bug that made a second action fail where a first
+   * succeeded, and it was never about scrolling. **"Layout" is not a
+   * unique name.** Bars has a Layout group and so does Y-axis. In a fresh
+   * pane only one of them is mounted, so a global lookup happens to be
+   * right; leave the Y-axis card expanded from a previous action and the
+   * same lookup silently resolves the wrong card's group.
+   *
+   * Scoping by containment removes the coincidence. Fails closed if the
+   * card or the group is not uniquely identifiable.
+   */
+  cardGroup: (cardName, groupName) => `(() => {
+    const W = window.innerWidth;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const named = (root, wanted) => [...root.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === wanted) && inPane(e));
+
+    const cardHeadings = named(document, ${JSON.stringify(cardName)});
+    if (cardHeadings.length !== 1) return { ok: false, reason: cardHeadings.length + ' cards named ' + ${JSON.stringify(cardName)} };
+    const card = cardHeadings[0].closest('formatting-card');
+    if (!card) return { ok: false, reason: ${JSON.stringify(cardName)} + ' is not inside a formatting-card' };
+
+    const groupHeadings = named(card, ${JSON.stringify(groupName)});
+    if (groupHeadings.length !== 1) {
+      return { ok: false, reason: groupHeadings.length + ' groups named ' + ${JSON.stringify(groupName)} + ' in ' + ${JSON.stringify(cardName)} };
+    }
+    const header = groupHeadings[0];
+    const r = header.getBoundingClientRect();
+    // Visible means visible INSIDE ITS SCROLLER, not inside the window: a
+    // header scrolled above the pane still sits happily in the viewport,
+    // and a click there lands on whatever is painted over it.
+    let scroller = header.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    return {
+      ok: true,
+      expanded: header.getAttribute('aria-expanded'),
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
+    };
   })()`,
 
   /** Somewhere empty on the canvas, to deselect. */
@@ -1222,11 +1354,9 @@ export class LabController {
       await this.session.click(visual.x, visual.y);
       await sleep(700);
     }
-    if (!(await this.seekFormattingCard("Bars"))) {
-      throw new Error('the "Bars" card never mounted, at any scroll position');
-    }
-    await step("controlAt", "Bars", (c) => c.expanded === "true");
-    await step("controlAt", "Layout", (c) => c.expanded === "true");
+    // Bars' OWN Layout group: Y-axis has one too, and a global name lookup
+    // resolves whichever happens to be mounted.
+    await this.openLayoutCard("Bars", "Layout");
 
     // Scroll until the control is both present and on screen.
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -1287,6 +1417,7 @@ export class LabController {
     }
     this.mutated.categorySpacing = Number(spacing);
     this.log(`category spacing now ${after.value} (range ${after.min}..${after.max})`);
+    await this.collapseFormattingCard("Bars");
     return { spacing: Number(after.value), changed: true, settled: outcome.settled };
   }
 
@@ -1334,6 +1465,7 @@ export class LabController {
     }
     this.mutated.gap = gap;
     this.log(`series gap now ${after.value} (range ${after.min}..${after.max})`);
+    await this.collapseFormattingCard("Bars");
     return { gap, changed: true, settled: outcome.settled };
   }
 
@@ -1435,6 +1567,9 @@ export class LabController {
     }
     this.mutated.categoryAxisTitleVisible = visible;
     this.log(`category axis title now ${visible ? "shown" : "hidden"}`);
+    // Exit half of the contract: leave no expanded card behind, or the next
+    // action finds two groups of the same name mounted.
+    await this.collapseFormattingCard("Y-axis");
     return { visible, changed: true, settled: outcome.settled };
   }
 
@@ -1447,12 +1582,11 @@ export class LabController {
     for (let attempt = 0; attempt < 12; attempt++) {
       const found = await this.session.read("groupToggle", card, group);
       if (found && found.ok && found.visible) return found;
-      // Scroll TOWARDS it. Expanding a group scrolls its contents into view
-      // and can leave the group's own header above the fold, where scrolling
-      // down only pushes it further away - and a click at an off-screen
-      // coordinate lands on nothing while the toggle quietly reports the old
-      // value.
-      const towards = found && found.ok && found.y < 60 ? -200 : 200;
+      // Scroll TOWARDS it, using the scroller-relative flag rather than a
+      // window coordinate: expanding a group scrolls its contents into view
+      // and leaves the group's own header above the pane, where scrolling
+      // down pushes it further away.
+      const towards = found && found.ok && found.above ? -200 : 200;
       if (!(await this.scrollFormatPane(towards))) break;
     }
     const final = await this.session.read("groupToggle", card, group);
@@ -1462,11 +1596,11 @@ export class LabController {
     return final;
   }
   /**
-   * Selects the visual and expands one card and one of its groups.
+   * Selects the visual, expands one card, then that card's own group.
    *
-   * Every step re-seeks before it acts, because expanding a card scrolls the
-   * pane and the pane virtualises: the group you are about to click can be
-   * unmounted by the click that revealed its own card.
+   * The group is resolved **within the card**, because group names repeat:
+   * Bars has a Layout group and so does Y-axis. Every step re-seeks first,
+   * since expanding a card scrolls the pane and the pane virtualises.
    */
   async openLayoutCard(card, section) {
     await this.selectVisual();
@@ -1479,50 +1613,64 @@ export class LabController {
       await this.session.click(visual.x, visual.y);
       await sleep(700);
     }
-    for (const label of [card, section]) {
-      let expanded = false;
-      for (let attempt = 0; attempt < 4 && !expanded; attempt++) {
-        if (!(await this.seekFormattingCard(label))) {
-          throw new Error(`the "${label}" section never mounted, at any scroll position`);
-        }
-        const control = await this.session.read("controlAt", label);
-        if (!control) { await sleep(400); continue; }
-        if (control.expanded === "true") { expanded = true; break; }
-        await this.session.click(control.x, control.y);
-        await sleep(900);
+
+    // The card, by its own heading.
+    let cardOpen = false;
+    for (let attempt = 0; attempt < 4 && !cardOpen; attempt++) {
+      if (!(await this.seekFormattingCard(card))) {
+        throw new Error(`the "${card}" card never mounted, at any scroll position`);
       }
-      if (!expanded) {
-        const final = await this.session.read("controlAt", label);
-        if (!final || final.expanded !== "true") {
-          throw new Error(`the "${label}" section would not expand`);
-        }
+      const control = await this.session.read("controlAt", card);
+      if (!control) { await sleep(400); continue; }
+      if (control.expanded === "true") { cardOpen = true; break; }
+      await this.session.click(control.x, control.y);
+      await sleep(900);
+    }
+    if (!cardOpen) throw new Error(`the "${card}" card would not expand`);
+
+    // The group, scoped to that card.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const group = await this.session.read("cardGroup", card, section);
+      if (!group || !group.ok) {
+        throw new Error(`REFUSING TO CLICK — ${card} → ${section}: ${group ? group.reason : "no result"}`);
       }
+      if (group.expanded === "true") return;
+      if (!group.visible) {
+        if (!(await this.scrollFormatPane(group.above ? -200 : 200))) break;
+        continue;
+      }
+      await this.session.click(group.x, group.y);
+      await sleep(900);
+    }
+    const final = await this.session.read("cardGroup", card, section);
+    if (!final || !final.ok || final.expanded !== "true") {
+      throw new Error(`the "${card} → ${section}" group would not expand`);
     }
   }
 
-  async setVisualSize(width, height) {
-    await this.requireLabVisual();
-    validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
-    const map = await this.resolveSizeFields();
-    const fields = await this.openSizeControls();
-
-    await this.session.typeInto(fields[map.width].x, fields[map.width].y, String(Math.round(width)));
-    await sleep(400);
-    const fields2 = await this.session.read("sizeFields");
-    await this.session.typeInto(fields2[map.height].x, fields2[map.height].y, String(Math.round(height)));
-    const outcome = await this.settle();
-
-    // State verification: the click happening is not success.
-    const geometry = await this.session.read("geometry");
-    const ok = Math.abs(geometry.w - width) <= 1 && Math.abs(geometry.h - height) <= 1;
-    if (!ok) {
-      throw new Error(`Power BI did not accept ${width}x${height} — visual is ${geometry.w}x${geometry.h}`);
+  /**
+   * Leaves the Format pane in a state the next action can start from.
+   *
+   * The contract is both ends: an action normalises on entry by seeking what
+   * it needs, and collapses the card it expanded on the way out. Without the
+   * exit half, one expanded card leaves a second group of the same name
+   * mounted and the next action resolves the wrong one — which is exactly
+   * how a second title mutation used to fail where the first succeeded.
+   *
+   * This is authoring UI state only. No formatting value is touched.
+   */
+  async collapseFormattingCard(card) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (!(await this.seekFormattingCard(card))) return false;
+      const control = await this.session.read("controlAt", card);
+      if (!control) return false;
+      if (control.expanded !== "true") return true;
+      await this.session.click(control.x, control.y);
+      await sleep(700);
     }
-    this.mutated.width = Math.round(width);
-    this.mutated.height = Math.round(height);
-    return { ...outcome, width: geometry.w, height: geometry.h };
+    const final = await this.session.read("controlAt", card);
+    return Boolean(final && final.expanded !== "true");
   }
-
   /**
    * Waits for the renderer to hold still.
    *
