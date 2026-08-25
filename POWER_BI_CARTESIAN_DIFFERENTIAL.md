@@ -1306,12 +1306,61 @@ the label side is measured in isolation — did not run. The Format pane
 virtualises its cards: once an earlier operation has scrolled down to the
 Bars → Layout section, the Y-axis card is genuinely unmounted rather than
 merely off screen, and the locator correctly reports that it cannot find
-it. The title experiment itself is unaffected, because it runs before any
-Layout scrolling; only the combined sweep hits the ordering.
+it.
+
+> **Half solved in §5.22.** The pane is now navigable in that direction:
+> from a pane scrolled to Bars → Layout, with Y-axis unmounted, the title
+> mutation rewinds, finds the card and succeeds. The *reverse* direction,
+> repeatedly, is not, so the sweep still cannot run.
 
 **Classification: B**, and closer than it was. The title's half is settled;
 the label's half is one experiment away, and that experiment needs the pane
 navigation to survive a Layout scroll.
+
+### 5.22 Navigating a virtualised Format pane
+
+The blocker on the label side is not the measurement, it is reaching the
+control. Power BI's Format pane **virtualises**: a card scrolled far enough
+away is removed from the DOM, so after anything has visited Bars → Layout,
+the Y-axis card does not exist to be clicked. Querying for it returns
+nothing, which the locator correctly reports as absence rather than
+guessing.
+
+#### What now works
+
+`seekFormattingCard` rewinds the pane and walks it in bounded steps,
+checking after each whether the card has mounted. Movement is *observed*:
+each step compares `scrollTop` before and after and stops when the pane
+refuses to move. Position is only ever read — the scrolling itself is real
+wheel input, because a virtualising pane needs the events to mount
+anything. Order is used to navigate and never to identify: the card is
+matched by its own heading, and reaching the end without one fails.
+
+Two follow-on bugs surfaced and are fixed. Expanding a card scrolls the
+pane and can unmount the group about to be clicked, so every step re-seeks
+before it acts. And `openGroupToggle` scrolled only downward — while
+expanding a group scrolls its *contents* into view and leaves the group's
+own header **above** the fold, where scrolling down pushes it further away.
+A click at an off-screen coordinate lands on nothing while the toggle
+quietly reports the old value, which is exactly the "toggle reports false,
+asked for true" failure. It now scrolls towards its target.
+
+**The acceptance test passes**: from a pane genuinely scrolled to Bars →
+Layout with Y-axis unmounted, `setCategoryAxisTitleVisible(false)` rewinds,
+finds the card, resolves the exact Title toggle and mutates.
+
+#### What still does not
+
+The reverse direction, repeatedly. Once the Title group has been expanded,
+navigating back to Bars → Layout fails to find the gap sliders, and a
+second title mutation in the same session fails where a fresh session
+succeeds every time. The pane state one mutation leaves behind is not a
+state the navigator can currently start from.
+
+That is a specific, reproducible symptom rather than flakiness, and it is
+the whole of what stands between here and the isolated label sweep. Until
+it is fixed the label-side constants stay fitted, and §5.21's model stays
+at Classification **B**.
 
 ### 5.5 Text measurement
 
