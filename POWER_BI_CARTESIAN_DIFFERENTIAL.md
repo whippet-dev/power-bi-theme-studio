@@ -1610,6 +1610,71 @@ independent viewport widths as well as six font sizes and both title
 states, and the anchor's fixed 9px survives every one — but the ownership
 of `2 + 0.375 × labelPx` is exactly where §5.25 left it.
 
+### 5.27 `textWidthMeasurer` is canvas `measureText`, and nothing else
+
+The open question since §5.24 has been whether the unattributed
+`2 + 0.375 × labelPx` lives **inside** Power BI's text measurement or
+**outside** it in axis geometry. Every rendering experiment leaves those
+two indistinguishable, because they predict the same gutter for any string
+at any size. Only the implementation can separate them.
+
+#### The trace
+
+`getAxisTickLabelMargins` receives its measurer as a parameter (§5.24).
+Following the binding rather than the parameter name:
+
+```
+textWidthMeasurer: TextMeasurementService.measureSvgTextWidth
+```
+
+and that method, reduced to its behaviour:
+
+```
+measureSvgTextWidth(textProperties, text):
+    require fontSize to be in px
+    if no canvas context:  return text.length × parseInt(fontSize)   // fallback only
+    set the canvas font from textProperties
+    return canvasCtx.measureText(text).width
+         + (letterSpacing != null ? letterSpacing × text.length : 0)
+```
+
+**It is the raw canvas advance width.** No padding, no safety allowance, no
+bounding-box correction. The only addition is a `letterSpacing` term that
+is null unless something sets it, and the character-count branch is a
+fallback for when no canvas exists at all.
+
+`PROVEN-RUNTIME`.
+
+#### What that settles
+
+Of the two models §5.25 left standing:
+
+| | model | verdict |
+|---|---|---|
+| 1 | `nativeTextWidth = canvasWidth + 6.5`, anchor offset 9 | **refuted** |
+| 2 | `nativeTextWidth = canvasWidth`, a separate chart-edge-side allocation of 6.5, anchor offset 9 | **supported** |
+
+So the `2 + 0.375 × labelPx` is **axis or chart geometry, not text
+measurement**. It is also now clear why Theme Studio's canvas measurement
+agrees with native ink to 0.02% (§5.14): both sides are literally calling
+the same browser API on the same string.
+
+One caveat worth stating: the measurer sets the canvas font from Power BI's
+own `textProperties`. If those ever carried a family string different from
+the one the SVG paints with, the measured width would diverge from what is
+drawn — so "canvas measureText" is the mechanism, and the *inputs* to it
+remain worth checking if a discrepancy ever appears.
+
+#### What is still open
+
+Where the remaining `2 + 0.375 × labelPx` sits geometrically. It is on the
+chart-edge side of the label, between the chart's left edge and the start
+of the label's box — 6.5px at 12px, 11px at 24px — and it is not the
+label-to-plot gap, which is a fixed 9px (§5.25).
+
+**Classification: B**, with one of the two candidate owners now eliminated
+by implementation rather than by inference.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1704,7 +1769,10 @@ refuted — only shown not to hold under the hero transform.
 | The category label-to-plot gap is a fixed **9px**, not font-relative | `PROVEN-EXPERIMENT` (§5.25) — anchor distance, six font sizes, spread 0.000 |
 | Category labels are `text-anchor: end` at `x = -9` from the plot origin | `PROVEN-EXPERIMENT` (§5.25) |
 | The `2 + 0.375 × labelPx` term sits left of the anchor, in the allocated label width | `PROVEN-EXPERIMENT` (§5.25) — by subtraction from a fixed anchor |
-| Whether that term is a measurement allowance or axis padding | `UNKNOWN` (§5.25) — needs text width varied at fixed font size |
+| Power BI's `textWidthMeasurer` is `TextMeasurementService.measureSvgTextWidth` | `PROVEN-RUNTIME` (§5.27) |
+| That method returns raw `canvasCtx.measureText(text).width`, with no allowance | `PROVEN-RUNTIME` (§5.27) |
+| The `2 + 0.375 × labelPx` is therefore axis/chart geometry, not text measurement | `PROVEN-RUNTIME` (§5.27) — by elimination of the alternative implementation |
+| Where that allocation sits geometrically | `UNKNOWN` (§5.27) |
 | The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
 | `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
 | `maxMarginFactor` is exposed per visual as "Maximum width", default 25, range 15..50 | `PROVEN-UI` (§5.26) |
