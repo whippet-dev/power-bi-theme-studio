@@ -608,7 +608,7 @@ between 600 and 300 height, which neither Classic does.
 #### `paddingInner` = 0.1 in all eighteen variants
 
 Three themes, six sizes, every one exactly 0.100000. Together with the gap
-experiment (§7.1, and its automated repeat) this is the most heavily
+experiments (§7.1 by hand, §7.2 autonomously) this is the most heavily
 confirmed finding in the investigation, and the one Theme Studio already
 implements correctly.
 
@@ -706,7 +706,7 @@ refuted — only shown not to hold under the hero transform.
 |---|---|
 | Native geometry, typography, tick values, band model | `PROVEN-EXPERIMENT` |
 | `clusteredGapSize` subdivides a fixed category slot, affecting nothing else | `PROVEN-EXPERIMENT` (§7.1) |
-| Theme Studio's band model predicts Power BI's response to a gap change | `PROVEN-EXPERIMENT` (§7.1) |
+| Theme Studio's band model predicts Power BI's response to a gap change | `PROVEN-EXPERIMENT` (§7.1 under Fluent, §7.2 under Classic 2026 — the rule reproduces, the absolute geometry differs with the theme) |
 | Power BI antialiases fractional edges (2 phases sampled) | `PROVEN-EXPERIMENT` |
 | Theme Studio antialiases **under the hero transform** (1 clean sample) | `PROVEN-EXPERIMENT` |
 | `estimateText` error is the 0.55 heuristic | `STRONGLY-SUPPORTED` — two independent browser measurements agree to 0.4% |
@@ -811,6 +811,39 @@ Power BI responds to a setting a user changes. `PROVEN-EXPERIMENT`.
 
 It also validates the workflow itself — a one-property change produced
 twelve relevant lines and no noise.
+
+### 7.2 The same experiment, autonomously — 10 → 40 → 10
+
+The lab controller repeated §7.1 with **no human step**: set the gap through
+Power BI's own control, wait for the render to settle, measure, set it back,
+verify. This was the acceptance test for the mutation path before it was
+trusted with the eighteen-variant matrix.
+
+At **600 × 600 under Classic 2026**:
+
+| | gap 10 | gap 40 |
+|---|---:|---:|
+| band | 25.121 | 18.679 |
+| series step | 27.912 | 31.132 |
+| `paddingInner` | 0.1 | 0.4 |
+| category step, plot, bar count, value labels, legend | — | **unchanged** |
+
+Restoring 10 returned the geometry to its baseline exactly.
+
+**Verdict: PASS** — the same native geometry *rule* was reproduced, and
+`clusteredSeriesBands` predicted both states from one measured
+`categoryWidth` to within **7e-4**, which is the three-decimal rounding in
+the capture rather than model error.
+
+**This is not a replay of §7.1, and was never meant to be.** That experiment
+ran under Fluent (everything before §5.9 did), where the category
+`innerPadding` is 55.2% against Classic's 23.33%, so the cluster extent —
+and therefore every absolute number — differs. What is reproduced is the
+**semantic behaviour**: the series re-divide a fixed category slot and
+nothing outside that slot moves. No claim is made of pixel-for-pixel or
+byte-for-byte agreement with the earlier capture; the agreement being
+claimed is that one model predicts both themes' states without being tuned
+for either.
 
 ---
 
