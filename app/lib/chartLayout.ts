@@ -372,10 +372,47 @@ export function horizontalCategoryLabelAllowance(labelFontPx: number): number {
   return 2 + 0.375 * Math.max(0, labelFontPx);
 }
 
+/**
+ * What a legend costs, and which edge it costs it on.
+ *
+ * The only implementation. `computeChartLayout` uses it to reserve its own
+ * legend rect, and a renderer that draws the legend itself uses it to take
+ * the same band out of the authored visual first — so the two are the same
+ * arithmetic rather than two copies of it that happen to agree today.
+ *
+ * A legend costs width when it sits beside the plot and height when it
+ * sits above or below, which is why the result carries both the extent and
+ * the orientation: a caller placing the band needs to know which edge it
+ * came off.
+ */
+export function legendExtent(
+  legend: LegendLayoutStyle | undefined,
+  seriesLabels: readonly string[],
+  measureText: TextMeasure,
+  labelGap: number = DEFAULT_LABEL_GAP,
+): { width: number; height: number; vertical: boolean; afterPlot: boolean } {
+  if (!legend?.show) return { width: 0, height: 0, vertical: false, afterPlot: false };
+  // The same reading of Power BI's eight positions that ChartParts'
+  // legendIsVertical/legendIsAfterPlot use.
+  const position = String(legend.position);
+  const vertical = position.startsWith("Left") || position.startsWith("Right");
+  const afterPlot = position.startsWith("Bottom") || position.startsWith("Right");
+  // A legend is sized by its entries, measured in the LEGEND's own font —
+  // not the axis's — and its title counts as an entry when shown.
+  const entries = legend.showTitle && String(legend.titleText ?? "")
+    ? [String(legend.titleText), ...seriesLabels]
+    : seriesLabels;
+  const text = widestText(entries, legend.fontSize, legend.fontFamily, measureText);
+  return vertical
+    ? { width: text.width + LEGEND_SWATCH_EXTENT + labelGap, height: 0, vertical, afterPlot }
+    : { width: 0, height: (entries.length ? text.height : 0) + labelGap, vertical, afterPlot };
+}
+
 export const DEFAULT_TICK_COUNT = 4;
-const DEFAULT_LABEL_GAP = 4;
+/** The gap between a label and what it labels. */
+export const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */
-const LEGEND_SWATCH_EXTENT = 14;
+export const LEGEND_SWATCH_EXTENT = 14;
 
 /** Axis start/end arrive as strings from the schema and are blank unless pinned. */
 function parseBound(value: string | number | undefined): number | null {
@@ -494,26 +531,15 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     : null;
 
   // --- Legend ------------------------------------------------------------
-  // Placement follows the same reading of Power BI's eight positions that
-  // ChartParts' legendIsVertical/legendIsAfterPlot already use.
+  // Sizing lives in `legendExtent`, which a renderer drawing its own legend
+  // also calls. Reserving here is then only about which edge to take it
+  // from.
   let legendRect: Rect | null = null;
   if (legend?.show) {
-    const position = String(legend.position);
-    const legendVertical = position.startsWith("Left") || position.startsWith("Right");
-    const afterPlot = position.startsWith("Bottom") || position.startsWith("Right");
-    // A legend is sized by its entries, measured in the LEGEND's own font —
-    // not the axis's — and its title counts as an entry when shown.
-    const entries = legend.showTitle && String(legend.titleText ?? "")
-      ? [String(legend.titleText), ...seriesLabels]
-      : seriesLabels;
-    const text = widestText(entries, legend.fontSize, legend.fontFamily, measureText);
-    if (legendVertical) {
-      const extent = text.width + LEGEND_SWATCH_EXTENT + labelGap;
-      legendRect = afterPlot ? takeRight(extent) : takeLeft(extent);
-    } else {
-      const extent = (entries.length ? text.height : 0) + labelGap;
-      legendRect = afterPlot ? takeBottom(extent) : takeTop(extent);
-    }
+    const band = legendExtent(legend, seriesLabels, measureText, labelGap);
+    legendRect = band.vertical
+      ? (band.afterPlot ? takeRight(band.width) : takeLeft(band.width))
+      : (band.afterPlot ? takeBottom(band.height) : takeTop(band.height));
   }
 
   // --- Axis gutters ------------------------------------------------------

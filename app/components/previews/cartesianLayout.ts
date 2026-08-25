@@ -1,6 +1,8 @@
 import {
   computeChartLayout,
   estimateText,
+  legendExtent,
+  type LegendLayoutStyle,
   type AxisLayoutStyle,
   type CartesianOrientation,
   type ChartLayout,
@@ -102,10 +104,34 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
 export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
 
 /**
- * The bar chart's natural chart box. Replaces a coordinate system that was
- * never really a box at all: `.bar-row`'s `grid-template-columns: 68px
- * minmax(80px,1fr) 28px`, with the value axis inset by a TypeScript
- * constant hand-copied from it (RENDERER_AUDIT §2.3).
+ * The bar chart's **authored** size — the dimensions ChartLayout and the
+ * renderer believe the Power BI visual has.
+ *
+ * Not the same thing as how large Theme Studio displays it. The finished
+ * visual is scaled uniformly into whatever space the tile has (see
+ * `PreviewShell`), and that scale never feeds back into layout: gutters,
+ * typography, the category scale and the marks are all computed here, at
+ * this size, once.
+ *
+ * **450 × 250**, up from 372 × 128. The old box was measurably too small
+ * for a full-furniture preview. Native Classic 2026 at 450 × 250 still
+ * renders everything — twelve bars, four categories, legend, value labels,
+ * both axis titles — while at 372 × 128 it shows six bars, two categories,
+ * no legend and no value labels (POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.12).
+ * So the previous box asked this renderer to keep furniture Power BI
+ * itself sheds at that size, and the axis gutter alone was taking 26% of
+ * the width. Authoring at a size Power BI would keep everything at, then
+ * scaling the result, is the composition Power BI users actually see.
+ *
+ * Width is REAL here, not nominal: the renderer applies it, so the
+ * authored geometry can be measured and compared with native directly.
+ *
+ * Previous rationale, still true of the height it replaced:
+ *
+ * Replaces a coordinate system that was never really a box at all:
+ * `.bar-row`'s `grid-template-columns: 68px minmax(80px,1fr) 28px`, with
+ * the value axis inset by a TypeScript constant hand-copied from it
+ * (RENDERER_AUDIT §2.3).
  *
  * 128, the same as the column chart: a clustered bar is the transpose of a
  * clustered column over the same four categories, so an equal footprint is
@@ -121,9 +147,8 @@ export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
  * shorter than its own text. 128 clears `minimumPlotHeight` in each
  * measured condition with room to spare.
  *
- * Width is nominal, as above.
  */
-export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
+export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 250 };
 
 /**
  * The line chart's natural chart box. Replaces `.line-preview__plot`'s
@@ -208,6 +233,57 @@ function inCssPixels<
     fontFamily: axis.fontFamilyCss ?? axis.fontFamily,
     titleFontFamily: axis.titleFontFamilyCss ?? axis.titleFontFamily,
   };
+}
+
+/**
+ * How much of the authored visual a renderer-owned legend takes.
+ *
+ * The authored size describes the WHOLE visual, the way Power BI's own
+ * 450 × 250 does. The legend is drawn by the preview rather than by
+ * ChartLayout, so it has to come out of that budget before the chart is
+ * laid out — otherwise the chart is given the whole visual, the legend is
+ * added outside it, and the finished result is taller than the size it
+ * claims to be. That is exactly the boundary error this replaced: an
+ * authored 450 × 250 whose DOM measured 450 × 317.
+ *
+ * A thin adapter over `legendExtent`, which is the one implementation of
+ * what a legend costs — the engine reserves its own legend rect with the
+ * same call. There is no second copy to drift. All this adds is the
+ * theme's point-to-pixel conversion, because the engine is given CSS
+ * pixels and a style object is not.
+ */
+export function legendBandExtent(
+  legend: LegendLayoutStyle | undefined,
+  entryLabels: readonly string[],
+  measure: TextMeasure = canvasTextMeasure,
+): { width: number; height: number } {
+  if (!legend?.show) return { width: 0, height: 0 };
+  const band = legendExtent(
+    { ...legend, fontSize: themeFontSizeToCssPx(legend.fontSize) },
+    entryLabels,
+    measure,
+  );
+  return { width: band.width, height: band.height };
+}
+
+/**
+ * The rectangle ChartLayout is given, once renderer-owned chrome has been
+ * taken out of the authored visual.
+ */
+export function authoredInnerBox(box: Rect, chrome: { width: number; height: number }): Rect {
+  return {
+    x: box.x,
+    y: box.y,
+    width: Math.max(0, box.width - chrome.width),
+    height: Math.max(0, box.height - chrome.height),
+  };
+}
+
+/** The band a renderer-owned legend occupies, as an inline style. */
+export function legendBandStyle(band: { width: number; height: number }): { width?: number; height?: number } {
+  if (band.width > 0) return { width: band.width };
+  if (band.height > 0) return { height: band.height };
+  return {};
 }
 
 export function computePreviewCartesianLayout(input: CartesianLayoutInput): ChartLayout {

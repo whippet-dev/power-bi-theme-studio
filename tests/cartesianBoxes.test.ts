@@ -272,12 +272,15 @@ test("a bar chart divides its plot by rows, a column chart by ticks", () => {
   assert.equal(divisionsOf(CARTESIAN[0], twelve), twelve.length);
   assert.equal(divisionsOf(CARTESIAN[2], twelve), DEFAULT_TICK_COUNT);
 
-  // The bar chart's rows are its categories, so twelve of them stop fitting
-  // in a box that comfortably holds four.
+  // The bar chart's rows are its categories, so enough of them stop fitting:
+  // a fixed box scrolls, it does not grow. Derived from the box rather than
+  // hardcoded, because the authored size is now 450x250 and twelve rows do
+  // fit in it - the point was never the number twelve.
   assert.ok(bar.layout.plot.height / 4 >= barLine);
+  const tooMany = Math.ceil(bar.layout.plot.height / barLine) + 1;
   assert.ok(
-    bar.layout.plot.height / twelve.length < barLine,
-    "twelve rows should no longer fit — a fixed box scrolls, it does not grow",
+    bar.layout.plot.height / tooMany < barLine,
+    `${tooMany} rows should no longer fit — a fixed box scrolls, it does not grow`,
   );
 
   // The column chart's vertical divisions are tick intervals, which twelve

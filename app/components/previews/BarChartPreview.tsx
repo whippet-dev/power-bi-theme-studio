@@ -23,6 +23,8 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
+import { authoredInnerBox, legendBandExtent, legendBandStyle } from "./cartesianLayout";
+import { PresentationScale } from "./PresentationScale";
 import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedBarChartStyle } from "../../lib/barChartProperties";
 
@@ -45,8 +47,15 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
   // top-to-bottom. One layout owns the plot and both gutters, which is what
   // makes RENDERER_AUDIT §2.2 structurally impossible — there is no longer
   // a CSS grid deciding where the bars go, and nothing to disagree with.
+  // The authored size describes the WHOLE visual, as Power BI's 450 x 250
+  // does. The legend is drawn here rather than by ChartLayout, so its band
+  // comes out of that budget first and the chart is laid out in what is
+  // left - otherwise the finished visual is taller than the size it claims.
+  const legendBand = legendBandExtent(barChartStyle.legend, legendItems.map((item) => item.label));
+  const authoredInner = authoredInnerBox(BAR_CHART_BOX, legendBand);
+
   const layout = computePreviewCartesianLayout({
-    box: BAR_CHART_BOX,
+    box: authoredInner,
     orientation: "horizontal",
     categoryAxis: barChartStyle.categoryAxis,
     valueAxis: barChartStyle.valueAxis,
@@ -100,14 +109,30 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
   );
 
   return (
+    <PresentationScale width={BAR_CHART_BOX.width}>
     <span
-      className={`chart-preview${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}
+      className={`chart-preview chart-preview--authored${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{
+        opacity: 1 - barChartStyle.plotArea.transparency / 100,
+        width: BAR_CHART_BOX.width,
+        height: BAR_CHART_BOX.height,
+      }}
     >
-      {!legendAtBottom && legendNode}
+      {!legendAtBottom && (
+        <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>
+          {legendNode}
+        </span>
+      )}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          <span className="bar-preview__plot" style={{ height: BAR_CHART_BOX.height }}>
+          {/* The authored plot region. Width is applied as well as height so
+              the visual genuinely occupies its authored size rather than
+              stretching to whatever the tile happens to be — presentation
+              scaling is what fits it to the UI, and it happens after this. */}
+          <span
+            className="bar-preview__plot"
+            style={{ width: authoredInner.width, height: authoredInner.height }}
+          >
             <ValueAxisGutter
               axis={barChartStyle.valueAxis}
               layout={layout}
@@ -217,7 +242,12 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
           </span>
         </span>
       </span>
-      {legendAtBottom && legendNode}
+      {legendAtBottom && (
+        <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>
+          {legendNode}
+        </span>
+      )}
     </span>
+    </PresentationScale>
   );
 }
