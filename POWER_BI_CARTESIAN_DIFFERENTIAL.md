@@ -737,6 +737,81 @@ the category slot without resizing it.
 3. **Responsive typography.** Native shrinks legend and axis titles below a
    height threshold; Theme Studio does not. Deferred deliberately (§9.2b).
 
+### 5.15 Which text class the category axis actually takes
+
+§5.14 changed `categoryAxisLabel` from `lightLabel` to `smallLightLabel` on
+the strength of a size: native Classic 2026 renders 12px, and 12px = 9pt =
+its declared `label` × 0.9. That proved the **number**. It did not prove the
+**mechanism**, and the two have different consequences for anyone who edits
+a theme — a 9pt visual-property default stays 9pt when a user raises their
+`label` class, where a ×0.9 class does not.
+
+Microsoft's published table associates category axis labels with
+`lightLabel` (BASE_THEME_DIFFERENTIAL_AUDIT.md §4.1), so this needed
+settling rather than asserting.
+
+#### The controls, at baseline
+
+Power BI's own Font Size control, read through the Format pane under each
+base theme:
+
+| base theme | category axis | value axis | rendered | theme's `label` | ratio |
+|---|---:|---:|---:|---:|---:|
+| Classic 2026 | **9pt** | 9pt | 12px | 10pt | 0.90 |
+| Classic 2018 | **8pt** | 8pt | 10.667px | 10pt | **0.80** |
+| Fluent 2 | **10.5pt** | 10.5pt | 14px | 10.5pt | 1.00 |
+
+Three ratios from three themes, which on its own looks like three
+visual-property defaults. Fluent's is one: it declares `fontSize` 10.5 in
+its own `visualStyles`. Classic 2018's 8pt is not explained by anything in
+its theme file, which declares `label` 10pt and no axis typography at all.
+
+#### The decisive experiment
+
+Raise the report theme's **primary text size** (Theme pane → Text → General,
+which is the `label` class) from 10pt to 20pt under Classic 2026, change
+nothing else, and watch which roles follow:
+
+| role | before | after | scale |
+|---|---|---|---|
+| category axis | 9pt / 12px | **18pt / 24px** | **×0.9** |
+| value axis | 9pt / 12px | 18pt / 24px | ×0.9 |
+| legend | 10pt / 13.333px | 26.667px | ×1.0 |
+| axis titles | 12pt / 16px | 16px | unmoved |
+
+**Outcome B.** The category axis derives from the primary label class with
+the 0.9 scale — it is `smallLightLabel`, and Power BI's own control says so:
+it reads **18** after the change, so this is the renderer's resolution and
+not an inference from pixels.
+
+The legend is the control in the experiment. It moved **1:1** in the same
+run, which rules out "the theme scaled everything" and shows the two roles
+genuinely take different classes. Axis titles did not move at all, which is
+`title` behaving exactly as documented.
+
+So the published table is wrong on this one row, and Theme Studio follows
+the runtime. The consequence is the point: a custom theme setting `label`
+to 20pt renders its category axis at 18pt, and only the class mapping
+reproduces that. Modelling 9pt as a visual-property default would have been
+right for the baseline and wrong for every theme a user edits.
+
+Restored to 10pt afterwards and verified.
+
+#### What this does not settle
+
+Classic 2018's **8pt**. It declares the same `label` 10pt as Classic 2026
+and no axis typography, yet resolves 8pt — and its legend renders at
+10.667px too, so under 2018 even the legend is not the unscaled label
+class. The same experiment under Classic 2018 could not be run: after the
+base-theme switch the Theme pane's General control was no longer where the
+controller could find it, and chasing that was out of scope here.
+
+This is the third finding to land on the same wall — shedding thresholds
+(§5.13), category typography (here), and axis-label sizing — where Classic
+2018 differs from Classic 2026 in ways nothing in either theme file
+explains. `UNKNOWN`, and the most valuable single question the lab could
+answer next.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -820,7 +895,10 @@ refuted — only shown not to hold under the hero transform.
 | Power BI's "Space between categories" default is **20**, read from its own control | `PROVEN-RUNTIME` (§5.14) |
 | The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
 | Native category outer padding ≈ 0.4 × step at each end | `STRONGLY-SUPPORTED` (§5.14) — derived from plot ÷ step = 4.600 at two sizes, not read from a control |
-| Category axis labels are a ×0.9 text class under Classic 2026 | `PROVEN-EXPERIMENT` (§5.13) — contradicts Microsoft's documented `lightLabel` association on size |
+| Category axis labels **derive from** the primary label class × 0.9 (`smallLightLabel`) | `PROVEN-EXPERIMENT` (§5.15) — theme label 10→20pt moved the axis 9→18pt and its own control to 18, while the legend moved 1:1; contradicts Microsoft's documented `lightLabel` association |
+| Legend text is the unscaled label class under Classic 2026 | `PROVEN-EXPERIMENT` (§5.15) |
+| Axis titles do not derive from the label class | `PROVEN-EXPERIMENT` (§5.15) — unmoved by a 2× label change |
+| Why Classic 2018 resolves 8pt from a declared 10pt label | `UNKNOWN` (§5.15) |
 | `estimateText`'s error is per-string, not a scale factor (0.453–0.561em) | `PROVEN-EXPERIMENT` (§5.14) |
 | Shedding differs by theme beyond what measured typography, furniture and plot area explain | `INFERENCE` (§5.13) — those three are ruled out as a complete explanation |
 | Whether the remaining cause is another theme-resolved default or theme-conditional renderer logic | `UNKNOWN` — unmeasured defaults (minimum category thickness, density or scroll thresholds, padding) would produce the same pattern |

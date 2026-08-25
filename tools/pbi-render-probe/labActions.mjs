@@ -24,6 +24,7 @@ export const ALLOWED_ACTIONS = Object.freeze({
   setVisualSize: { params: ["width", "height"], mutates: true, implemented: true },
   setBaseTheme: { params: ["theme"], mutates: true, implemented: true },
   setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
+  setThemeTextSize: { params: ["size"], mutates: true, implemented: true },
   readState: { params: [], mutates: false, implemented: true },
 });
 
@@ -94,6 +95,13 @@ export function validateAction(action) {
   if (action.type === "setSeriesGap") {
     if (!Number.isFinite(action.gap) || action.gap < 0 || action.gap > 75) {
       throw new ActionError("gap must be between 0 and 75");
+    }
+  }
+  if (action.type === "setThemeTextSize") {
+    // The report theme's primary text class. Power BI's own control caps
+    // at 45, and a value below 8 is not something the pane will accept.
+    if (!Number.isFinite(action.size) || action.size < 8 || action.size > 45) {
+      throw new ActionError("theme text size must be between 8 and 45");
     }
   }
   return true;
@@ -310,6 +318,12 @@ export function planRestoration(initial, mutated) {
   if (mutated?.baseTheme !== undefined && initial.baseTheme !== mutated.baseTheme) {
     plan.push({ type: "setBaseTheme", theme: initial.baseTheme });
   }
+  // After the base theme, not before: switching base themes re-resolves the
+  // text classes, so a text size restored first would be thrown away by the
+  // switch that follows it.
+  if (mutated?.themeTextSize !== undefined && initial.themeTextSize !== mutated.themeTextSize) {
+    plan.push({ type: "setThemeTextSize", size: initial.themeTextSize });
+  }
   for (const action of plan) validateAction(action);
   return plan;
 }
@@ -317,7 +331,7 @@ export function planRestoration(initial, mutated) {
 /** Did restoration actually work? Compared, never assumed. */
 export function verifyRestoration(initial, current, tolerance = 0.5) {
   const problems = [];
-  for (const key of ["width", "height", "gap"]) {
+  for (const key of ["width", "height", "gap", "themeTextSize"]) {
     if (initial?.[key] === undefined || current?.[key] === undefined) continue;
     if (Math.abs(initial[key] - current[key]) > tolerance) {
       problems.push(`${key}: expected ${initial[key]}, found ${current[key]}`);

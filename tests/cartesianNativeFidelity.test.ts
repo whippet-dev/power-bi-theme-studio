@@ -117,8 +117,10 @@ test("a custom theme's own label class still drives the derivation", () => {
     name: "custom",
     textClasses: { label: { fontSize: 20, fontFace: "Arial", color: "#000000" } },
   } as PowerBITheme;
-  // 20 x 0.9. The correction changes which class the role takes, not whether
-  // a custom theme reaches it.
+  // 20 x 0.9 - and this is the case the native experiment actually tested:
+  // with the report theme's primary text at 20pt, Power BI's own category
+  // axis control reads 18 and it renders 24px. This assertion is the same
+  // number, reached the same way.
   assert.equal(styleOf(custom, "classic2026").categoryAxis.fontSize, 18);
 });
 

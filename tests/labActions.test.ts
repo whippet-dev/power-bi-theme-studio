@@ -458,3 +458,54 @@ test("an unimplemented action refuses loudly rather than silently passing", () =
     if (spec.implemented) assert.equal(requireImplemented(name), true, name);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Editing the report theme's primary text size
+// ---------------------------------------------------------------------------
+
+test("setThemeTextSize is allowlisted and implemented", () => {
+  assert.ok(ALLOWED_ACTIONS.setThemeTextSize, "on the allowlist");
+  assert.equal(ALLOWED_ACTIONS.setThemeTextSize.mutates, true);
+  assert.equal(requireImplemented("setThemeTextSize"), true);
+});
+
+test("a theme text size outside Power BI's own range is refused", () => {
+  // The control caps at 45 and will not take a value below 8. This edits the
+  // whole report's typography, so a typo is worth catching before it lands.
+  for (const size of [0, 7, 46, 200, Number.NaN, "20"]) {
+    assert.throws(
+      () => validateAction({ type: "setThemeTextSize", size }),
+      ActionError,
+      `size ${String(size)} should be refused`,
+    );
+  }
+  assert.equal(validateAction({ type: "setThemeTextSize", size: 20 }), true);
+  assert.throws(() => validateAction({ type: "setThemeTextSize" }), /needs size/);
+});
+
+test("restoring a theme text size happens AFTER the base theme, not before", () => {
+  // Switching base themes re-resolves the text classes, so a size put back
+  // first would be discarded by the switch that follows it.
+  const plan = planRestoration(
+    { width: 600, height: 600, baseTheme: "Classic 2026", themeTextSize: 10 },
+    { baseTheme: "Fluent 2", themeTextSize: 20 },
+  );
+  assert.deepEqual(plan, [
+    { type: "setBaseTheme", theme: "Classic 2026" },
+    { type: "setThemeTextSize", size: 10 },
+  ]);
+});
+
+test("a text size nobody changed is never restored", () => {
+  assert.deepEqual(planRestoration({ themeTextSize: 10 }, {}), []);
+  assert.deepEqual(planRestoration({ themeTextSize: 10 }, { themeTextSize: 10 }), []);
+});
+
+test("an unrestored theme text size is reported as a problem", () => {
+  const result = verifyRestoration(
+    { width: 600, height: 600, themeTextSize: 10 },
+    { width: 600, height: 600, themeTextSize: 20 },
+  );
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /themeTextSize: expected 10, found 20/);
+});

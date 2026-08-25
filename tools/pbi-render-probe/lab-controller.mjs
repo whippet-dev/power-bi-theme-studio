@@ -445,6 +445,77 @@ const PAYLOADS = {
    */
   sliderControlAt: (label) => SLIDER_CONTROL(label),
 
+  /**
+   * Every value-bearing control in the Format pane, with the label nearest
+   * above it.
+   *
+   * Read-only and deliberately unopinionated: the pane's font-size control
+   * has no accessible name of its own, and which element type Power BI uses
+   * for it has changed between releases. Reporting what is actually there
+   * beats guessing a selector that will rot.
+   */
+  paneInputs: () => `(() => {
+    const W = window.innerWidth;
+    const inPane = (r) => r.x > W * 0.62 && r.width > 4 && r.height > 4;
+    const texts = [...document.querySelectorAll('*')]
+      .filter((e) => !e.children.length && (e.textContent || '').trim())
+      .map((e) => ({ text: (e.textContent || '').trim(), r: e.getBoundingClientRect() }))
+      .filter((t) => inPane(t.r));
+    const nearestLabel = (r) => {
+      let best = null;
+      for (const t of texts) {
+        if (t.r.bottom > r.top + 4) continue;
+        const d = r.top - t.r.bottom + Math.abs(t.r.x - r.x) / 8;
+        if (d < 0 || d > 80) continue;
+        if (!best || d < best.d) best = { d, text: t.text };
+      }
+      return best ? best.text : null;
+    };
+    return [...document.querySelectorAll('input,[role=combobox],[role=spinbutton]')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => inPane(r))
+      .map(({ el, r }) => ({
+        tag: el.tagName.toLowerCase(),
+        type: el.getAttribute('type'),
+        role: el.getAttribute('role'),
+        ariaLabel: el.getAttribute('aria-label'),
+        value: el.value !== undefined ? el.value : (el.textContent || '').trim(),
+        label: nearestLabel(r),
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      }));
+  })()`,
+
+  /**
+   * The report theme's primary text-size control.
+   *
+   * Theme pane — Text — General, which is the `label` text class every other
+   * class derives from. Found through the label that owns it, like the
+   * Layout sliders, because the input itself is named only "Font Size" and
+   * several controls share that name.
+   */
+  themeTextSizeControl: () => `(() => {
+    const W = window.innerWidth;
+    const inPane = (r) => r.x > W * 0.62 && r.width > 4 && r.height > 4;
+    const labels = [...document.querySelectorAll('*')]
+      .filter((e) => !e.children.length && (e.textContent || '').trim() === 'General')
+      .map((e) => e.getBoundingClientRect())
+      .filter(inPane);
+    if (labels.length !== 1) return null;
+    const row = labels[0];
+    const input = [...document.querySelectorAll('input')].find((el) => {
+      const r = el.getBoundingClientRect();
+      return inPane(r) && el.getAttribute('aria-label') === 'Font Size'
+        && Math.abs(r.top - row.top) < 40;
+    });
+    if (!input) return null;
+    const r = input.getBoundingClientRect();
+    return {
+      value: input.value,
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+    };
+  })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');
@@ -865,6 +936,63 @@ export class LabController {
     return { gap, changed: true, settled: outcome.settled };
   }
 
+  /**
+   * Opens the report theme pane's Text section and returns its General
+   * font-size control.
+   */
+  async openThemeTextControl() {
+    await this.openThemeControls();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const existing = await this.session.read("themeTextSizeControl");
+      if (existing) return existing;
+      const text = await this.session.read("controlAt", "Text");
+      if (!text) break;
+      if (text.expanded !== "true") await this.session.click(text.x, text.y);
+      await sleep(800);
+    }
+    const final = await this.session.read("themeTextSizeControl");
+    if (!final) throw new Error("could not find the theme's General text-size control");
+    return final;
+  }
+
+  /**
+   * Sets the report theme's primary text size, through Power BI's own
+   * control.
+   *
+   * This edits the report theme rather than one visual, so it is restored
+   * like any other mutation — and the original is captured on first use,
+   * not eagerly, so a run that never touches it pays nothing.
+   */
+  async setThemeTextSize(size) {
+    validateAction({ type: "setThemeTextSize", size });
+    requireImplemented("setThemeTextSize");
+    await this.requireLabVisual();
+
+    const control = await this.openThemeTextControl();
+    if (this.initialState && this.initialState.themeTextSize === undefined) {
+      this.initialState.themeTextSize = Number(control.value);
+    }
+    if (Number(control.value) === Number(size)) {
+      this.log(`theme text size already ${size}`);
+      await this.selectVisual();
+      return { size, changed: false, settled: true };
+    }
+
+    await this.session.typeInto(control.x, control.y, String(size));
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("themeTextSizeControl");
+    if (!after || Number(after.value) !== Number(size)) {
+      throw new Error(
+        `theme text size did not take: asked for ${size}, control reports ${after ? after.value : "nothing"}`,
+      );
+    }
+    this.mutated.themeTextSize = Number(size);
+    this.log(`theme text size now ${after.value}`);
+    await this.selectVisual();
+    return { size: Number(after.value), changed: true, settled: outcome.settled };
+  }
+
   async setVisualSize(width, height) {
     await this.requireLabVisual();
     validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
@@ -924,9 +1052,15 @@ export class LabController {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
       if (action.type === "setSeriesGap") await this.setSeriesGap(action.gap);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
+      if (action.type === "setThemeTextSize") await this.setThemeTextSize(action.size);
     }
     const current = await this.session.read("labState");
     current.baseTheme = await this.readBaseTheme();
+    if (this.mutated.themeTextSize !== undefined) {
+      const text = await this.session.read("themeTextSizeControl");
+      if (text) current.themeTextSize = Number(text.value);
+      await this.selectVisual();
+    }
     const result = verifyRestoration(this.initialState, current);
     if (!result.restored) {
       console.error("\n*** RESTORATION FAILED ***");

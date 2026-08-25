@@ -235,14 +235,16 @@ test("the semantic roles map to the classes Microsoft documents", () => {
   assert.equal(TEXT_ROLE_CLASS.categoryAxisTitle, "title");
   assert.equal(TEXT_ROLE_CLASS.valueAxisTitle, "title");
   // Microsoft's published table associates category axis labels with
-  // `lightLabel`. Power BI's own output disagrees on size: under Classic
-  // 2026, whose theme declares label 10pt, the legend renders at 13.333px
-  // (10pt, the unscaled class) while BOTH axis labels render at 12px (9pt,
-  // the x0.9 class) at every one of twelve tested sizes. Rendering is what
-  // Theme Studio has to predict, so the size follows the measurement and the
-  // documented association is recorded as contradicted in
-  // BASE_THEME_DIFFERENTIAL_AUDIT.md 4.1. The colour is identical either
-  // way - both are light classes - so only the scale moves.
+  // `lightLabel`. The runtime disagrees, and was made to prove it rather
+  // than inferred from one baseline number: raising the report theme's
+  // primary text size from 10pt to 20pt in Power BI Desktop moved the
+  // category axis to 18pt/24px (x0.9) and its own font-size control to 18,
+  // while the legend moved to 26.667px (x1.0) in the same run and the axis
+  // titles did not move at all. A custom theme setting label 20pt must
+  // therefore render its category axis at 18pt, which only the class
+  // mapping reproduces. The documented association is recorded as
+  // contradicted in BASE_THEME_DIFFERENTIAL_AUDIT.md 4.1; colour is
+  // identical either way, so only the scale moves.
   assert.equal(TEXT_ROLE_CLASS.categoryAxisLabel, "smallLightLabel");
   assert.equal(TEXT_ROLE_CLASS.legendText, "lightLabel");
   assert.equal(TEXT_ROLE_CLASS.valueAxisLabel, "smallLightLabel");
