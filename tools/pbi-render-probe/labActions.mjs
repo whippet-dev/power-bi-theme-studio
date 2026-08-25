@@ -25,7 +25,18 @@ export const ALLOWED_ACTIONS = Object.freeze({
   setBaseTheme: { params: ["theme"], mutates: true, implemented: true },
   setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
   setThemeTextSize: { params: ["size"], mutates: true, implemented: true },
+  // Navigable and readable, but the selection does not take: the theme
+  // pane's font dropdown opens and reports all 26 families, and clicking an
+  // option - with or without a preceding hover - leaves the control on its
+  // old value. The size control beside it applies live, so this is specific
+  // to the family picker. Refuses rather than reporting a change it did not
+  // make.
+  setThemeLabelFontFamily: { params: ["family"], mutates: true, implemented: false },
   setCategorySpacing: { params: ["spacing"], mutates: true, implemented: true },
+  // Driveable once the toggle's OWNER was found rather than its position:
+  // a formatting-card owns a named heading, a formatting-group inside it
+  // owns its own heading, and that group's header holds exactly one toggle.
+  setCategoryAxisTitleVisible: { params: ["visible"], mutates: true, implemented: true },
   readState: { params: [], mutates: false, implemented: true },
 });
 
@@ -54,6 +65,19 @@ export function requireImplemented(type) {
  * nothing, and the run would then be filed under the wrong theme.
  */
 export const SUPPORTED_BASE_THEMES = Object.freeze(["Fluent 2", "Classic 2026", "Classic 2018"]);
+
+/**
+ * The families the lab may select for the theme's primary label class.
+ *
+ * Deliberately a short allowlist of built-ins with materially different
+ * metrics rather than an arbitrary font API: the point is to vary measured
+ * text width while holding font size fixed, not to offer font control. The
+ * live dropdown is still checked before anything is clicked — a name being
+ * allowlisted here does not mean this build exposes it.
+ */
+export const SUPPORTED_LABEL_FONTS = Object.freeze([
+  "Segoe UI", "Arial", "Courier New", "Georgia", "Times New Roman", "Verdana", "Trebuchet MS", "Tahoma",
+]);
 
 export class ActionError extends Error {}
 
@@ -98,6 +122,9 @@ export function validateAction(action) {
       throw new ActionError("gap must be between 0 and 75");
     }
   }
+  if (action.type === "setCategoryAxisTitleVisible") {
+    if (typeof action.visible !== "boolean") throw new ActionError("visible must be a boolean");
+  }
   if (action.type === "setCategorySpacing") {
     // Power BI's "Space between categories", the user-facing property. Its
     // own control reports 0..75, the same range as the series gap - which
@@ -105,6 +132,13 @@ export function validateAction(action) {
     // the layout entirely.
     if (!Number.isFinite(action.spacing) || action.spacing < 0 || action.spacing > 75) {
       throw new ActionError("category spacing must be between 0 and 75");
+    }
+  }
+  if (action.type === "setThemeLabelFontFamily") {
+    if (typeof action.family !== "string" || !SUPPORTED_LABEL_FONTS.includes(action.family)) {
+      throw new ActionError(
+        `font family ${JSON.stringify(action.family)} is not allowlisted (${SUPPORTED_LABEL_FONTS.join(", ")})`,
+      );
     }
   }
   if (action.type === "setThemeTextSize") {
@@ -129,10 +163,43 @@ export function validateAction(action) {
  * production report, so the check is deliberately conjunctive: every
  * expectation must hold, and an absent field fails rather than passes.
  */
+/**
+ * The category sets this lab will accept, and no others.
+ *
+ * The gutter experiment needs the widest label's width varied while every
+ * other input is held still, and Power BI's own font controls could not be
+ * driven to do it. So the synthetic fixture's text is edited by hand
+ * instead — which means identity has to recognise the edited fixture without
+ * becoming an "any four categories" check.
+ *
+ * Each variant is listed in full and matched exactly. `SHORT` replaces the
+ * widest value with a shorter one so a different existing string becomes
+ * the maximum; `LONG` replaces it with a clearly wider one. Everything else
+ * — series names, series count, visual type, the sentinel — is unchanged, so a
+ * report that merely happens to plot four UK regions still fails.
+ */
+export const FIXTURE_CATEGORY_SETS = Object.freeze({
+  BASELINE: Object.freeze(["London", "North West", "Scotland", "Wales"]),
+  SHORT: Object.freeze(["London", "NW", "Scotland", "Wales"]),
+  LONG: Object.freeze(["London", "Loughborough", "Scotland", "Wales"]),
+});
+
+/** Which known variant a rendered category set belongs to, or null. */
+export function fixtureVariantOf(categories) {
+  if (!Array.isArray(categories) || !categories.length) return null;
+  for (const [name, values] of Object.entries(FIXTURE_CATEGORY_SETS)) {
+    // Power BI sheds categories when space is tight, so membership rather
+    // than equality - but every rendered value must belong to ONE variant,
+    // which stops a mixture passing.
+    if (categories.every((c) => values.includes(c))) return name;
+  }
+  return null;
+}
+
 export function identifyLabEnvironment(state, expected = {}) {
   const reasons = [];
   const want = {
-    categories: ["London", "North West", "Scotland", "Wales"],
+    categories: null,
     series: ["Online", "Phone", "Post"],
     seriesCount: 3,
     visualType: "cartesian",
@@ -146,13 +213,20 @@ export function identifyLabEnvironment(state, expected = {}) {
     reasons.push(`visual type ${JSON.stringify(state.visualType)} is not ${want.visualType}`);
   }
   if (!Array.isArray(state.categories)) reasons.push("no categories read from the visual");
+  else if (state.categories.length === 0) reasons.push("no categories rendered");
   else {
     // Power BI may render a subset when space is tight, so the check is that
-    // every rendered category belongs to the fixture — not that all of the
-    // fixture is on screen.
-    const unexpected = state.categories.filter((c) => !want.categories.includes(c));
-    if (unexpected.length) reasons.push(`unexpected categories: ${unexpected.join(", ")}`);
-    if (state.categories.length === 0) reasons.push("no categories rendered");
+    // every rendered category belongs to ONE known variant — not that all of
+    // the variant is on screen, and not that any four strings will do.
+    const allowed = want.categories ? { EXPECTED: want.categories } : FIXTURE_CATEGORY_SETS;
+    const variant = Object.entries(allowed)
+      .find(([, values]) => state.categories.every((c) => values.includes(c)));
+    if (!variant) {
+      reasons.push(
+        `categories ${state.categories.join(", ")} are not a known fixture variant ` +
+          `(${Object.keys(allowed).join(", ")})`,
+      );
+    }
   }
   if (state.seriesCount !== want.seriesCount) {
     reasons.push(`series count ${state.seriesCount} is not ${want.seriesCount}`);
@@ -326,6 +400,10 @@ export function planRestoration(initial, mutated) {
   if (mutated?.categorySpacing !== undefined && initial.categorySpacing !== mutated.categorySpacing) {
     plan.push({ type: "setCategorySpacing", spacing: initial.categorySpacing });
   }
+  if (mutated?.categoryAxisTitleVisible !== undefined
+      && initial.categoryAxisTitleVisible !== mutated.categoryAxisTitleVisible) {
+    plan.push({ type: "setCategoryAxisTitleVisible", visible: initial.categoryAxisTitleVisible });
+  }
   // Theme last: it triggers the largest re-render, so putting it back after
   // the cheaper settings avoids paying for that settle more than once.
   if (mutated?.baseTheme !== undefined && initial.baseTheme !== mutated.baseTheme) {
@@ -336,6 +414,10 @@ export function planRestoration(initial, mutated) {
   // switch that follows it.
   if (mutated?.themeTextSize !== undefined && initial.themeTextSize !== mutated.themeTextSize) {
     plan.push({ type: "setThemeTextSize", size: initial.themeTextSize });
+  }
+  if (mutated?.themeLabelFontFamily !== undefined
+      && initial.themeLabelFontFamily !== mutated.themeLabelFontFamily) {
+    plan.push({ type: "setThemeLabelFontFamily", family: initial.themeLabelFontFamily });
   }
   for (const action of plan) validateAction(action);
   return plan;
@@ -348,6 +430,19 @@ export function verifyRestoration(initial, current, tolerance = 0.5) {
     if (initial?.[key] === undefined || current?.[key] === undefined) continue;
     if (Math.abs(initial[key] - current[key]) > tolerance) {
       problems.push(`${key}: expected ${initial[key]}, found ${current[key]}`);
+    }
+  }
+  if (initial?.themeLabelFontFamily !== undefined && current?.themeLabelFontFamily !== undefined) {
+    if (initial.themeLabelFontFamily !== current.themeLabelFontFamily) {
+      problems.push(`themeLabelFontFamily: expected ${initial.themeLabelFontFamily}, found ${current.themeLabelFontFamily}`);
+    }
+  }
+  // Booleans compare exactly, like the theme name below.
+  if (initial?.categoryAxisTitleVisible !== undefined && current?.categoryAxisTitleVisible !== undefined) {
+    if (initial.categoryAxisTitleVisible !== current.categoryAxisTitleVisible) {
+      problems.push(
+        `categoryAxisTitleVisible: expected ${initial.categoryAxisTitleVisible}, found ${current.categoryAxisTitleVisible}`,
+      );
     }
   }
   // Compared exactly: a theme is a name, and "close enough" is meaningless.

@@ -9,6 +9,8 @@ import {
   computeChartLayout,
   estimateText,
   CATEGORY_OUTER_PADDING,
+  CATEGORY_TICK_LABEL_ANCHOR_OFFSET,
+  horizontalCategoryLabelAllowance,
   type AxisLayoutStyle,
   type CartesianOrientation,
   type ChartLayout,
@@ -217,22 +219,36 @@ test("the category gutter responds to font size, longest label and the supplied 
 
   assert.ok(longer.categoryAxis!.width > base.categoryAxis!.width, "a longer label must widen the gutter");
   assert.ok(wider.categoryAxis!.width > base.categoryAxis!.width, "a wider measurer must widen the gutter");
-  // A horizontal category gutter is label-WIDTH driven and the fixed
-  // measurer's width ignores font size, so the font drives the gutter only
-  // where height is what matters — the vertical orientation.
-  assert.ok(near(bigger.categoryAxis!.width, base.categoryAxis!.width), "fixed-width measurer: width must not move");
+  // A horizontal category gutter is label-WIDTH driven, and this measurer's
+  // width ignores font size — but the gutter still moves with the font,
+  // because Power BI's chart-edge allowance is font-relative
+  // (2 + 0.375 x fontPx). The width term is unchanged; the allowance is not.
+  const fontDelta = bigger.categoryAxis!.width - base.categoryAxis!.width;
+  assert.ok(
+    near(fontDelta, horizontalCategoryLabelAllowance(20) - horizontalCategoryLabelAllowance(10)),
+    `fixed-width measurer: only the allowance may move, got ${fontDelta}`,
+  );
   const tallerV = layout({ categoryAxis: axis({ fontSize: 20 }) });
   const baseV = layout();
   assert.ok(tallerV.categoryAxis!.height > baseV.categoryAxis!.height, "a bigger font must deepen the gutter");
 });
 
-test("the category gutter is not a literal: it equals measured text plus the declared gap", () => {
-  // Directly replaces BAR_VALUE_AXIS_INSET's hand-copied `68 + 8`.
+test("the horizontal category gutter is the measured text plus the native terms", () => {
+  // Directly replaces BAR_VALUE_AXIS_INSET's hand-copied `68 + 8`, and now
+  // carries the terms measured against Power BI rather than one house gap:
+  // the label's width, the chart-edge allowance, and the fixed 9px offset
+  // from the label's anchor to the plot. No title here.
   const perChar = 6;
-  const gap = 4;
-  const l = layout({ orientation: "horizontal", measureText: fixed(perChar, 12), labelGap: gap });
+  const l = layout({ orientation: "horizontal", measureText: fixed(perChar, 12) });
   const longest = Math.max(...CATEGORIES.map((c) => c.length));
-  assert.ok(near(l.categoryAxis!.width, longest * perChar + gap), "gutter must be measured, not assumed");
+  const fontPx = axis().fontSize;
+  assert.ok(
+    near(
+      l.categoryAxis!.width,
+      longest * perChar + horizontalCategoryLabelAllowance(fontPx) + CATEGORY_TICK_LABEL_ANCHOR_OFFSET,
+    ),
+    "gutter must be measured, not assumed",
+  );
 });
 
 test("AUDIT §2.6: a shown value axis reserves real positive width, and hiding it returns it", () => {
@@ -435,12 +451,25 @@ test("horizontal and vertical layouts are exact transposes, so bar and column ca
   const v = computeChartLayout({ ...shared, orientation: "vertical" });
   const h = computeChartLayout({ ...shared, orientation: "horizontal" });
 
-  // The gutter each orientation puts on the left is the same size, and so
-  // is the one each puts along the bottom.
-  assert.ok(near(v.valueAxis!.width, h.categoryAxis!.width), "left gutters must transpose");
+  // The bottom gutters still transpose: neither of them changed.
   assert.ok(near(v.categoryAxis!.height, h.valueAxis!.height), "bottom gutters must transpose");
-  // Which makes the plot rectangle itself identical between them.
-  assert.deepEqual(v.plot, h.plot, "a true transpose must leave the same plot rect");
+
+  // The LEFT pair deliberately no longer does. A horizontal category axis
+  // is now sized the way Power BI sizes it — label width, chart-edge
+  // allowance, anchor offset — and there is no native evidence for the
+  // transposed case, so a vertical chart's value axis keeps the layout this
+  // engine always had. Asserting the exact difference means the day the
+  // other axis is measured too, this test says so rather than passing
+  // quietly.
+  const labelWidth = 4 * 6;
+  assert.ok(
+    near(
+      h.categoryAxis!.width - v.valueAxis!.width,
+      horizontalCategoryLabelAllowance(axis().fontSize) + CATEGORY_TICK_LABEL_ANCHOR_OFFSET - 4,
+    ),
+    "the horizontal category gutter exceeds its transpose by exactly the native terms",
+  );
+  void labelWidth;
 
   // Each value scale spans its own plot fully, in the transposed direction.
   assert.ok(near(v.scale.value(0) - v.scale.value(DATA_MAX), v.plot.height), "vertical value scale must span the plot");

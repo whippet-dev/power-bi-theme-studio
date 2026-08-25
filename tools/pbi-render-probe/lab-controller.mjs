@@ -205,10 +205,14 @@ const SLIDER_CONTROL = (label) => `(() => {
     const range = [...card.querySelectorAll('input')].find((i) => i.type === 'range');
     if (!spin) return null;
     const r = spin.getBoundingClientRect();
+    let scroller = spin.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
     return {
       value: spin.value,
       x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
-      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
       min: range ? range.getAttribute('min') : null,
       max: range ? range.getAttribute('max') : null,
     };
@@ -587,6 +591,535 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * The horizontal layer chain, from the visual's own edge to the plot's.
+   *
+   * "Non-plot width" is not one thing. Between the visual's edge and the
+   * plot rectangle sit a container padding, a chart viewport, the category
+   * labels, the axis title and whatever margin the renderer keeps on the
+   * far side — and calling the sum of them "axis padding" is how a layout
+   * model ends up with a magic constant. This reads every layer that is
+   * observable, relative to the visual's left edge, so the terms can be
+   * separated rather than inferred.
+   *
+   * Read-only.
+   */
+  horizontalGeometry: () => `(() => {
+    const n3 = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(3) : null);
+    const el = ${VISUAL};
+    if (!el) return null;
+    const vis = el.getBoundingClientRect();
+    const rel = (node) => {
+      if (!node) return null;
+      const r = node.getBoundingClientRect();
+      return { left: n3(r.left - vis.left), right: n3(r.right - vis.left), width: n3(r.width),
+               top: n3(r.top - vis.top), bottom: n3(r.bottom - vis.top), height: n3(r.height) };
+    };
+    const q = (sel) => rel(el.querySelector(sel));
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const isTitleFace = (f) => /wf_standard-font/.test(f);
+    const texts = [...el.querySelectorAll('svg text')]
+      .map((t) => ({ text: own(t), node: t, r: t.getBoundingClientRect(), face: getComputedStyle(t).fontFamily,
+                     px: parseFloat(getComputedStyle(t).fontSize) }))
+      .filter((t) => t.text);
+    const catLabels = texts.filter((t) => barLeft !== null && t.r.right <= barLeft + 2 && !isTitleFace(t.face));
+    const catTitle = texts.find((t) => barLeft !== null && t.r.right <= barLeft + 2 && isTitleFace(t.face));
+
+    const widest = catLabels.reduce((best, t) => (!best || t.r.width > best.r.width ? t : best), null);
+    const labelsRight = catLabels.length ? Math.max(...catLabels.map((t) => t.r.right - vis.left)) : null;
+    const labelsLeft = catLabels.length ? Math.min(...catLabels.map((t) => t.r.left - vis.left)) : null;
+
+    const plot = el.querySelector('svg.mainGraphicsContext');
+    const chart = el.querySelector('svg.cartesianChart');
+    const plotRect = rel(plot);
+    const chartRect = rel(chart);
+
+    return {
+      visual: { width: n3(vis.width), height: n3(vis.height) },
+      vcBody: q('[class*="vcBody"]'),
+      visualWrapper: q('[class*="visualWrapper"]'),
+      innerViewport: q('[class*="customPadding"]'),
+      chart: chartRect,
+      chartAttrWidth: chart ? n3(Number(chart.getAttribute('width'))) : null,
+      scrollable: q('svg.svgScrollable'),
+      plot: plotRect,
+      plotAttrWidth: plot ? n3(Number(plot.getAttribute('width'))) : null,
+      categoryLabels: catLabels.map((t) => ({ text: t.text, left: n3(t.r.left - vis.left), right: n3(t.r.right - vis.left), width: n3(t.r.width), px: n3(t.px) })),
+      widestLabel: widest ? { text: widest.text, width: n3(widest.r.width), left: n3(widest.r.left - vis.left), right: n3(widest.r.right - vis.left), px: n3(widest.px) } : null,
+      labelsLeft: n3(labelsLeft),
+      labelsRight: n3(labelsRight),
+      categoryTitle: catTitle ? { text: catTitle.text, px: n3(catTitle.px), ...rel(catTitle.node) } : null,
+      // The derived decomposition, all relative to the visual's left edge.
+      leftOfChart: chartRect ? n3(chartRect.left) : null,
+      rightOfChart: chartRect ? n3(vis.width - chartRect.right) : null,
+      plotInsetFromChartLeft: chartRect && plotRect ? n3(plotRect.left - chartRect.left) : null,
+      plotInsetFromChartRight: chartRect && plotRect ? n3(chartRect.right - plotRect.right) : null,
+      labelToPlotGap: plotRect && labelsRight !== null ? n3(plotRect.left - labelsRight) : null,
+      titleToLabelGap: catTitle && labelsLeft !== null ? n3(labelsLeft - (catTitle.r.right - vis.left)) : null,
+      totalNonPlot: plotRect ? n3(vis.width - plotRect.width) : null,
+    };
+  })()`,
+
+  /**
+   * Every on/off control in the Format pane, with its accessible name and
+   * state. Read-only; used to find a named toggle rather than guess at one.
+   */
+  paneToggles: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=switch],input[type=checkbox],button[aria-pressed],[aria-checked],[class*=toggle],[class*=Toggle],[class*=switch]')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.x > W * 0.62 && r.width > 2 && r.height > 2)
+      .map(({ el, r }) => ({
+        role: el.getAttribute('role') || el.tagName.toLowerCase(),
+        ariaLabel: el.getAttribute('aria-label'),
+        checked: el.getAttribute('aria-checked') ?? (el.checked === undefined ? null : String(el.checked)),
+        title: el.getAttribute('title'),
+        cls: String(el.className).slice(0, 40),
+        text: (el.textContent || '').trim().slice(0, 24),
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      }));
+  })()`,
+
+  /**
+   * The on/off switch belonging to one formatting group inside one
+   * formatting card, both named.
+   *
+   * Power BI's toggles carry no accessible name, so the only honest handle
+   * is ownership. The pane's structure supplies it: a `formatting-card` owns
+   * a named heading, a `formatting-group` inside it owns its own heading,
+   * and that group's header holds exactly one `pbi-toggle-button`. Walking
+   * card — group — toggle is a chain of containment, not a chain of guesses.
+   *
+   * Fails closed at every link: the card heading must be unique, the group
+   * heading must be unique inside that card, and the smallest ancestor of
+   * that heading which contains a toggle must contain exactly one. Anything
+   * else returns a reason instead of an element, because "the toggle near
+   * the Title text" is how the wrong axis gets switched off.
+   */
+  groupToggle: (cardName, groupName) => `(() => {
+    const W = window.innerWidth;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const named = (root, wanted) => [...root.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === wanted) && inPane(e));
+
+    const cardHeadings = named(document, ${JSON.stringify(cardName)});
+    if (cardHeadings.length !== 1) return { ok: false, reason: cardHeadings.length + ' headings named ' + ${JSON.stringify(cardName)} };
+    const card = cardHeadings[0].closest('formatting-card');
+    if (!card) return { ok: false, reason: 'the ' + ${JSON.stringify(cardName)} + ' heading is not inside a formatting-card' };
+
+    const groupHeadings = named(card, ${JSON.stringify(groupName)});
+    if (groupHeadings.length !== 1) {
+      return { ok: false, reason: groupHeadings.length + ' headings named ' + ${JSON.stringify(groupName)} + ' inside ' + ${JSON.stringify(cardName)} };
+    }
+
+    // The smallest ancestor of the group heading that owns a toggle.
+    let owner = groupHeadings[0];
+    for (let i = 0; i < 6 && owner; i++) {
+      if (owner.querySelector('pbi-toggle-button')) break;
+      owner = owner.parentElement;
+    }
+    if (!owner || !owner.querySelector('pbi-toggle-button')) return { ok: false, reason: 'no toggle owned by the ' + ${JSON.stringify(groupName)} + ' group' };
+    if (!card.contains(owner)) return { ok: false, reason: 'the owning group escaped the ' + ${JSON.stringify(cardName)} + ' card' };
+
+    const toggles = [...owner.querySelectorAll('pbi-toggle-button')];
+    if (toggles.length !== 1) return { ok: false, reason: toggles.length + ' toggles inside the ' + ${JSON.stringify(groupName)} + ' group' };
+    const headingsInOwner = named(owner, ${JSON.stringify(groupName)});
+    if (headingsInOwner.length !== 1) return { ok: false, reason: 'the owning group holds ' + headingsInOwner.length + ' ' + ${JSON.stringify(groupName)} + ' headings' };
+
+    const toggle = toggles[0];
+    const input = toggle.querySelector('input');
+    const r = toggle.getBoundingClientRect();
+    // Inside its SCROLLER, not inside the window: a control scrolled above
+    // the pane is still in the viewport, and clicking it hits whatever is
+    // painted there instead - which reports success and changes nothing.
+    let scroller = toggle.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    return {
+      ok: true,
+      ownerTag: owner.tagName.toLowerCase(),
+      ownerClass: String(owner.className || '').slice(0, 40),
+      checked: input ? (input.getAttribute('aria-checked') ?? String(input.checked)) : null,
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
+    };
+  })()`,
+  /**
+   * Named controls along the right-hand pane strip.
+   *
+   * When a pane is collapsed the Format tabs do not exist at all, so the
+   * controller cannot recover by selecting the visual again. This lists what
+   * is actually there, by accessible name, so the reopen is a named action
+   * rather than a coordinate.
+   */
+  paneStrip: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=button],button,[role=tab],[aria-label]')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      // Below the window chrome: the title bar carries the signed-in
+      // account name, and the lab has no business reading it.
+      .filter(({ r }) => r.x > W * 0.85 && r.y > 140 && r.width > 2 && r.height > 2)
+      .map(({ el, r }) => ({
+        name: (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim().slice(0, 40),
+        tag: el.tagName.toLowerCase(),
+        expanded: el.getAttribute('aria-expanded'),
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+        w: Math.round(r.width), h: Math.round(r.height),
+      }))
+      .filter((e) => e.name);
+  })()`,
+
+  /**
+   * A snapshot of the Format pane's navigable state.
+   *
+   * Read-only, and scoped to what explains navigation: which cards and
+   * groups are mounted, which are expanded, where the scroller is and
+   * whether it is even the same element as last time. Enough to answer
+   * "what does a second action start from that a first does not" without
+   * reading anything about the person signed in.
+   */
+  paneState: () => `(() => {
+    const W = window.innerWidth;
+    const n = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
+    const inPane = (r) => r.x > W * 0.62;
+
+    const scrollers = [...document.querySelectorAll('*')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ el, r }) => inPane(r) && r.width > 150 && r.height > 150
+        && el.scrollHeight > el.clientHeight + 5);
+    const tallest = scrollers.sort((a, b) => b.el.clientHeight - a.el.clientHeight)[0];
+
+    const headings = (root, selector) => [...root.querySelectorAll(selector)]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => inPane(r) && r.width > 2 && r.height > 2);
+
+    const cards = headings(document, 'formatting-card').map(({ el }) => {
+      const header = el.querySelector('[role=button],button');
+      return {
+        name: header ? (header.getAttribute('aria-label') || header.textContent || '').trim().slice(0, 24) : null,
+        expanded: header ? header.getAttribute('aria-expanded') : null,
+        groups: el.querySelectorAll('formatting-group').length,
+        top: n(el.getBoundingClientRect().top),
+      };
+    }).filter((c) => c.name);
+
+    const groups = headings(document, 'formatting-group').map(({ el }) => {
+      const header = el.querySelector('[role=button],button');
+      return {
+        name: header ? (header.getAttribute('aria-label') || header.textContent || '').trim().slice(0, 24) : null,
+        expanded: header ? header.getAttribute('aria-expanded') : null,
+        card: (() => {
+          const owner = el.closest('formatting-card');
+          const h = owner && owner.querySelector('[role=button],button');
+          return h ? (h.getAttribute('aria-label') || h.textContent || '').trim().slice(0, 24) : null;
+        })(),
+        top: n(el.getBoundingClientRect().top),
+      };
+    }).filter((g) => g.name);
+
+    const active = document.activeElement;
+    const formatTab = [...document.querySelectorAll('[role=tab]')]
+      .find((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === 'Format visual'));
+
+    return {
+      scroller: tallest ? {
+        tag: tallest.el.tagName.toLowerCase(),
+        cls: String(tallest.el.className || '').slice(0, 44),
+        scrollTop: n(tallest.el.scrollTop),
+        scrollHeight: n(tallest.el.scrollHeight),
+        clientHeight: n(tallest.el.clientHeight),
+        top: n(tallest.r.top), left: n(tallest.r.left),
+        candidates: scrollers.length,
+      } : null,
+      cards: cards.map((c) => c.name + (c.expanded === 'true' ? '*' : '') + '@' + c.top),
+      expandedCards: cards.filter((c) => c.expanded === 'true').map((c) => c.name),
+      groups: groups.map((g) => g.card + '/' + g.name + (g.expanded === 'true' ? '*' : '') + '@' + g.top),
+      expandedGroups: groups.filter((g) => g.expanded === 'true').map((g) => g.card + '/' + g.name),
+      focus: active ? {
+        tag: active.tagName.toLowerCase(),
+        role: active.getAttribute('role'),
+        inPane: inPane(active.getBoundingClientRect()),
+        top: n(active.getBoundingClientRect().top),
+      } : null,
+      formatTabSelected: formatTab ? formatTab.getAttribute('aria-selected') : null,
+    };
+  })()`,
+
+  /**
+   * A formatting group's header, scoped to the card that owns it.
+   *
+   * This is the bug that made a second action fail where a first
+   * succeeded, and it was never about scrolling. **"Layout" is not a
+   * unique name.** Bars has a Layout group and so does Y-axis. In a fresh
+   * pane only one of them is mounted, so a global lookup happens to be
+   * right; leave the Y-axis card expanded from a previous action and the
+   * same lookup silently resolves the wrong card's group.
+   *
+   * Scoping by containment removes the coincidence. Fails closed if the
+   * card or the group is not uniquely identifiable.
+   */
+  cardGroup: (cardName, groupName) => `(() => {
+    const W = window.innerWidth;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const named = (root, wanted) => [...root.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === wanted) && inPane(e));
+
+    const cardHeadings = named(document, ${JSON.stringify(cardName)});
+    if (cardHeadings.length !== 1) return { ok: false, reason: cardHeadings.length + ' cards named ' + ${JSON.stringify(cardName)} };
+    const card = cardHeadings[0].closest('formatting-card');
+    if (!card) return { ok: false, reason: ${JSON.stringify(cardName)} + ' is not inside a formatting-card' };
+
+    const groupHeadings = named(card, ${JSON.stringify(groupName)});
+    if (groupHeadings.length !== 1) {
+      return { ok: false, reason: groupHeadings.length + ' groups named ' + ${JSON.stringify(groupName)} + ' in ' + ${JSON.stringify(cardName)} };
+    }
+    const header = groupHeadings[0];
+    const r = header.getBoundingClientRect();
+    // Visible means visible INSIDE ITS SCROLLER, not inside the window: a
+    // header scrolled above the pane still sits happily in the viewport,
+    // and a click there lands on whatever is painted over it.
+    let scroller = header.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    return {
+      ok: true,
+      expanded: header.getAttribute('aria-expanded'),
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
+    };
+  })()`,
+
+  /**
+   * Where the category labels are ANCHORED, as opposed to where their ink
+   * lands.
+   *
+   * A right-aligned tick label is positioned by its anchor; the painted
+   * glyph box sits a bearing's width to the left of it and moves with the
+   * typeface. Every gap measured off `getBoundingClientRect` so far has
+   * carried that bearing, which is exactly the contamination that keeps an
+   * axis term looking font-relative when it may not be.
+   *
+   * Anchors are mapped through `getScreenCTM`, so nested transforms and
+   * group translations resolve without assuming the `x` attribute is
+   * already plot-relative. Everything is returned in client pixels and
+   * relative to the plot's own origin, mapped the same way.
+   */
+  categoryLabelAnchors: () => `(() => { try {
+    const n = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(3) : null);
+    const el = ${VISUAL};
+    if (!el) return null;
+    const plot = el.querySelector('svg.mainGraphicsContext');
+    const root = el.querySelector('svg.cartesianChart');
+    if (!plot || !root) return null;
+
+    const originOf = (node) => {
+      const ctm = node.getScreenCTM();
+      if (!ctm) return null;
+      const pt = root.createSVGPoint();
+      pt.x = 0; pt.y = 0;
+      return pt.matrixTransform(ctm);
+    };
+    const plotOrigin = originOf(plot);
+    if (!plotOrigin) return null;
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const isTitleFace = (f) => /wf_standard-font/.test(f);
+
+    const labels = [...el.querySelectorAll('svg text')]
+      .map((t) => ({ t, r: t.getBoundingClientRect(), cs: getComputedStyle(t) }))
+      .filter(({ t, r, cs }) => own(t) && barLeft !== null && r.right <= barLeft + 2 && !isTitleFace(cs.fontFamily))
+      .map(({ t, r, cs }) => {
+        const ctm = t.getScreenCTM();
+        const pt = root.createSVGPoint();
+        // Attributes can carry units ('0.35em') or be absent entirely, and a
+        // non-finite value throws on assignment rather than being ignored.
+        const num = (v) => { const f = parseFloat(v); return Number.isFinite(f) ? f : 0; };
+        pt.x = num(t.getAttribute('x')) + num(t.getAttribute('dx'));
+        pt.y = num(t.getAttribute('y')) + num(t.getAttribute('dy'));
+        const anchor = ctm ? pt.matrixTransform(ctm) : null;
+        let bbox = null;
+        try { const b = t.getBBox(); bbox = { x: n(b.x), width: n(b.width) }; } catch (e) { bbox = null; }
+        return {
+          text: own(t),
+          fontPx: n(parseFloat(cs.fontSize)),
+          fontFamily: cs.fontFamily,
+          textAnchor: cs.textAnchor || t.getAttribute('text-anchor'),
+          xAttr: n(Number(t.getAttribute('x') || 0)),
+          dxAttr: t.getAttribute('dx'),
+          transform: t.getAttribute('transform'),
+          bbox,
+          // All relative to the plot's own origin, in client pixels.
+          anchorX: anchor ? n(anchor.x - plotOrigin.x) : null,
+          inkLeft: n(r.left - plotOrigin.x),
+          inkRight: n(r.right - plotOrigin.x),
+          inkWidth: n(r.width),
+        };
+      });
+    if (!labels.length) return null;
+
+    const widest = labels.reduce((best, l) => (!best || l.inkWidth > best.inkWidth ? l : best), null);
+    return {
+      plotOriginClientX: n(plotOrigin.x),
+      labels,
+      widest,
+      // The two quantities the whole question turns on.
+      anchorToPlot: widest ? n(-widest.anchorX) : null,
+      inkToPlot: widest ? n(-widest.inkRight) : null,
+      anchorToInk: widest ? n(widest.anchorX - widest.inkRight) : null,
+    };
+  } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
+
+  /** Every clickable control in the Format pane with its visible text. Read-only. */
+  paneControls: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=button],[role=combobox],button,select,pbi-dropdown,tri-dropdown')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.x > W * 0.62 && r.width > 8 && r.height > 8)
+      .map(({ el, r }) => ({
+        tag: el.tagName.toLowerCase(),
+        role: el.getAttribute('role'),
+        name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
+        expanded: el.getAttribute('aria-expanded'),
+        y: Math.round(r.y), x: Math.round(r.x + r.width / 2), w: Math.round(r.width),
+      }));
+  })()`,
+
+  /**
+   * The dropdown belonging to a named group in the theme pane.
+   *
+   * Same containment rule as everything else: find the heading, walk up to
+   * the smallest ancestor holding a dropdown, and require exactly one.
+   */
+  groupDropdown: (groupName) => `(() => {
+    const W = window.innerWidth;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const headings = [...document.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === ${JSON.stringify(groupName)}) && inPane(e));
+    if (headings.length !== 1) return { ok: false, reason: headings.length + ' headings named ' + ${JSON.stringify(groupName)} };
+    let owner = headings[0];
+    for (let i = 0; i < 6 && owner; i++) {
+      if (owner.querySelector('pbi-dropdown')) break;
+      owner = owner.parentElement;
+    }
+    const found = owner ? [...owner.querySelectorAll('pbi-dropdown')] : [];
+    if (found.length !== 1) return { ok: false, reason: found.length + ' dropdowns owned by ' + ${JSON.stringify(groupName)} };
+    const el = found[0];
+    const r = el.getBoundingClientRect();
+    let scroller = el.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    return {
+      ok: true,
+      value: (el.textContent || '').trim(),
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
+    };
+  })()`,
+
+  /**
+   * Power BI Desktop's OWN canvas text metrics, for the fixture's strings.
+   *
+   * Read-only, and the point is the font rather than the canvas: Desktop
+   * has `wf_segoe-ui_normal` loaded and our browser does not, so measuring
+   * the same string in the two places gives different answers. Power BI's
+   * layout calls `canvasCtx.measureText` (§5.27), so measuring here — in the
+   * page that owns the font — gives the width its axis code actually used.
+   *
+   * The font is taken from a rendered category label rather than assumed,
+   * and the strings and sizes are the fixture's own. Nothing is drawn,
+   * nothing is mutated, and no font data leaves the process.
+   */
+  desktopTextWidths: () => `(() => { try {
+    const n4 = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(4) : null);
+    const el = ${VISUAL};
+    if (!el) return { error: 'no lab visual' };
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const label = [...el.querySelectorAll('svg text')]
+      .find((t) => own(t) && barLeft !== null && t.getBoundingClientRect().right <= barLeft + 2
+        && !/wf_standard-font/.test(getComputedStyle(t).fontFamily));
+    if (!label) return { error: 'no category label to read the font from' };
+    const cs = getComputedStyle(label);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { error: 'no 2d context' };
+
+    const fontAt = (px) => [cs.fontStyle, cs.fontVariant, cs.fontWeight, px + 'px', cs.fontFamily]
+      .filter((part) => part && part !== 'normal').join(' ');
+
+    const STRINGS = ['London', 'North West', 'NW', 'Scotland', 'Wales', 'Loughborough'];
+    const SIZES = [9.6, 12, 14.4, 16.8, 19.2, 24];
+
+    const atTwelve = {};
+    ctx.font = fontAt(12);
+    const fontTwelve = ctx.font;
+    for (const text of STRINGS) atTwelve[text] = n4(ctx.measureText(text).width);
+
+    // The rendered CSS stack puts "Segoe UI" first, but Power BI's own
+    // textProperties need not use that order - and if it resolves to the web
+    // font instead, the metrics differ. Measure the plausible stacks so the
+    // question is settled by numbers rather than by assumption.
+    const STACKS = {
+      computed: cs.fontFamily,
+      webFontFirst: 'wf_segoe-ui_normal, "Segoe UI", helvetica, arial, sans-serif',
+      webFontOnly: 'wf_segoe-ui_normal',
+      installedOnly: '"Segoe UI"',
+      sansSerif: 'sans-serif',
+    };
+    const byStack = {};
+    for (const [name, family] of Object.entries(STACKS)) {
+      ctx.font = '12px ' + family;
+      byStack[name] = { resolved: ctx.font, widths: {} };
+      for (const text of STRINGS) byStack[name].widths[text] = n4(ctx.measureText(text).width);
+    }
+
+    const northWestBySize = {};
+    for (const px of SIZES) {
+      ctx.font = fontAt(px);
+      northWestBySize[px] = n4(ctx.measureText('North West').width);
+    }
+
+    return {
+      font: {
+        family: cs.fontFamily,
+        size: cs.fontSize,
+        weight: cs.fontWeight,
+        style: cs.fontStyle,
+        variant: cs.fontVariant,
+        letterSpacing: cs.letterSpacing,
+        canvasFontStringAt12: fontTwelve,
+        accepted: fontTwelve === fontAt(12),
+      },
+      atTwelve,
+      northWestBySize,
+      byStack,
+      renderedLabel: own(label),
+    };
+  } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');
@@ -763,6 +1296,29 @@ export class LabController {
   }
 
   /**
+   * Reopens the Visualizations pane if something collapsed it.
+   *
+   * A collapsed pane removes the Format tabs from the DOM entirely, so
+   * `selectVisual` cannot recover on its own — it selects the visual
+   * successfully and then waits forever for a tab that cannot exist. Found
+   * by the strip control's own accessible name, and only clicked when it
+   * reports itself collapsed.
+   */
+  async ensureVisualizationsPane() {
+    const strip = await this.session.read("paneStrip");
+    // A collapsed pane draws its name ROTATED, so its box is taller than it
+    // is wide. aria-expanded is not the signal it looks like: the open pane's
+    // header tab also reports false, and clicking that collapses the pane -
+    // which is exactly the loop this method used to create.
+    const pane = (strip ?? []).find((c) => c.name === "Visualizations" && c.h > c.w);
+    if (!pane) return false;
+    this.log("the Visualizations pane was collapsed; reopening it");
+    await this.session.click(pane.x, pane.y);
+    await sleep(900);
+    return true;
+  }
+
+  /**
    * Selects the lab visual, verified by the Format visual tab appearing.
    *
    * That tab only exists while a visual is selected, so its presence is a
@@ -772,6 +1328,8 @@ export class LabController {
   async selectVisual() {
     for (let attempt = 0; attempt < 4; attempt++) {
       if (await this.session.read("tabAt", "Format visual")) return true;
+      // A collapsed pane is the one failure selecting again cannot fix.
+      if (attempt === 1) await this.ensureVisualizationsPane();
       const selection = await this.session.read("selection");
       if (!selection) throw new Error("the lab visual is no longer on the page");
       await this.session.click(selection.x, selection.y);
@@ -906,14 +1464,84 @@ export class LabController {
   }
 
   /** Scrolls the Format pane by one wheel notch. Internal only. */
+  /**
+   * Scrolls the Format pane by one wheel notch and reports where it landed.
+   *
+   * Returns the scroller AFTER the wheel, so a caller can tell movement
+   * from a no-op. Reading `scrollTop` is fine; writing it is not, because a
+   * pane that virtualises its cards has to be given real input events or it
+   * never mounts what scrolled into view.
+   */
   async scrollFormatPane(deltaY) {
     const scroller = await this.session.read("formatPaneScroller");
-    if (!scroller) return false;
+    if (!scroller) return null;
     await this.session.send("Input.dispatchMouseEvent", {
       type: "mouseWheel", x: scroller.x, y: scroller.y, deltaX: 0, deltaY,
     });
     await sleep(300);
-    return true;
+    return this.session.read("formatPaneScroller");
+  }
+
+  /**
+   * Brings a formatting card into the DOM, wherever the pane happens to be.
+   *
+   * The Format pane VIRTUALISES: a card scrolled far enough away is not off
+   * screen, it is unmounted, and querying for it returns nothing at all.
+   * Anything that scrolled down to Bars → Layout therefore leaves the axis
+   * cards genuinely absent, which is how the previous sweep died.
+   *
+   * So: rewind to the top, then walk down in bounded steps, checking after
+   * each whether the card has mounted. Movement is observed rather than
+   * assumed — each step compares `scrollTop` before and after, and the walk
+   * stops when the pane refuses to move. Position is only ever *read*; the
+   * scrolling itself is real wheel input, because a virtualising pane needs
+   * the events to mount anything.
+   *
+   * Order is used to navigate, never to identify: the card is always
+   * matched by its own heading, and a run that reaches the end without one
+   * fails rather than settling for whatever is on screen.
+   */
+  async seekFormattingCard(card) {
+    if (await this.session.read("controlAt", card)) return true;
+
+    // No scroller at all means the Format pane is not the one on display
+    // yet - it was just brought to the front and has not rendered. Give it a
+    // bounded moment rather than concluding the card does not exist.
+    for (let wait = 0; wait < 6; wait++) {
+      if (await this.session.read("formatPaneScroller")) break;
+      await sleep(500);
+      if (await this.session.read("controlAt", card)) return true;
+      // Halfway through, consider that the pane is not slow but gone: a click
+      // can collapse it, and no amount of waiting brings it back.
+      if (wait === 2) {
+        await this.ensureVisualizationsPane();
+        await this.selectVisual();
+        if (await this.session.read("controlAt", card)) return true;
+      }
+    }
+
+    // Rewind. Bounded, and stops as soon as the pane stops moving.
+    let previous = null;
+    for (let step = 0; step < 25; step++) {
+      const scroller = await this.scrollFormatPane(-400);
+      if (!scroller) break;
+      if (await this.session.read("controlAt", card)) return true;
+      if (previous !== null && scroller.scrollTop >= previous) break;
+      previous = scroller.scrollTop;
+      if (scroller.scrollTop <= 0) break;
+    }
+    if (await this.session.read("controlAt", card)) return true;
+
+    // Walk down until it mounts or the pane runs out.
+    previous = null;
+    for (let step = 0; step < 40; step++) {
+      const scroller = await this.scrollFormatPane(300);
+      if (!scroller) break;
+      if (await this.session.read("controlAt", card)) return true;
+      if (previous !== null && scroller.scrollTop <= previous) break;
+      previous = scroller.scrollTop;
+    }
+    return Boolean(await this.session.read("controlAt", card));
   }
 
   /**
@@ -948,8 +1576,9 @@ export class LabController {
       await this.session.click(visual.x, visual.y);
       await sleep(700);
     }
-    await step("controlAt", "Bars", (c) => c.expanded === "true");
-    await step("controlAt", "Layout", (c) => c.expanded === "true");
+    // Bars' OWN Layout group: Y-axis has one too, and a global name lookup
+    // resolves whichever happens to be mounted.
+    await this.openLayoutCard("Bars", "Layout");
 
     // Scroll until the control is both present and on screen.
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -1010,6 +1639,7 @@ export class LabController {
     }
     this.mutated.categorySpacing = Number(spacing);
     this.log(`category spacing now ${after.value} (range ${after.min}..${after.max})`);
+    await this.collapseFormattingCard("Bars");
     return { spacing: Number(after.value), changed: true, settled: outcome.settled };
   }
 
@@ -1057,6 +1687,7 @@ export class LabController {
     }
     this.mutated.gap = gap;
     this.log(`series gap now ${after.value} (range ${after.min}..${after.max})`);
+    await this.collapseFormattingCard("Bars");
     return { gap, changed: true, settled: outcome.settled };
   }
 
@@ -1077,6 +1708,57 @@ export class LabController {
     const final = await this.session.read("themeTextSizeControl");
     if (!final) throw new Error("could not find the theme's General text-size control");
     return final;
+  }
+
+  /**
+   * Sets the report theme's primary label FONT FAMILY.
+   *
+   * The point is to move measured text width while holding font size
+   * fixed, which is the only way to tell a text-width term from a
+   * font-relative one — for a single string at a single size the two are
+   * the same line.
+   *
+   * The requested family must be allowlisted AND offered by this build's
+   * own dropdown; nothing is typed into it.
+   */
+  async setThemeLabelFontFamily(family) {
+    validateAction({ type: "setThemeLabelFontFamily", family });
+    requireImplemented("setThemeLabelFontFamily");
+    await this.requireLabVisual();
+
+    await this.openThemeTextControl();
+    let control = await this.session.read("groupDropdown", "General");
+    if (!control || !control.ok) {
+      throw new Error(`REFUSING TO CLICK — the theme's General font dropdown: ${control ? control.reason : "no result"}`);
+    }
+    if (this.initialState && this.initialState.themeLabelFontFamily === undefined) {
+      this.initialState.themeLabelFontFamily = control.value;
+    }
+    if (control.value === family) {
+      this.log(`theme label font already ${family}`);
+      await this.selectVisual();
+      return { family, changed: false, settled: true };
+    }
+
+    await this.session.click(control.x, control.y);
+    await sleep(700);
+    const options = await this.session.read("baseThemeOptions");
+    const option = (options ?? []).find((o) => o.label === family);
+    if (!option) {
+      await this.session.pressEscape();
+      throw new Error(`"${family}" is not offered by this build (saw ${(options ?? []).length} options)`);
+    }
+    await this.session.click(option.x, option.y);
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("groupDropdown", "General");
+    if (!after || !after.ok || after.value !== family) {
+      throw new Error(`theme label font did not take: asked for ${family}, control reports ${after && after.ok ? after.value : "nothing"}`);
+    }
+    this.mutated.themeLabelFontFamily = family;
+    this.log(`theme label font now ${after.value}`);
+    await this.selectVisual();
+    return { family, changed: true, settled: outcome.settled };
   }
 
   /**
@@ -1117,6 +1799,167 @@ export class LabController {
     return { size: Number(after.value), changed: true, settled: outcome.settled };
   }
 
+  /**
+   * Shows or hides the category axis title, through the Y-axis card's own
+   * Title toggle.
+   *
+   * Verified twice over, because neither check alone is enough: the toggle
+   * must report the requested state, AND a title must exist in the rendered
+   * SVG or not. A control can report a value the renderer refused, and a
+   * render can settle before a control commits.
+   */
+  async setCategoryAxisTitleVisible(visible) {
+    validateAction({ type: "setCategoryAxisTitleVisible", visible });
+    requireImplemented("setCategoryAxisTitleVisible");
+    await this.requireLabVisual();
+
+    const before = await this.session.read("horizontalGeometry");
+    if (this.initialState && this.initialState.categoryAxisTitleVisible === undefined) {
+      this.initialState.categoryAxisTitleVisible = Boolean(before && before.categoryTitle);
+    }
+    if (Boolean(before && before.categoryTitle) === visible) {
+      this.log(`category axis title already ${visible ? "shown" : "hidden"}`);
+      return { visible, changed: false, settled: true };
+    }
+
+    const toggle = await this.openGroupToggle("Y-axis", "Title");
+    await this.session.click(toggle.x, toggle.y);
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("groupToggle", "Y-axis", "Title");
+    if (!after || !after.ok) {
+      throw new Error(`the Title toggle could not be read back: ${after ? after.reason : "no result"}`);
+    }
+    if (String(after.checked) !== String(visible)) {
+      throw new Error(`Title toggle reports ${after.checked}, asked for ${visible}`);
+    }
+    const geometry = await this.session.read("horizontalGeometry");
+    const shown = Boolean(geometry && geometry.categoryTitle);
+    if (shown !== visible) {
+      throw new Error(`the toggle says ${visible} but the title ${shown ? "is still drawn" : "is not drawn"}`);
+    }
+    this.mutated.categoryAxisTitleVisible = visible;
+    this.log(`category axis title now ${visible ? "shown" : "hidden"}`);
+    // Exit half of the contract: leave no expanded card behind, or the next
+    // action finds two groups of the same name mounted.
+    await this.collapseFormattingCard("Y-axis");
+    return { visible, changed: true, settled: outcome.settled };
+  }
+
+  /**
+   * Navigates to a named card and group and returns that group's toggle,
+   * scrolling the pane until it is on screen.
+   */
+  async openGroupToggle(card, group) {
+    await this.openLayoutCard(card, group);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const found = await this.session.read("groupToggle", card, group);
+      if (found && found.ok && found.visible) return found;
+      // Scroll TOWARDS it, using the scroller-relative flag rather than a
+      // window coordinate: expanding a group scrolls its contents into view
+      // and leaves the group's own header above the pane, where scrolling
+      // down pushes it further away.
+      const towards = found && found.ok && found.above ? -200 : 200;
+      if (!(await this.scrollFormatPane(towards))) break;
+    }
+    const final = await this.session.read("groupToggle", card, group);
+    if (!final || !final.ok) {
+      throw new Error(`REFUSING TO CLICK — ${card} → ${group}: ${final ? final.reason : "no result"}`);
+    }
+    return final;
+  }
+  /**
+   * Selects the visual, expands one card, then that card's own group.
+   *
+   * The group is resolved **within the card**, because group names repeat:
+   * Bars has a Layout group and so does Y-axis. Every step re-seeks first,
+   * since expanding a card scrolls the pane and the pane virtualises.
+   */
+  async openLayoutCard(card, section) {
+    await this.selectVisual();
+    const tab = await this.session.read("tabAt", "Format visual");
+    if (tab && tab.selected !== "true") { await this.session.click(tab.x, tab.y); await sleep(700); }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", card)) break;
+      const visual = await this.session.read("controlAt", "Visual");
+      if (!visual) break;
+      await this.session.click(visual.x, visual.y);
+      await sleep(700);
+    }
+
+    // The card, by its own heading.
+    let cardOpen = false;
+    for (let attempt = 0; attempt < 4 && !cardOpen; attempt++) {
+      if (!(await this.seekFormattingCard(card))) {
+        throw new Error(`the "${card}" card never mounted, at any scroll position`);
+      }
+      const control = await this.session.read("controlAt", card);
+      if (!control) { await sleep(400); continue; }
+      if (control.expanded === "true") { cardOpen = true; break; }
+      await this.session.click(control.x, control.y);
+      await sleep(900);
+    }
+    if (!cardOpen) throw new Error(`the "${card}" card would not expand`);
+
+    // The group, scoped to that card.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const group = await this.session.read("cardGroup", card, section);
+      if (!group || !group.ok) {
+        throw new Error(`REFUSING TO CLICK — ${card} → ${section}: ${group ? group.reason : "no result"}`);
+      }
+      if (group.expanded === "true") return;
+      if (!group.visible) {
+        if (!(await this.scrollFormatPane(group.above ? -200 : 200))) break;
+        continue;
+      }
+      await this.session.click(group.x, group.y);
+      await sleep(900);
+    }
+    const final = await this.session.read("cardGroup", card, section);
+    if (!final || !final.ok || final.expanded !== "true") {
+      throw new Error(`the "${card} → ${section}" group would not expand`);
+    }
+  }
+
+  /**
+   * Selects the visual and expands one card and one of its groups.
+   *
+   * Every step re-seeks before it acts, because expanding a card scrolls the
+   * pane and the pane virtualises: the group you are about to click can be
+   * unmounted by the click that revealed its own card.
+   */
+  async openLayoutCard(card, section) {
+    await this.selectVisual();
+    const tab = await this.session.read("tabAt", "Format visual");
+    if (tab && tab.selected !== "true") { await this.session.click(tab.x, tab.y); await sleep(700); }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", card)) break;
+      const visual = await this.session.read("controlAt", "Visual");
+      if (!visual) break;
+      await this.session.click(visual.x, visual.y);
+      await sleep(700);
+    }
+    for (const label of [card, section]) {
+      let expanded = false;
+      for (let attempt = 0; attempt < 4 && !expanded; attempt++) {
+        if (!(await this.seekFormattingCard(label))) {
+          throw new Error(`the "${label}" section never mounted, at any scroll position`);
+        }
+        const control = await this.session.read("controlAt", label);
+        if (!control) { await sleep(400); continue; }
+        if (control.expanded === "true") { expanded = true; break; }
+        await this.session.click(control.x, control.y);
+        await sleep(900);
+      }
+      if (!expanded) {
+        const final = await this.session.read("controlAt", label);
+        if (!final || final.expanded !== "true") {
+          throw new Error(`the "${label}" section would not expand`);
+        }
+      }
+    }
+  }
+
   async setVisualSize(width, height) {
     await this.requireLabVisual();
     validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
@@ -1140,6 +1983,29 @@ export class LabController {
     return { ...outcome, width: geometry.w, height: geometry.h };
   }
 
+  /**
+   * Leaves the Format pane in a state the next action can start from.
+   *
+   * The contract is both ends: an action normalises on entry by seeking what
+   * it needs, and collapses the card it expanded on the way out. Without the
+   * exit half, one expanded card leaves a second group of the same name
+   * mounted and the next action resolves the wrong one — which is exactly
+   * how a second title mutation used to fail where the first succeeded.
+   *
+   * This is authoring UI state only. No formatting value is touched.
+   */
+  async collapseFormattingCard(card) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (!(await this.seekFormattingCard(card))) return false;
+      const control = await this.session.read("controlAt", card);
+      if (!control) return false;
+      if (control.expanded !== "true") return true;
+      await this.session.click(control.x, control.y);
+      await sleep(700);
+    }
+    const final = await this.session.read("controlAt", card);
+    return Boolean(final && final.expanded !== "true");
+  }
   /**
    * Waits for the renderer to hold still.
    *
@@ -1176,14 +2042,26 @@ export class LabController {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
       if (action.type === "setSeriesGap") await this.setSeriesGap(action.gap);
       if (action.type === "setCategorySpacing") await this.setCategorySpacing(action.spacing);
+      if (action.type === "setCategoryAxisTitleVisible") await this.setCategoryAxisTitleVisible(action.visible);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
       if (action.type === "setThemeTextSize") await this.setThemeTextSize(action.size);
+      if (action.type === "setThemeLabelFontFamily") await this.setThemeLabelFontFamily(action.family);
     }
     const current = await this.session.read("labState");
     current.baseTheme = await this.readBaseTheme();
+    if (this.mutated.categoryAxisTitleVisible !== undefined) {
+      const geometry = await this.session.read("horizontalGeometry");
+      current.categoryAxisTitleVisible = Boolean(geometry && geometry.categoryTitle);
+    }
     if (this.mutated.categorySpacing !== undefined) {
       const spacing = await this.session.read("sliderControlAt", "Space between categories");
       if (spacing) current.categorySpacing = Number(spacing.value);
+    }
+    if (this.mutated.themeLabelFontFamily !== undefined) {
+      await this.openThemeTextControl();
+      const font = await this.session.read("groupDropdown", "General");
+      if (font && font.ok) current.themeLabelFontFamily = font.value;
+      await this.selectVisual();
     }
     if (this.mutated.themeTextSize !== undefined) {
       const text = await this.session.read("themeTextSizeControl");

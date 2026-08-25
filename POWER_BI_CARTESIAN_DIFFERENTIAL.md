@@ -1114,6 +1114,785 @@ non-plot axis width (native spends 110–114px where the widest label needs
 60.5px), responsive typography, and the shedding behaviour — all deferred,
 and none of them a category-scale question.
 
+### 5.20 The non-plot width, decomposed — and one term still unnamed
+
+Native Classic 2026 spends 110px of a 450- or 600-wide visual on things
+that are not the plot, and 114px once the axis title grows. The widest
+category label is 61.4px, so "label width" explains barely half of it. This
+section takes it apart.
+
+#### Every layer, five sizes
+
+Measured from the visual's own left edge. `plot` is the attribute width, not
+the rect — `getBoundingClientRect` on `svg.mainGraphicsContext` returns the
+union of its children, which is where the longest bar ends.
+
+| size | pad L | title px | gutter | plot | far inset | pad R | sum | non-plot |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 450×250 | 5 | 12 | 93 | 340 | 7 | 5 | 450 | 110 |
+| 600×250 | 5 | 12 | 93 | 490 | 7 | 5 | 600 | 110 |
+| 600×300 | 5 | 16 | 97 | 486 | 7 | 5 | 600 | 114 |
+| 600×600 | 5 | 16 | 97 | 486 | 7 | 5 | 600 | 114 |
+| 750×300 | 5 | 16 | 97 | 636 | 7 | 5 | 750 | 114 |
+
+The columns add to the visual width exactly at every size. So:
+
+- **container padding: 5px each side.** Constant. Belongs to the visual, not
+  the axis.
+- **far-side plot inset: 7px.** Constant. Belongs to the plot, not the axis.
+- **gutter: 93 or 97**, tracking the axis title's font size one for one.
+
+That last point is the clue §5.13 hinted at: the 4px difference between the
+600×250 and 600×300 states is exactly the 4px difference in title font size.
+
+#### Inside the gutter
+
+Sweeping the report theme's primary Label size at 600×600 moves the category
+labels while the axis title stays at 16px — the title comes from the `title`
+class and does not derive from `label` (§5.15), which makes it a control
+inside the same experiment.
+
+| theme label | category label | widest label (ink) | gutter |
+|---:|---:|---:|---:|
+| 10pt | 12px | 61.432 | 97 |
+| 14pt | 16.8px | 84.957 | 123 |
+| 20pt | 24px | 121.000 | 162 |
+| 30pt | 36px | 129.359 **truncated** | 179 |
+
+Canvas `measureText` reproduces the native ink boxes to within 0.93px at
+12px and 0.004px at 24px, so Theme Studio's own measurer is a fair stand-in
+for what Power BI measured.
+
+Subtracting the measured text and the title's font size leaves a residual
+that is **not constant**:
+
+| category label | residual after title px and text width |
+|---:|---:|
+| 12px | 20.502 |
+| 16.8px | 22.353 |
+| 24px | 25.004 |
+
+A straight line through the first and last gives `16 + 0.375 × labelPx`,
+which predicts the middle state to 0.05px and reproduces every measured
+gutter — including both title sizes — to the same precision:
+
+```
+gutter = titleFontPx + 16 + 0.375 × labelFontPx + measuredLabelWidth
+```
+
+| state | predicted | measured |
+|---|---:|---:|
+| title 12, label 12 | 92.998 | 93 |
+| title 16, label 12 | 96.998 | 97 |
+| title 16, label 16.8 | 122.947 | 123 |
+| title 16, label 24 | 161.996 | 162 |
+
+#### Why this is B and not A
+
+The formula fits, and that is not the same as being understood. `16 +
+0.375 × labelPx` is one number split between at least two gaps — title to
+labels, and labels to plot — and the DOM cannot say which. Both gaps are
+measured from *ink* boxes, and glyph bearing moves those by a pixel or so
+in exactly the direction that would corrupt the split: the title's box
+starts 1px left of the chart edge at 12px and flush at 16px.
+
+~~The experiment that would separate them is hiding the axis title and
+measuring what the plot gains. It is not available: the Y-axis Title card's
+toggle carries no accessible name and does not sit inside the header's own
+card element, so the lab refuses to click it rather than guessing at a
+coordinate.~~
+
+> **Run in §5.21.** The toggle is identifiable after all — not by its own
+> name, which it does not have, but by the group that owns it.
+
+**Classification: B — a small systematic residual resolved into a term that
+predicts every measured state but cannot yet be named.** No production
+change follows from it. Writing `gutter += 20.5` would reproduce today's
+four states and be wrong for the first theme a user edits, which is exactly
+the failure §5.15 was built to prevent.
+
+#### `maxMarginFactor`, answered
+
+The 30pt state truncated its labels, which made the cap measurable. Holding
+the label size and varying the visual width:
+
+| visual | chart | gutter | 0.25 × chart | gutter − 0.25 × chart |
+|---:|---:|---:|---:|---:|
+| 450 | 440 | 141 | 110.0 | 31.0 |
+| 600 | 590 | 179 | 147.5 | 31.5 |
+| 750 | 740 | 216 | 185.0 | 31.0 |
+
+So the **tick-label margin is capped at `chartViewportWidth × maxMarginFactor`**,
+and the title's allocation (~31px here) sits outside that cap. The runtime
+agrees exactly: it computes `marginLimits.left = viewport.width ×
+maxMarginFactor` with a default of **0.25**, and the Format pane surfaces it
+as `Math.round(100 × maxMarginFactor)` — a percentage. Labels that exceed the
+limit are truncated with an ellipsis rather than the plot shrinking further.
+
+`maxMarginFactor` is therefore **not** a padding or a margin in pixels: it is
+the maximum share of the chart viewport the axis labels may consume, per
+side. `PROVEN-RUNTIME` for the rule, `PROVEN-EXPERIMENT` for the 0.25.
+
+#### Recorded, not implemented
+
+The label sweep also exposed a **responsive font cap**: at 600×300 the
+category label stopped growing at 16px however large the theme's label class
+went, while at 600×600 it reached 36px. And at 450 wide with a 30pt theme
+label it dropped to 21.333px. That is responsive typography, deferred
+elsewhere, and noted here only because it bounds what the label sweep could
+reach.
+
+### 5.21 The title's contribution, measured
+
+§5.20 could predict the gutter but not explain it, because one term covered
+two gaps at once. Hiding the axis title separates them, and the toggle is
+reachable after all: not by its own accessible name, which it does not
+have, but by the **formatting-group that owns it**. A card owns a named
+heading, a group inside it owns its own heading, and that group's header
+holds exactly one toggle.
+
+#### Title on, off, on — at both title sizes
+
+Classic 2026, Clustered bar, spacing 20, gap 10, category label 12px.
+
+| size | title px | gutter ON | gutter OFF | **delta** | plot ON | plot OFF |
+|---|---:|---:|---:|---:|---:|---:|
+| 600×600 | 16 | 97 | **76** | **21** | 486 | 507 |
+| 600×250 | 12 | 93 | **76** | **17** | 490 | 507 |
+
+Both round trips reproduced the original geometry exactly.
+
+**The title's contribution is `titleFontPx + 5`.** 16 → 21, 12 → 17: the
+delta moves with the font one for one, and the five is what remains when
+the font is taken out. That is outcome **B** of the three the experiment
+was designed to distinguish — the title costs its own font size plus a
+fixed gap, not just its font size.
+
+And the gutter with the title hidden is **76 at both sizes**, as it must be
+if the title is the only thing that differs between them.
+
+#### Splitting the fitted term
+
+§5.20 fitted `16 + 0.375 × labelPx` on top of the title's font size and the
+measured text. With the title's own cost now known to be `titleFontPx + 5`,
+the five belongs to the title side and eleven to the label side:
+
+| state | title | label | measured text (canvas) | predicted gutter | native |
+|---|---:|---:|---:|---:|---:|
+| 600×250 | 12px | 12px | 60.498 | 92.998 | 93 |
+| 600×600 | 16px | 12px | 60.498 | 96.998 | 97 |
+| **title off** | — | 12px | 60.498 | **75.998** | **76** |
+| 600×600, theme 14pt | 16px | 16.8px | 84.647 | 122.947 | 123 |
+| 600×600, theme 20pt | 16px | 24px | 120.996 | 161.996 | 162 |
+
+```
+gutter = (titleShown ? titleFontPx + 5 : 0)
+       + measuredLabelWidth + 11 + 0.375 × labelFontPx
+```
+
+Every state to **≤0.05px**, including the two title-off states, which the
+earlier fit had no way to predict at all.
+
+#### Why this is still not an implementation
+
+The title term is now **measured**: two title sizes, a controlled on/off,
+and a clean round trip. The label side is not. `11 + 0.375 × labelPx`
+reproduces every state, but it comes from fitting two constants to three
+label sizes, and 0.375 has no named mechanism — it is a coefficient that
+works, which is precisely the thing §5.20 declined to ship.
+
+The confirming experiment — sweep the label size with the title hidden, so
+the label side is measured in isolation — did not run. The Format pane
+virtualises its cards: once an earlier operation has scrolled down to the
+Bars → Layout section, the Y-axis card is genuinely unmounted rather than
+merely off screen, and the locator correctly reports that it cannot find
+it.
+
+> **Half solved in §5.22.** The pane is now navigable in that direction:
+> from a pane scrolled to Bars → Layout, with Y-axis unmounted, the title
+> mutation rewinds, finds the card and succeeds. The *reverse* direction,
+> repeatedly, is not, so the sweep still cannot run.
+
+**Classification: B**, and closer than it was. The title's half is settled;
+the label's half is one experiment away, and that experiment needs the pane
+navigation to survive a Layout scroll.
+
+### 5.22 Navigating a virtualised Format pane
+
+The blocker on the label side is not the measurement, it is reaching the
+control. Power BI's Format pane **virtualises**: a card scrolled far enough
+away is removed from the DOM, so after anything has visited Bars → Layout,
+the Y-axis card does not exist to be clicked. Querying for it returns
+nothing, which the locator correctly reports as absence rather than
+guessing.
+
+#### What now works
+
+`seekFormattingCard` rewinds the pane and walks it in bounded steps,
+checking after each whether the card has mounted. Movement is *observed*:
+each step compares `scrollTop` before and after and stops when the pane
+refuses to move. Position is only ever read — the scrolling itself is real
+wheel input, because a virtualising pane needs the events to mount
+anything. Order is used to navigate and never to identify: the card is
+matched by its own heading, and reaching the end without one fails.
+
+Two follow-on bugs surfaced and are fixed. Expanding a card scrolls the
+pane and can unmount the group about to be clicked, so every step re-seeks
+before it acts. And `openGroupToggle` scrolled only downward — while
+expanding a group scrolls its *contents* into view and leaves the group's
+own header **above** the fold, where scrolling down pushes it further away.
+A click at an off-screen coordinate lands on nothing while the toggle
+quietly reports the old value, which is exactly the "toggle reports false,
+asked for true" failure. It now scrolls towards its target.
+
+**The acceptance test passes**: from a pane genuinely scrolled to Bars →
+Layout with Y-axis unmounted, `setCategoryAxisTitleVisible(false)` rewinds,
+finds the card, resolves the exact Title toggle and mutates.
+
+#### What still does not
+
+~~The reverse direction, repeatedly.~~ **Diagnosed and fixed in §5.23** —
+and it was not virtualisation at all.
+
+### 5.23 "Layout" is not a unique name
+
+The second semantic action failed where the first succeeded, and the cause
+turned out to be embarrassingly simple once the pane was instrumented
+rather than guessed at.
+
+#### What the instrumentation ruled out
+
+Six checkpoints through the failing sequence, capturing the scroller, the
+mounted cards and groups, which are expanded, and where focus is:
+
+| hypothesis | verdict | the observable |
+|---|---|---|
+| stale scroller identity | **refuted** | same element and box at every checkpoint, one candidate throughout |
+| rewind never reaches the start | **refuted** | `scrollTop` 0 at checkpoint D |
+| focus trapped in the expanded group | **refuted** | focus is on `body` at the moment of failure |
+| Y-axis card stays expanded | **supported** — but not for the reason assumed |
+| Title group stays expanded | **supported** — same |
+
+The Bars card was **mounted and on screen** when the lookup for it
+"failed". Nothing was missing.
+
+#### The actual cause
+
+**Bars has a `Layout` group. So does Y-axis.**
+
+A fresh pane has Y-axis collapsed, so only Bars' Layout is mounted and a
+global lookup by name is accidentally right. Leave the Y-axis card expanded
+from a previous action and a second `Layout` mounts — the lookup silently
+resolves the wrong card's group, expands it, and then cannot find a slider
+that was never going to be inside it.
+
+Group headings are now resolved **within the card that owns them**, which
+is the containment rule the toggle lookup already used. It was applied to
+toggles and not to groups, and the gap held exactly one bug.
+
+#### The second bug behind it
+
+Visibility was judged against the **window**. A control scrolled above the
+Format pane is still inside the viewport — it is simply not inside its own
+scroll container — so it counted as visible, the click went to whatever was
+painted at those coordinates, and the toggle reported its old value. That
+is the "reports false, asked for true" failure. Visibility is now measured
+against the control's own scroller, and scrolling moves towards the target
+in that same frame.
+
+#### The contract
+
+Actions normalise at **both** ends: they seek what they need on entry, and
+collapse the card they expanded on exit, so no action inherits an expanded
+card from the one before it. That is authoring UI state only — no
+formatting value is touched.
+
+**Torture test: 36 checks, two full cycles, one session, zero failures.**
+Series gap → title off → category spacing → identity → title on, repeated,
+with `Y-axis/Layout` and `Bars/Layout` now resolving independently and the
+negative cases still refusing.
+
+### 5.24 The label side, measured in isolation
+
+With the pane composable, the sweep that has been blocked since §5.20 runs:
+title OFF, 600 × 600, spacing 20, gap 10, six theme label sizes, all
+uncapped and untruncated.
+
+| theme | category label | widest ink | gutter | gutter − ink |
+|---:|---:|---:|---:|---:|
+| 8pt | 9.6px | 49.145 | **63** | 13.855 |
+| 10pt | 12px | 61.432 | **76** | 14.568 |
+| 12pt | 14.4px | 72.718 | **89** | 16.282 |
+| 14pt | 16.8px | 84.957 | **102** | 17.043 |
+| 16pt | 19.2px | 97.291 | **115** | 17.709 |
+| 20pt | 24px | 121.000 | **141** | 20.000 |
+
+The gutter column is the result. Every value is an **integer**, and the
+differences are 13, 13, 13, 13, 26 against label steps of 2.4, 2.4, 2.4,
+2.4, 4.8 — a slope of exactly **65/12 = 5.41667 per label pixel** at both
+step sizes. So
+
+```
+gutter(title hidden) = 11 + 5.41667 × labelFontPx
+```
+
+exact at all six. Since canvas measures "North West" at 5.0415 px per font
+pixel, that decomposes as `measuredWidth + 11 + 0.375 × labelPx` — the
+same numbers §5.21 fitted, now measured against six sizes with the title
+removed from the equation instead of three with it included.
+
+#### And why that is still not a mechanism
+
+One string cannot separate the two readings. For a fixed label, "measured
+text plus a font-proportional gap" and "a pure multiple of the font size"
+are the same line. The truncated states rule out the second — a capped
+label changes the gutter while the font does not — so the allocation is
+text-dependent. But the split between *text measurement* and *axis gap*
+remains unresolved with this fixture's four category names.
+
+#### What the runtime says
+
+Power BI's tick-label margin is
+
+> `getAxisTickLabelMargins(...)` → `maxWidth = max over labels of
+> textWidthMeasurer(label, fontProperties)`
+
+with **no padding and no allowance added**. So the extra `11 + 0.375 ×
+labelPx` is not inside the label-margin calculation at all; it belongs to
+the axis geometry around it, or to whatever `textWidthMeasurer` returns
+over the ink. That narrows the search considerably and rules out the
+"margin adds padding" reading, but it does not yet name the term.
+
+The cap composition, by contrast, is now read directly from the same
+function's caller:
+
+> `leftMargin = min(max(overflow, maxWidth), yMarginLimit)`
+
+which is exactly `min(natural, viewportWidth × maxMarginFactor)` from
+§5.20, no longer inferred. `PROVEN-RUNTIME`.
+
+**Classification: B.** The relationship is now measured rather than fitted,
+the cap is proven, and the title term is proven — but `0.375 × labelPx`
+still has no named owner, and the gate for A requires one.
+
+### 5.25 The label anchor — where the font-relative term is not
+
+Every gap measured so far came from `getBoundingClientRect`, which returns
+the painted glyph box. A right-aligned tick label is not positioned by its
+ink; it is positioned by its **anchor**, and the bearing between the two
+moves with the typeface. So the ink-based gaps were carrying a term that
+may never have been a gap at all.
+
+Anchors mapped through `getScreenCTM`, relative to the plot's own origin:
+
+```
+text-anchor: end     x = -9     for every category label
+```
+
+#### The anchor does not move with the font
+
+Title off, 600 × 600, the same six label sizes:
+
+| label px | anchor → plot | ink → plot | gutter |
+|---:|---:|---:|---:|
+| 9.6 | **9** | 8.084 | 63 |
+| 12 | **9** | 8.068 | 76 |
+| 14.4 | **9** | 8.891 | 89 |
+| 16.8 | **9** | 8.699 | 102 |
+| 19.2 | **9** | 8.506 | 115 |
+| 24 | **9** | 9.000 | 141 |
+
+**Spread in the anchor distance: 0.000.** The label-to-plot gap is a fixed
+**9px**, and the wandering 8.07–9.00 in the ink column is glyph bearing,
+not layout. The hypothesis that the font-relative term is a label-to-plot
+gap is **refuted**.
+
+#### Which relocates the term rather than naming it
+
+With the anchor fixed, the gutter decomposes as
+
+```
+gutter = (chart edge → text allocation) + allocatedTextWidth + 9
+```
+
+and since `gutter = 11 + 5.41667 × labelPx` (§5.24), whatever sits left of
+the anchor is `2 + 5.41667 × labelPx`. Against a canvas advance width of
+`5.0415 × labelPx` for this label, that leaves
+
+```
+allocation − advance = 2 + 0.375 × labelPx
+```
+
+— 6.5px at 12px, 11px at 24px. So the term lives on the **chart-edge side**
+of the text, not the plot side: either Power BI's `textWidthMeasurer`
+returns more than the advance width, or the axis pads the far side of the
+label band. The runtime already rules out the margin calculation itself
+adding anything (§5.24), which leaves those two.
+
+#### The experiment that would separate them, and why it did not run
+
+Vary the font family at a fixed 12px: text width then moves independently
+of font size, and the two readings predict different gutters. The lab can
+now navigate to the control — the theme pane's General font dropdown opens
+and reports all 26 families this build exposes, including Arial, Verdana,
+Georgia and Courier New — but **clicking an option does not take**. The
+control returns to its previous value, with or without a preceding hover,
+while the font *size* control beside it applies live. So
+`setThemeLabelFontFamily` is allowlisted, coded and marked
+`NOT_IMPLEMENTED` rather than reporting a change it did not make.
+
+**Classification: B.** The term now has a *location* — left of the anchor,
+in the label's allocated width — which is a real narrowing from "somewhere
+in the gutter". It does not yet have an owner.
+
+### 5.26 The cap, in the UI and in the geometry
+
+The remaining question — whether the `2 + 0.375 × labelPx` belongs to Power
+BI's text measurement or to axis geometry — needs text width varied while
+font size is held fixed. Two routes were tried this round.
+
+#### The font-family route is closed for now
+
+The theme pane's General font dropdown opens and lists all 26 families,
+but neither mouse nor keyboard selection commits: with the list open,
+arrowing to a family and pressing Enter leaves the control on its previous
+value, exactly as clicking does. Reaching that dropdown also depends on
+the Theme pane, which was itself unreachable for most of this session. The
+action stays `NOT_IMPLEMENTED`.
+
+#### `maxMarginFactor` is a per-visual control, and it says 25
+
+Found while looking for another route: **Y-axis → Values → "Maximum
+width"** reads **25**, with a range of **15..50**. That is
+`maxMarginFactor` as a percentage, exposed in the Format pane — the
+runtime value read back from the UI, and the first direct confirmation
+that the 0.25 default in the bundle is the same number a user sees.
+
+#### Narrowing the visual forces the cap to bite
+
+Title off, 12px labels, four categories, only the visual's width varying —
+so the font never changes but the rendered string eventually must:
+
+| visual | chart | widest label | gutter | 0.25 × chart |
+|---:|---:|---|---:|---:|
+| 600 | 590 | North West | **76** | 147.5 |
+| 340 | 330 | North West | **76** | 82.5 |
+| 300 | 290 | North West | **76** | 72.5 |
+| 280 | 270 | North West | **76** | 67.5 |
+| 260 | 250 | North **…** (truncated) | **73** | 62.5 |
+
+The uncapped model predicts **75.998** against a measured **76** at all
+four uncapped widths:
+
+```
+gutter = min(canvasWidth + 6.5, cap) + 9
+```
+
+and the label-to-plot anchor stayed at exactly **9** in every state,
+including the truncated one.
+
+#### What the capped state does not settle
+
+At 260 the cap bites and the label truncates, but the measured gutter of 73
+sits between the two candidate bases: `0.25 × chartWidth` predicts 71.5 and
+`0.25 × visualWidth` predicts 74. One capped state cannot choose between
+them, and further widths could not be measured — CDP input began timing
+out against the WebView partway through the second sweep.
+
+It also does not break the degeneracy. The margin is computed from the
+widest **value**, not from what is painted, so truncation changes the drawn
+string without changing the quantity the allocation is derived from. The
+260-wide state proves the cap is real; it does not vary the measured width
+of the widest value.
+
+**Classification: B**, unchanged. The uncapped model now predicts four
+independent viewport widths as well as six font sizes and both title
+states, and the anchor's fixed 9px survives every one — but the ownership
+of `2 + 0.375 × labelPx` is exactly where §5.25 left it.
+
+### 5.27 `textWidthMeasurer` is canvas `measureText`, and nothing else
+
+The open question since §5.24 has been whether the unattributed
+`2 + 0.375 × labelPx` lives **inside** Power BI's text measurement or
+**outside** it in axis geometry. Every rendering experiment leaves those
+two indistinguishable, because they predict the same gutter for any string
+at any size. Only the implementation can separate them.
+
+#### The trace
+
+`getAxisTickLabelMargins` receives its measurer as a parameter (§5.24).
+Following the binding rather than the parameter name:
+
+```
+textWidthMeasurer: TextMeasurementService.measureSvgTextWidth
+```
+
+and that method, reduced to its behaviour:
+
+```
+measureSvgTextWidth(textProperties, text):
+    require fontSize to be in px
+    if no canvas context:  return text.length × parseInt(fontSize)   // fallback only
+    set the canvas font from textProperties
+    return canvasCtx.measureText(text).width
+         + (letterSpacing != null ? letterSpacing × text.length : 0)
+```
+
+**It is the raw canvas advance width.** No padding, no safety allowance, no
+bounding-box correction. The only addition is a `letterSpacing` term that
+is null unless something sets it, and the character-count branch is a
+fallback for when no canvas exists at all.
+
+`PROVEN-RUNTIME`.
+
+#### What that settles
+
+Of the two models §5.25 left standing:
+
+| | model | verdict |
+|---|---|---|
+| 1 | `nativeTextWidth = canvasWidth + 6.5`, anchor offset 9 | **refuted** |
+| 2 | `nativeTextWidth = canvasWidth`, a separate chart-edge-side allocation of 6.5, anchor offset 9 | **supported** |
+
+So the `2 + 0.375 × labelPx` is **axis or chart geometry, not text
+measurement**. It is also now clear why Theme Studio's canvas measurement
+agrees with native ink to 0.02% (§5.14): both sides are literally calling
+the same browser API on the same string.
+
+One caveat worth stating: the measurer sets the canvas font from Power BI's
+own `textProperties`. If those ever carried a family string different from
+the one the SVG paints with, the measured width would diverge from what is
+drawn — so "canvas measureText" is the mechanism, and the *inputs* to it
+remain worth checking if a discrepancy ever appears.
+
+#### What is still open
+
+Where the remaining `2 + 0.375 × labelPx` sits geometrically. It is on the
+chart-edge side of the label, between the chart's left edge and the start
+of the label's box — 6.5px at 12px, 11px at 24px — and it is not the
+label-to-plot gap, which is a fixed 9px (§5.25).
+
+**Classification: B**, with one of the two candidate owners now eliminated
+by implementation rather than by inference.
+
+### 5.28 Three strings, one font size — the degeneracy breaks
+
+Power BI's own controls could not vary text width at a fixed font size, so
+the synthetic fixture's text was edited by hand instead: `North West` →
+`NW` (making Scotland the widest) → `Loughborough`. Everything else held:
+Classic 2026, 600 × 600, 12px labels, same family, spacing 20, gap 10,
+title on at 16px, no truncation, cap nowhere near.
+
+| variant | widest | canvas | native ink | gutter | g − canvas | g − ink | anchor |
+|---|---|---:|---:|---:|---:|---:|---:|
+| SHORT | Scotland | 45.885 | 45.891 | **81** | 35.115 | 35.109 | 9 |
+| BASELINE | North West | 60.498 | 61.432 | **97** | 36.502 | 35.568 | 9 |
+| LONG | Loughborough | 79.266 | 79.475 | **116** | 36.734 | 36.525 | 9 |
+
+The anchor stayed at **9** in all three, and the plot moved with the
+gutter: 502, 486, 467.
+
+#### Text width does contribute, but the residual is not constant
+
+`d(gutter) / d(width)` comes out at 1.01–1.09 against canvas and 1.03–1.05
+against ink — near one, which settles that this is a **text-width**
+contribution and not a font-size-only term. But the residual moves:
+**1.62px** of spread against canvas, **1.42px** against ink.
+
+By the taxonomy this is **outcome B**: canvas `measureText` in our browser
+is not exactly the quantity Power BI allocates.
+
+#### ~~Why, and it is not a missing layout term~~
+
+> **This explanation was wrong, and §5.29 disproves it.** The reasoning
+> below blamed font substitution: Desktop has `wf_segoe-ui_normal` loaded,
+> our browser falls back to installed Segoe UI, and the per-string
+> differences between native ink and our canvas looked erratic in the way
+> substitution produces. Measuring inside Desktop's own WebView showed the
+> widths are **identical to four decimals**. The erratic column was ink
+> versus advance width, not one font versus another — and the residual is
+> real native behaviour. Kept struck through because the wrong hypothesis
+> is why the right measurement got made.
+
+~~§5.27 established that Power BI measures with `canvasCtx.measureText`. It
+does so with its own `textProperties`, and Power BI Desktop has
+`wf_segoe-ui_normal` loaded where our browser falls back to the installed
+Segoe UI. So the ~1.5px is the size of our measurement error against Power
+BI's, not evidence of an unknown allocation.~~
+
+#### One pattern worth recording
+
+Every native gutter measured in this whole investigation is an integer. If
+the chart-edge term is exactly **5** — the same constant as the title gap —
+then the implied label margins are
+
+| variant | implied margin |
+|---|---:|
+| SHORT | **46.000** |
+| BASELINE | **62.000** |
+| LONG | **81.000** |
+
+Three exact integers from three unrelated strings. That is strong evidence
+the margin is integer-rounded and that the chart-edge constant at 12px is 5
+rather than the 6.5 the earlier algebra suggested — with the difference
+absorbed by rounding. It does not survive being pushed across font sizes:
+`ceil(width) + 14` fits 12px but not 14.4px, so the font-proportional part
+of §5.24 is still real and still unexplained.
+
+**Classification: B.** Text width is now independently established as a
+one-for-one contributor; the measurer is known to be canvas `measureText`;
+the anchor is a fixed 9px; the title is `titleFontPx + 5`. What remains
+unowned is the font-proportional part of the chart-edge allocation, and the
+~1.5px between our text measurement and Power BI's.
+
+### 5.29 Desktop measures exactly what we measure
+
+§5.28 attributed a ~1.5px residual to font substitution: Desktop has
+`wf_segoe-ui_normal` loaded, our browser falls back to installed Segoe UI,
+so the two might measure the same string differently. If true, the fitted
+`0.375 × fontPx` coefficient would be part layout and part our own
+measurement error, and encoding it would bake that error into ChartLayout.
+
+That is worth being wrong about, so it was measured rather than argued:
+an offscreen canvas **inside Desktop's own WebView**, using the font read
+off a rendered category label.
+
+#### The font, read not assumed
+
+```
+family        "Segoe UI", wf_segoe-ui_normal, helvetica, arial, sans-serif
+size          12px       weight 400       style normal
+letterSpacing normal      (so the measurer's letterSpacing term is 0)
+```
+
+#### The widths, at 12px
+
+| stack | Scotland | North West | Loughborough |
+|---|---:|---:|---:|
+| as rendered | 45.8848 | 60.4980 | 79.2656 |
+| `wf_segoe-ui_normal` first | 45.8848 | 60.4980 | 79.2656 |
+| `wf_segoe-ui_normal` only | 45.8848 | 60.4980 | 79.2656 |
+| installed `"Segoe UI"` only | 45.8848 | 60.4980 | 79.2656 |
+| `sans-serif` (control) | 46.6992 | 59.7949 | 77.4082 |
+| **our browser** | **45.8848** | **60.4980** | **79.2656** |
+
+**Identical to four decimal places.** The web font and the installed font
+have the same metrics here, and the `sans-serif` row proves the measurement
+is sensitive enough to have shown a difference if there were one.
+
+**The font-substitution explanation is refuted.** Our canvas measurement
+*is* Power BI's canvas measurement.
+
+#### Which kills the `31/6` candidate
+
+The candidate needed Desktop to measure "North West" as `(31/6) × fontPx`.
+It does not:
+
+| fontPx | Desktop canvas | `(31/6) × px` | diff |
+|---:|---:|---:|---:|
+| 9.6 | 48.3984 | 49.600 | −1.202 |
+| 12 | 60.4980 | 62.000 | −1.502 |
+| 14.4 | 72.5976 | 74.400 | −1.802 |
+| 16.8 | 84.6468 | 86.800 | −2.153 |
+| 19.2 | 96.7968 | 99.200 | −2.403 |
+| 24 | 120.9961 | 124.000 | −3.004 |
+
+The gap grows as exactly `0.125 × fontPx`, which is the difference between
+the candidate's implied 5.1667 px-per-font-px and the real 5.0415. So
+`2 + 0.25 × fontPx` fails by 1.2 to 3.0px, and **`2 + 0.375 × fontPx`
+survives**: against Desktop's own widths the six title-off states give
+allowances of 5.6016, 6.5020, 7.4024, 8.3532, 9.2032 and 11.0039 against
+predictions of 5.600, 6.500, 7.400, 8.300, 9.200 and 11.000 — every one
+within **0.053px**.
+
+#### But the allowance depends on the string, and that is real
+
+At a fixed 12px, across the three fixture variants:
+
+| widest | Desktop canvas | gutter | allowance |
+|---|---:|---:|---:|
+| Scotland | 45.8848 | 81 | **5.1152** |
+| North West | 60.4980 | 97 | **6.5020** |
+| Loughborough | 79.2656 | 116 | **6.7344** |
+
+Spread **1.619px** at one font size, with the font question now closed. So
+this is not our measurement error — it is the allowance itself varying with
+the label, and no simple rounding rule fits all three (the implied margins
+are exactly 51, 67 and 86, but neither `ceil(w) + 5` nor `ceil(w + 5)`
+produces that set).
+
+**Outcome C for the candidate; Classification stays B.** The model is
+exact along the font-size axis and drifts up to 1.6px when the widest
+label changes — which is now the single remaining unknown, and it is a
+layout behaviour rather than a metrics artefact.
+
+### 5.30 IMPLEMENTED — the horizontal category gutter
+
+**Status: implemented as an empirical compatibility rule. Classification
+remains B.**
+
+`ChartLayout` now sizes a horizontal category axis from four separate
+terms rather than one house gap:
+
+```
+categoryGutter = measuredLabelWidth
+               + (2 + 0.375 × labelFontPx)      empirical
+               + 9                              proven
+               + (titleFontPx + 5) if shown     proven
+```
+
+| term | status | evidence |
+|---|---|---|
+| label width, via the injected `measureText` | **proven** | Power BI's measurer *is* `canvasCtx.measureText`, and its widths match ours to four decimals (§5.27, §5.29) |
+| anchor offset, 9px | **proven** | six font sizes, several viewports, three strings, spread 0.000 (§5.25) |
+| title allocation, `titleFontPx + 5` | **proven** | title on/off at 12px and 16px, round trip exact (§5.21) |
+| chart-edge allowance, `2 + 0.375 × labelFontPx` | **empirical** | ≤0.053px across six font sizes; up to ~1.4px out when the widest label changes (§5.24, §5.28, §5.29) |
+
+#### What shipped, and what did not
+
+Only the **horizontal** category axis changed, because that is the only
+one measured. Clustered Bar and Stacked Bar both take that path and both
+improved; Clustered Column, Stacked Column and Line keep the vertical
+layout this engine always had. No special case was written for any single
+visual.
+
+Deliberately still absent, and each is a separate piece of work:
+
+- **`maxMarginFactor`** — the cap exists and its composition is read from
+  the runtime, but which viewport it is a share of is still ambiguous
+  (§5.26), so the gutter is uncapped. The architecture leaves room for it
+  around the label term.
+- **5px container padding** each side, and the **7px far-side plot inset**.
+  Both are separately owned and neither belongs in the axis.
+
+#### Verified in the browser
+
+At the natural Clustered Bar preview, before and after, normalised out of
+the hero's 1.5× presentation scale:
+
+| | before | after | native |
+|---|---:|---:|---:|
+| category gutter | 86.094 | **96.984** | **97** |
+| plot width | 283.906 | 273.016 | — |
+| widest label | 60.5 | 60.5 | 60.498 |
+| title allocation | — | 21 | 21 |
+
+The plot gave up exactly what the gutter took — 10.891px each way, no
+pixels invented. Stacked Bar reports the same 96.984, confirming the
+shared path rather than a per-visual fix.
+
+And the category scale did not move: `plot / step` 4.5975, leading inset
+0.3992 of a step, band 0.7658 of a step, all identical before and after,
+as are `categoryWidth` and the series bands.
+
+#### The honest caveat, in the code
+
+The allowance's doc comment carries the six-state table, the ~1.4px
+string-dependent error, and an explicit note that it is a compatibility
+approximation rather than a claim about Power BI's algorithm. A test pins
+the error for all three measured strings, so nobody can later "fix" the
+formula into agreeing with one of them without the suite saying so.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1198,6 +1977,35 @@ refuted — only shown not to hold under the hero transform.
 | The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
 | Native category outer padding = **0.4 × step** at each end | `PROVEN-EXPERIMENT` (§5.16) — 12 states, two independent derivations, zero spread |
 | Category **thickness** = `plot / (count + 2 × pOuter)`, with no inner-padding term | `PROVEN-EXPERIMENT` (§5.18) — constant across six spacings at two sizes |
+| Visual container padding is 5px each side | `PROVEN-EXPERIMENT` (§5.20) — five sizes |
+| The plot keeps a 7px inset on the far side | `PROVEN-EXPERIMENT` (§5.20) — five sizes |
+| The category gutter tracks the axis title's font size one for one | `PROVEN-EXPERIMENT` (§5.20) |
+| `maxMarginFactor` caps the label margin at `viewportWidth × factor`, default 0.25 | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.20) — three widths |
+| The category axis title costs `titleFontPx + 5` | `PROVEN-EXPERIMENT` (§5.21) — on/off at two title sizes, round trip reproduced |
+| The gutter with the title hidden is the same at 600×250 and 600×600 | `PROVEN-EXPERIMENT` (§5.21) |
+| The label side is `measuredWidth + 11 + 0.375 × labelPx` | `PROVEN-EXPERIMENT` (§5.24) — six uncapped sizes, title hidden, exact integers on a single line |
+| The category label-to-plot gap is a fixed **9px**, not font-relative | `PROVEN-EXPERIMENT` (§5.25) — anchor distance, six font sizes, spread 0.000 |
+| Category labels are `text-anchor: end` at `x = -9` from the plot origin | `PROVEN-EXPERIMENT` (§5.25) |
+| The `2 + 0.375 × labelPx` term sits left of the anchor, in the allocated label width | `PROVEN-EXPERIMENT` (§5.25) — by subtraction from a fixed anchor |
+| Power BI's `textWidthMeasurer` is `TextMeasurementService.measureSvgTextWidth` | `PROVEN-RUNTIME` (§5.27) |
+| That method returns raw `canvasCtx.measureText(text).width`, with no allowance | `PROVEN-RUNTIME` (§5.27) |
+| The `2 + 0.375 × labelPx` is therefore axis/chart geometry, not text measurement | `PROVEN-RUNTIME` (§5.27) — by elimination of the alternative implementation |
+| Where that allocation sits geometrically | `UNKNOWN` (§5.27) |
+| The gutter responds to TEXT WIDTH, not just font size | `PROVEN-EXPERIMENT` (§5.28) — three strings at one font size, slope ≈ 1 |
+| Canvas `measureText` in our browser is not exactly Power BI's measured width | `PROVEN-EXPERIMENT` (§5.28) — residual spreads 1.6px across three strings |
+| ~~The discrepancy is font substitution~~ | **REFUTED** (§5.29) — Desktop's own canvas returns identical widths to ours, to four decimals |
+| Desktop's canvas widths equal ours for every Segoe stack | `PROVEN-EXPERIMENT` (§5.29) — measured inside Desktop's WebView |
+| `2 + 0.25 × fontPx` as the chart-edge allowance | **REFUTED** (§5.29) — fails by 1.2 to 3.0px against Desktop's own widths |
+| `2 + 0.375 × fontPx` fits the six title-off states | `PROVEN-EXPERIMENT` (§5.29) — ≤0.053px against Desktop's own widths |
+| The allowance varies with the label string at fixed font size | `PROVEN-EXPERIMENT` (§5.29) — 1.619px of spread across three strings |
+| The native label margin is an integer number of pixels | `STRONGLY-SUPPORTED` (§5.28) — implied margins 46/62/81 from three strings |
+| The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
+| `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
+| `maxMarginFactor` is exposed per visual as "Maximum width", default 25, range 15..50 | `PROVEN-UI` (§5.26) |
+| `gutter = min(canvasWidth + 6.5, cap) + 9` at 12px | `PROVEN-EXPERIMENT` (§5.26) — four viewport widths, predicted 75.998 against 76 |
+| Which viewport the cap is a share of | `UNKNOWN` (§5.26) — one capped state falls between the chart-width and visual-width bases |
+| The margin follows the widest VALUE, not the widest painted label | `PROVEN-EXPERIMENT` (§5.26) — truncation changes the drawn string without changing the allocation |
+| Format-pane group names repeat across cards (`Layout` in Bars and Y-axis) | `PROVEN-EXPERIMENT` (§5.23) |
 | Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
 | Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
 | The series gap cannot move the category scale | `PROVEN-EXPERIMENT` (§5.18) — 3 gaps × 3 spacings, width invariant |

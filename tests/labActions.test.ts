@@ -6,11 +6,14 @@ import {
   NotImplementedError,
   requireImplemented,
   SUPPORTED_BASE_THEMES,
+  SUPPORTED_LABEL_FONTS,
   checkVariantTheme,
   expandMatrix,
   selectLabVisual,
   detectBreakpoints,
   expandExperiment,
+  FIXTURE_CATEGORY_SETS,
+  fixtureVariantOf,
   identifyLabEnvironment,
   isStable,
   planRestoration,
@@ -100,7 +103,7 @@ test("anything unrecognised refuses to be mutated", () => {
 
   const foreign = identifyLabEnvironment({ ...LAB, categories: ["Revenue", "Cost"] });
   assert.equal(foreign.ok, false);
-  assert.match(foreign.reasons.join(" "), /unexpected categories/);
+  assert.match(foreign.reasons.join(" "), /not a known fixture variant/);
 });
 
 test("an empty render is not treated as a match", () => {
@@ -557,4 +560,141 @@ test("an unrestored category spacing is reported as a problem", () => {
   const result = verifyRestoration({ categorySpacing: 20 }, { categorySpacing: 75 });
   assert.equal(result.restored, false);
   assert.match(result.problems.join(" "), /categorySpacing: expected 20, found 75/);
+});
+
+// ---------------------------------------------------------------------------
+// The category-axis title toggle, declared but not driveable
+// ---------------------------------------------------------------------------
+
+test("setCategoryAxisTitleVisible is allowlisted and implemented", () => {
+  // Driveable once the toggle's OWNER was found rather than its position: a
+  // formatting-card owns a named heading, a formatting-group inside it owns
+  // its own, and that group's header holds exactly one toggle.
+  assert.ok(ALLOWED_ACTIONS.setCategoryAxisTitleVisible, "on the allowlist");
+  assert.equal(ALLOWED_ACTIONS.setCategoryAxisTitleVisible.mutates, true);
+  assert.equal(requireImplemented("setCategoryAxisTitleVisible"), true);
+  assert.equal(validateAction({ type: "setCategoryAxisTitleVisible", visible: true }), true);
+  assert.equal(validateAction({ type: "setCategoryAxisTitleVisible", visible: false }), true);
+  for (const visible of ["yes", 1, 0, null, undefined]) {
+    assert.throws(() => validateAction({ type: "setCategoryAxisTitleVisible", visible }), ActionError);
+  }
+});
+
+test("a title visibility left alone is never restored", () => {
+  assert.deepEqual(planRestoration({ categoryAxisTitleVisible: true }, {}), []);
+  assert.deepEqual(
+    planRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: true }),
+    [],
+  );
+  assert.deepEqual(
+    planRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: false }),
+    [{ type: "setCategoryAxisTitleVisible", visible: true }],
+  );
+});
+
+test("an unrestored title visibility is reported as a problem", () => {
+  const result = verifyRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: false });
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /categoryAxisTitleVisible: expected true, found false/);
+});
+
+// ---------------------------------------------------------------------------
+// The theme label font family: allowlisted, not yet driveable
+// ---------------------------------------------------------------------------
+
+test("font families are allowlisted, not free text", () => {
+  // The point of this action is to move measured text width while holding
+  // font size fixed. That needs a handful of built-ins with different
+  // metrics, not a font API.
+  assert.ok(SUPPORTED_LABEL_FONTS.includes("Segoe UI"));
+  assert.ok(SUPPORTED_LABEL_FONTS.includes("Courier New"));
+  for (const family of ["Comic Sans", "'; DROP TABLE", "", 12, null]) {
+    assert.throws(() => validateAction({ type: "setThemeLabelFontFamily", family }), ActionError);
+  }
+  assert.equal(validateAction({ type: "setThemeLabelFontFamily", family: "Arial" }), true);
+});
+
+test("setThemeLabelFontFamily refuses until the selection actually takes", () => {
+  // The dropdown opens and reports all 26 families; clicking an option leaves
+  // the control on its old value, while the size control beside it applies
+  // live. Allowlisted means reviewed, not working.
+  assert.equal(ALLOWED_ACTIONS.setThemeLabelFontFamily.implemented, false);
+  assert.throws(() => requireImplemented("setThemeLabelFontFamily"), NotImplementedError);
+});
+
+test("a font family left alone is never restored", () => {
+  assert.deepEqual(planRestoration({ themeLabelFontFamily: "Segoe UI" }, {}), []);
+  assert.deepEqual(
+    planRestoration({ themeLabelFontFamily: "Segoe UI" }, { themeLabelFontFamily: "Arial" }),
+    [{ type: "setThemeLabelFontFamily", family: "Segoe UI" }],
+  );
+  const result = verifyRestoration({ themeLabelFontFamily: "Segoe UI" }, { themeLabelFontFamily: "Arial" });
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /themeLabelFontFamily: expected Segoe UI, found Arial/);
+});
+
+// ---------------------------------------------------------------------------
+// Known fixture variants
+// ---------------------------------------------------------------------------
+
+test("each known fixture variant identifies, and nothing else does", () => {
+  // The gutter experiment needs the widest label's width varied by hand,
+  // because Power BI's font controls could not be driven to do it. Identity
+  // has to recognise the edited fixture without degrading into "any four
+  // categories".
+  const base = {
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+  };
+  for (const [name, categories] of Object.entries(FIXTURE_CATEGORY_SETS)) {
+    const result = identifyLabEnvironment({ ...base, categories: [...categories] });
+    assert.equal(result.ok, true, `${name}: ${result.reasons.join("; ")}`);
+    assert.equal(fixtureVariantOf([...categories]), name);
+  }
+});
+
+test("a category set that is not a known variant is refused", () => {
+  const base = {
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+  };
+  for (const categories of [
+    ["Paris", "Berlin", "Madrid", "Rome"],
+    ["London", "North West", "Scotland", "Cardiff"],
+    // A mixture of two variants must not pass either.
+    ["London", "NW", "Loughborough", "Wales"],
+    [],
+  ]) {
+    const result = identifyLabEnvironment({ ...base, categories });
+    assert.equal(result.ok, false, `${categories.join(",") || "(empty)"} should be refused`);
+  }
+  assert.equal(fixtureVariantOf(["Paris"]), null);
+  assert.equal(fixtureVariantOf([]), null);
+});
+
+test("a shed subset of one variant still identifies", () => {
+  // Power BI drops categories when space is tight; that must not read as a
+  // different fixture.
+  const result = identifyLabEnvironment({
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+    categories: ["London", "Loughborough"],
+  });
+  assert.equal(result.ok, true, result.reasons.join("; "));
+});
+
+test("an explicit expectation still overrides the variant list", () => {
+  const result = identifyLabEnvironment(
+    {
+      visualType: "cartesian",
+      seriesCount: 3,
+      sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+      categories: ["London", "NW", "Scotland", "Wales"],
+    },
+    { categories: ["London", "North West", "Scotland", "Wales"] },
+  );
+  assert.equal(result.ok, false, "a caller asking for BASELINE must not get SHORT");
 });
