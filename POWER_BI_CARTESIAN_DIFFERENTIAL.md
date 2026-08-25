@@ -1702,18 +1702,23 @@ contribution and not a font-size-only term. But the residual moves:
 By the taxonomy this is **outcome B**: canvas `measureText` in our browser
 is not exactly the quantity Power BI allocates.
 
-#### Why, and it is not a missing layout term
+#### ~~Why, and it is not a missing layout term~~
 
-§5.27 established that Power BI measures with `canvasCtx.measureText`. It
+> **This explanation was wrong, and §5.29 disproves it.** The reasoning
+> below blamed font substitution: Desktop has `wf_segoe-ui_normal` loaded,
+> our browser falls back to installed Segoe UI, and the per-string
+> differences between native ink and our canvas looked erratic in the way
+> substitution produces. Measuring inside Desktop's own WebView showed the
+> widths are **identical to four decimals**. The erratic column was ink
+> versus advance width, not one font versus another — and the residual is
+> real native behaviour. Kept struck through because the wrong hypothesis
+> is why the right measurement got made.
+
+~~§5.27 established that Power BI measures with `canvasCtx.measureText`. It
 does so with its own `textProperties`, and Power BI Desktop has
 `wf_segoe-ui_normal` loaded where our browser falls back to the installed
-Segoe UI. The per-string differences between native ink and our canvas are
-erratic in exactly the way font substitution produces — London +0.21,
-North West +0.93, Scotland +0.01, Wales +1.01 — rather than the smooth
-bearing offset a single font would give.
-
-So the ~1.5px is the size of *our measurement error against Power BI's*,
-not evidence of an unknown allocation.
+Segoe UI. So the ~1.5px is the size of our measurement error against Power
+BI's, not evidence of an unknown allocation.~~
 
 #### One pattern worth recording
 
@@ -1820,6 +1825,73 @@ produces that set).
 exact along the font-size axis and drifts up to 1.6px when the widest
 label changes — which is now the single remaining unknown, and it is a
 layout behaviour rather than a metrics artefact.
+
+### 5.30 IMPLEMENTED — the horizontal category gutter
+
+**Status: implemented as an empirical compatibility rule. Classification
+remains B.**
+
+`ChartLayout` now sizes a horizontal category axis from four separate
+terms rather than one house gap:
+
+```
+categoryGutter = measuredLabelWidth
+               + (2 + 0.375 × labelFontPx)      empirical
+               + 9                              proven
+               + (titleFontPx + 5) if shown     proven
+```
+
+| term | status | evidence |
+|---|---|---|
+| label width, via the injected `measureText` | **proven** | Power BI's measurer *is* `canvasCtx.measureText`, and its widths match ours to four decimals (§5.27, §5.29) |
+| anchor offset, 9px | **proven** | six font sizes, several viewports, three strings, spread 0.000 (§5.25) |
+| title allocation, `titleFontPx + 5` | **proven** | title on/off at 12px and 16px, round trip exact (§5.21) |
+| chart-edge allowance, `2 + 0.375 × labelFontPx` | **empirical** | ≤0.053px across six font sizes; up to ~1.4px out when the widest label changes (§5.24, §5.28, §5.29) |
+
+#### What shipped, and what did not
+
+Only the **horizontal** category axis changed, because that is the only
+one measured. Clustered Bar and Stacked Bar both take that path and both
+improved; Clustered Column, Stacked Column and Line keep the vertical
+layout this engine always had. No special case was written for any single
+visual.
+
+Deliberately still absent, and each is a separate piece of work:
+
+- **`maxMarginFactor`** — the cap exists and its composition is read from
+  the runtime, but which viewport it is a share of is still ambiguous
+  (§5.26), so the gutter is uncapped. The architecture leaves room for it
+  around the label term.
+- **5px container padding** each side, and the **7px far-side plot inset**.
+  Both are separately owned and neither belongs in the axis.
+
+#### Verified in the browser
+
+At the natural Clustered Bar preview, before and after, normalised out of
+the hero's 1.5× presentation scale:
+
+| | before | after | native |
+|---|---:|---:|---:|
+| category gutter | 86.094 | **96.984** | **97** |
+| plot width | 283.906 | 273.016 | — |
+| widest label | 60.5 | 60.5 | 60.498 |
+| title allocation | — | 21 | 21 |
+
+The plot gave up exactly what the gutter took — 10.891px each way, no
+pixels invented. Stacked Bar reports the same 96.984, confirming the
+shared path rather than a per-visual fix.
+
+And the category scale did not move: `plot / step` 4.5975, leading inset
+0.3992 of a step, band 0.7658 of a step, all identical before and after,
+as are `categoryWidth` and the series bands.
+
+#### The honest caveat, in the code
+
+The allowance's doc comment carries the six-state table, the ~1.4px
+string-dependent error, and an explicit note that it is a compatibility
+approximation rather than a claim about Power BI's algorithm. A test pins
+the error for all three measured strings, so nobody can later "fix" the
+formula into agreeing with one of them without the suite saying so.
 
 ### 5.5 Text measurement
 

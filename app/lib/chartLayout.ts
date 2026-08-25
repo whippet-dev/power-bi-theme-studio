@@ -316,6 +316,62 @@ export function categoryPercent(
  */
 export const CATEGORY_OUTER_PADDING = 0.4;
 
+/**
+ * The distance Power BI leaves between a category tick label's ANCHOR and
+ * the plot's edge, on a horizontal category axis.
+ *
+ * Category labels are `text-anchor: end` at `x = -9` from the plot origin,
+ * and that 9 does not move: six font sizes, several viewport widths and
+ * three different category strings all measured exactly 9, spread 0.000.
+ * Measuring the same gap from the painted glyph box instead gives 8.07 to
+ * 9.00, because the ink box carries the font's side bearing — which is why
+ * this is defined against the anchor. See
+ * POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.25.
+ */
+export const CATEGORY_TICK_LABEL_ANCHOR_OFFSET = 9;
+
+/**
+ * The gap an axis title adds beyond its own font size.
+ *
+ * Measured by switching the category axis title off and on: a 16px title
+ * costs 21px of gutter and a 12px title costs 17px, both times returning
+ * exactly on the way back. See §5.21.
+ */
+const AXIS_TITLE_GAP = 5;
+
+/**
+ * The allowance Power BI keeps on the CHART-EDGE side of a horizontal
+ * category label, beyond the label's own measured width.
+ *
+ * **This is an empirical compatibility rule, not Power BI's algorithm.**
+ *
+ * What is solid: measured against Power BI Desktop's own canvas widths —
+ * measured inside its WebView, and identical to ours to four decimals — it
+ * reproduces all six title-off font-size states to within **0.053px**:
+ *
+ * | label px | native allowance | this rule |
+ * |---:|---:|---:|
+ * | 9.6 | 5.6016 | 5.600 |
+ * | 12 | 6.5020 | 6.500 |
+ * | 14.4 | 7.4024 | 7.400 |
+ * | 16.8 | 8.3532 | 8.300 |
+ * | 19.2 | 9.2032 | 9.200 |
+ * | 24 | 11.0039 | 11.000 |
+ *
+ * What is not: at a fixed 12px the native allowance varies with the label
+ * itself — 5.1152 for "Scotland", 6.5020 for "North West", 6.7344 for
+ * "Loughborough". So a different widest label can be out by about **1.4px**.
+ * That residual is real native behaviour rather than a measurement error:
+ * the font question was closed by measuring in Desktop's own runtime.
+ *
+ * It is deliberately left approximate. Fitting a branch to make one string
+ * land exactly would hide the evidence rather than explain it. See §5.24,
+ * §5.28 and §5.29.
+ */
+export function horizontalCategoryLabelAllowance(labelFontPx: number): number {
+  return 2 + 0.375 * Math.max(0, labelFontPx);
+}
+
 export const DEFAULT_TICK_COUNT = 4;
 const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */
@@ -483,14 +539,40 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
       : takeBottom(text.height + labelGap + axisTitleExtent(valueAxis));
   }
 
+  /**
+   * A horizontal category axis, sized the way Power BI sizes it.
+   *
+   * Four terms, each measured separately rather than folded into one
+   * constant: the label's own width, the allowance on the chart-edge side
+   * of it, the fixed anchor offset to the plot, and the title when shown.
+   *
+   * The label width comes from the same `measureText` the renderer paints
+   * with, which is correct rather than convenient — Power BI's own
+   * `textWidthMeasurer` is `canvasCtx.measureText`, and its widths match
+   * ours to four decimals (§5.27, §5.29).
+   *
+   * A future `maxMarginFactor` cap belongs around the label part of this
+   * sum — Power BI computes `min(max(overflow, labelWidth), viewport ×
+   * factor)` and adds the title outside that cap. The cap is NOT
+   * implemented: its viewport basis is still ambiguous (§5.26), so the
+   * gutter is currently uncapped.
+   */
+  const horizontalCategoryAxisExtent = (measuredLabelWidth: number, axis: AxisLayoutStyle): number =>
+    measuredLabelWidth
+    + horizontalCategoryLabelAllowance(axis.fontSize)
+    + CATEGORY_TICK_LABEL_ANCHOR_OFFSET
+    + (axis.showAxisTitle && String(axis.titleText) ? axis.titleFontSize + AXIS_TITLE_GAP : 0);
+
   let categoryAxisRect: Rect | null = null;
   if (categoryAxis.show) {
     const text = widestText(categories, categoryAxis.fontSize, categoryAxis.fontFamily, measureText);
     // And the category axis is the other way round: along the bottom for a
-    // vertical chart, down the left edge for a horizontal one.
+    // vertical chart, down the left edge for a horizontal one. Only the
+    // horizontal case is measured against Power BI, so only it changed;
+    // the vertical one keeps the layout this engine always had.
     categoryAxisRect = vertical
       ? takeBottom(text.height + labelGap + axisTitleExtent(categoryAxis))
-      : takeLeft(text.width + labelGap + axisTitleExtent(categoryAxis));
+      : takeLeft(horizontalCategoryAxisExtent(text.width, categoryAxis));
   }
 
   const plot: Rect = { x: left, y: top, width: Math.max(0, width), height: Math.max(0, height) };
