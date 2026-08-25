@@ -968,8 +968,19 @@ button { color: inherit; }
 
 .chart-gridline {
   position: absolute;
-  border-left-style: solid;
-  border-top-style: solid;
+  /* A gridline draws with exactly ONE edge: a vertical one its left
+     border, a horizontal one its top. Each renderer sets that edge's
+     width, style and colour inline, so this rule's job is the opposite
+     one - making the other three edges unable to paint at all.
+
+     Declaring `border-left-style: solid` AND `border-top-style: solid`
+     here is what produced the black triangular wedges at the ends of
+     vertical gridlines: the top border was styled but never given a
+     width or colour, so it fell back to the browser default (`medium`,
+     currentColor) and mitred diagonally against the left border across
+     the zero-width box. Zero width makes that structurally impossible
+     rather than merely unlikely. */
+  border: 0 solid transparent;
   pointer-events: none;
 }
 
@@ -1644,7 +1655,10 @@ button { color: inherit; }
 .column-item__fill {
   position: absolute;
   display: block;
-  border-radius: 2px 2px 0 0;
+  /* Square, deliberately. Power BI draws a cartesian column as a plain
+     SVG rect with no rx/ry, and no resolved property in the column or
+     stacked-column registries controls a corner radius - so rounding
+     here was our decoration, not the theme's. */
 }
 
 .column-item__error {
@@ -1693,7 +1707,7 @@ button { color: inherit; }
 .bar-item__fill {
   position: absolute;
   display: block;
-  border-radius: 2px;
+  /* Square, for the same reason as `.column-item__fill`. */
 }
 
 .bar-item__value {
