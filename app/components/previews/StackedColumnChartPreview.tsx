@@ -20,7 +20,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
 type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[] };
@@ -93,7 +93,11 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
               )}
 
               {barCategories.map((label, index) => {
-                const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
+                // The mark's thickness is the category WIDTH, which is not the
+                // positioning band: Power BI derives it from a category
+                // thickness that carries no inner padding at all. stacked: one band, so the whole bar takes the category width.
+                const { offset: left } = categoryPercent(layout, index, barCategories.length);
+                const width = categoryWidthPercent(layout, barCategories.length);
                 const segments = stackSegments(categoryValues(cartesianFixture, index));
                 const total = segments.length ? segments[segments.length - 1].end : 0;
                 const topPct = valueFraction(layout, total * VALUE_SCALE) * 100;

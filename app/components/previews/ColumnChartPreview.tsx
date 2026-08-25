@@ -19,7 +19,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { categoryPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
 type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[] };
@@ -126,7 +126,11 @@ export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
               )}
 
               {barCategories.map((label, index) => {
-                const { offset: left, size: width } = categoryPercent(layout, index, barCategories.length);
+                // The mark's thickness is the category WIDTH, which is not the
+                // positioning band: Power BI derives it from a category
+                // thickness that carries no inner padding at all. clustered: this is the extent clusteredSeriesBands subdivides.
+                const { offset: left } = categoryPercent(layout, index, barCategories.length);
+                const width = categoryWidthPercent(layout, barCategories.length);
                 return (
                   <span className="column-item" key={label} style={{ left: `${left}%`, width: `${width}%` }}>
                     {cartesianFixture.series.map((series, seriesIndex) => {
