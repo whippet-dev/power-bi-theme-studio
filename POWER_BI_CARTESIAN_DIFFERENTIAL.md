@@ -906,6 +906,49 @@ state — so this belongs to the series scale inside the band, not here. It
 is the same declared-versus-effective gap recorded in §5.14, now measured
 across six values instead of one.
 
+### 5.17 The category scale, verified in Theme Studio
+
+Measured in the browser at Theme Studio's natural preview size, before and
+after the change, against the native reference at "Space between
+categories" 20. Everything is normalised by the category step, so the
+differing box sizes do not enter into it.
+
+| | before | after | native |
+|---|---:|---:|---:|
+| plot ÷ step | 3.9978 | **4.5975** | **4.6000** |
+| leading edge ÷ step | 0.0993 | **0.3992** | **0.4000** |
+| trailing edge ÷ step | 0.1007 | **0.4008** | 0.4000 (band) / 0.4333 (drawn) |
+| band ÷ step | 0.7993 | 0.7992 | 0.7667 (drawn) |
+| series step ÷ step | 0.2754 | 0.2750 | 0.2644 |
+| bar ÷ step | 0.2478 | 0.2475 | 0.2379 |
+| series `paddingInner` | 0.1 | 0.1 | 0.1 |
+| category step, px | 21.563 | 18.750 | — |
+
+Before, Theme Studio put **4.00** steps in the plot and inset each band by
+half its inner padding — categories tiled edge to edge and the first band
+began 0.099 of a step in. After, it puts **4.5975** steps in and begins
+0.3992 of a step in, against native's 4.6000 and 0.4000.
+
+The residuals in the third decimal are the measurement, not the model: the
+browser lays out at fractional pixels and the hero scales by 1.5, so a
+figure read back from `getBoundingClientRect` and divided by 1.5 cannot
+resolve better than about 0.001 of a step. The pure scale is exact — the
+unit tests assert 4.6000 and 0.4000 with a 1e-9 tolerance.
+
+#### The residual that remains
+
+`band ÷ step` is 0.799 against native's 0.767, and the two rows below it
+follow from that one: Theme Studio's series scale divides a slightly wider
+band, so its series step and bar thickness are proportionally larger. This
+is the declared-versus-effective inner padding recorded in §5.14 and now
+measured at six spacings in §5.16 — Theme Studio uses the property Power BI
+reports (20), and Power BI's own bands come out narrower than that property
+implies. It belongs to the series scale inside the category band, and
+deliberately did not move here.
+
+Nothing else moved: the plot rectangle, both gutters, the axis typography
+and the series `paddingInner` are identical before and after.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
