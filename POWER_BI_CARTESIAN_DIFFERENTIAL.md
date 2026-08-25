@@ -1675,6 +1675,71 @@ label-to-plot gap, which is a fixed 9px (§5.25).
 **Classification: B**, with one of the two candidate owners now eliminated
 by implementation rather than by inference.
 
+### 5.28 Three strings, one font size — the degeneracy breaks
+
+Power BI's own controls could not vary text width at a fixed font size, so
+the synthetic fixture's text was edited by hand instead: `North West` →
+`NW` (making Scotland the widest) → `Loughborough`. Everything else held:
+Classic 2026, 600 × 600, 12px labels, same family, spacing 20, gap 10,
+title on at 16px, no truncation, cap nowhere near.
+
+| variant | widest | canvas | native ink | gutter | g − canvas | g − ink | anchor |
+|---|---|---:|---:|---:|---:|---:|---:|
+| SHORT | Scotland | 45.885 | 45.891 | **81** | 35.115 | 35.109 | 9 |
+| BASELINE | North West | 60.498 | 61.432 | **97** | 36.502 | 35.568 | 9 |
+| LONG | Loughborough | 79.266 | 79.475 | **116** | 36.734 | 36.525 | 9 |
+
+The anchor stayed at **9** in all three, and the plot moved with the
+gutter: 502, 486, 467.
+
+#### Text width does contribute, but the residual is not constant
+
+`d(gutter) / d(width)` comes out at 1.01–1.09 against canvas and 1.03–1.05
+against ink — near one, which settles that this is a **text-width**
+contribution and not a font-size-only term. But the residual moves:
+**1.62px** of spread against canvas, **1.42px** against ink.
+
+By the taxonomy this is **outcome B**: canvas `measureText` in our browser
+is not exactly the quantity Power BI allocates.
+
+#### Why, and it is not a missing layout term
+
+§5.27 established that Power BI measures with `canvasCtx.measureText`. It
+does so with its own `textProperties`, and Power BI Desktop has
+`wf_segoe-ui_normal` loaded where our browser falls back to the installed
+Segoe UI. The per-string differences between native ink and our canvas are
+erratic in exactly the way font substitution produces — London +0.21,
+North West +0.93, Scotland +0.01, Wales +1.01 — rather than the smooth
+bearing offset a single font would give.
+
+So the ~1.5px is the size of *our measurement error against Power BI's*,
+not evidence of an unknown allocation.
+
+#### One pattern worth recording
+
+Every native gutter measured in this whole investigation is an integer. If
+the chart-edge term is exactly **5** — the same constant as the title gap —
+then the implied label margins are
+
+| variant | implied margin |
+|---|---:|
+| SHORT | **46.000** |
+| BASELINE | **62.000** |
+| LONG | **81.000** |
+
+Three exact integers from three unrelated strings. That is strong evidence
+the margin is integer-rounded and that the chart-edge constant at 12px is 5
+rather than the 6.5 the earlier algebra suggested — with the difference
+absorbed by rounding. It does not survive being pushed across font sizes:
+`ceil(width) + 14` fits 12px but not 14.4px, so the font-proportional part
+of §5.24 is still real and still unexplained.
+
+**Classification: B.** Text width is now independently established as a
+one-for-one contributor; the measurer is known to be canvas `measureText`;
+the anchor is a fixed 9px; the title is `titleFontPx + 5`. What remains
+unowned is the font-proportional part of the chart-edge allocation, and the
+~1.5px between our text measurement and Power BI's.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1773,6 +1838,10 @@ refuted — only shown not to hold under the hero transform.
 | That method returns raw `canvasCtx.measureText(text).width`, with no allowance | `PROVEN-RUNTIME` (§5.27) |
 | The `2 + 0.375 × labelPx` is therefore axis/chart geometry, not text measurement | `PROVEN-RUNTIME` (§5.27) — by elimination of the alternative implementation |
 | Where that allocation sits geometrically | `UNKNOWN` (§5.27) |
+| The gutter responds to TEXT WIDTH, not just font size | `PROVEN-EXPERIMENT` (§5.28) — three strings at one font size, slope ≈ 1 |
+| Canvas `measureText` in our browser is not exactly Power BI's measured width | `PROVEN-EXPERIMENT` (§5.28) — residual spreads 1.6px across three strings |
+| The discrepancy is font substitution, not a missing layout term | `STRONGLY-SUPPORTED` (§5.28) — per-string differences are erratic, and §5.27 fixes the mechanism |
+| The native label margin is an integer number of pixels | `STRONGLY-SUPPORTED` (§5.28) — implied margins 46/62/81 from three strings |
 | The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
 | `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
 | `maxMarginFactor` is exposed per visual as "Maximum width", default 25, range 15..50 | `PROVEN-UI` (§5.26) |
