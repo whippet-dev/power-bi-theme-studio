@@ -2799,3 +2799,27 @@ button { color: inherit; }
   font-size: 11px;
   line-height: 1.45;
 }
+
+/* An authored visual, displayed at whatever size the UI has room for.
+   The frame reserves the scaled footprint; the content keeps its authored
+   width and is transformed from its top-left corner, so the visual's own
+   geometry is measurable before presentation and unaffected by it. See
+   previews/PresentationScale.tsx. */
+.authored-visual {
+  display: block;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.authored-visual__content {
+  display: block;
+  transform-origin: top left;
+}
+
+/* Inside a presentation frame the authored visual sizes to its own content:
+   the frame reserves the scaled footprint, so a height imposed by the tile
+   would clip the visual instead of scaling it. */
+.authored-visual__content > .chart-preview {
+  height: auto;
+}

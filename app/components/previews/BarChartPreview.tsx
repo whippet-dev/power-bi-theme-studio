@@ -23,6 +23,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
+import { PresentationScale } from "./PresentationScale";
 import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedBarChartStyle } from "../../lib/barChartProperties";
 
@@ -100,6 +101,7 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
   );
 
   return (
+    <PresentationScale width={BAR_CHART_BOX.width}>
     <span
       className={`chart-preview${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
       style={{ opacity: 1 - barChartStyle.plotArea.transparency / 100 }}
@@ -107,7 +109,14 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
       {!legendAtBottom && legendNode}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          <span className="bar-preview__plot" style={{ height: BAR_CHART_BOX.height }}>
+          {/* The authored plot region. Width is applied as well as height so
+              the visual genuinely occupies its authored size rather than
+              stretching to whatever the tile happens to be — presentation
+              scaling is what fits it to the UI, and it happens after this. */}
+          <span
+            className="bar-preview__plot"
+            style={{ width: BAR_CHART_BOX.width, height: BAR_CHART_BOX.height }}
+          >
             <ValueAxisGutter
               axis={barChartStyle.valueAxis}
               layout={layout}
@@ -219,5 +228,6 @@ export function BarChartPreview({ barChartStyle, palette }: Props) {
       </span>
       {legendAtBottom && legendNode}
     </span>
+    </PresentationScale>
   );
 }

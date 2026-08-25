@@ -102,10 +102,34 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
 export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
 
 /**
- * The bar chart's natural chart box. Replaces a coordinate system that was
- * never really a box at all: `.bar-row`'s `grid-template-columns: 68px
- * minmax(80px,1fr) 28px`, with the value axis inset by a TypeScript
- * constant hand-copied from it (RENDERER_AUDIT §2.3).
+ * The bar chart's **authored** size — the dimensions ChartLayout and the
+ * renderer believe the Power BI visual has.
+ *
+ * Not the same thing as how large Theme Studio displays it. The finished
+ * visual is scaled uniformly into whatever space the tile has (see
+ * `PreviewShell`), and that scale never feeds back into layout: gutters,
+ * typography, the category scale and the marks are all computed here, at
+ * this size, once.
+ *
+ * **450 × 250**, up from 372 × 128. The old box was measurably too small
+ * for a full-furniture preview. Native Classic 2026 at 450 × 250 still
+ * renders everything — twelve bars, four categories, legend, value labels,
+ * both axis titles — while at 372 × 128 it shows six bars, two categories,
+ * no legend and no value labels (POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.12).
+ * So the previous box asked this renderer to keep furniture Power BI
+ * itself sheds at that size, and the axis gutter alone was taking 26% of
+ * the width. Authoring at a size Power BI would keep everything at, then
+ * scaling the result, is the composition Power BI users actually see.
+ *
+ * Width is REAL here, not nominal: the renderer applies it, so the
+ * authored geometry can be measured and compared with native directly.
+ *
+ * Previous rationale, still true of the height it replaced:
+ *
+ * Replaces a coordinate system that was never really a box at all:
+ * `.bar-row`'s `grid-template-columns: 68px minmax(80px,1fr) 28px`, with
+ * the value axis inset by a TypeScript constant hand-copied from it
+ * (RENDERER_AUDIT §2.3).
  *
  * 128, the same as the column chart: a clustered bar is the transpose of a
  * clustered column over the same four categories, so an equal footprint is
@@ -121,9 +145,8 @@ export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
  * shorter than its own text. 128 clears `minimumPlotHeight` in each
  * measured condition with room to spare.
  *
- * Width is nominal, as above.
  */
-export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
+export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 250 };
 
 /**
  * The line chart's natural chart box. Replaces `.line-preview__plot`'s

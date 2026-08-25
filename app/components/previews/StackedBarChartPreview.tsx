@@ -19,6 +19,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
+import { PresentationScale } from "./PresentationScale";
 import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedStackedBarChartStyle } from "../../lib/stackedBarChartProperties";
 
@@ -55,6 +56,7 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
   const valueGutter = layout.valueAxis?.height ?? 0;
 
   return (
+    <PresentationScale width={BAR_CHART_BOX.width}>
     <span
       className={`chart-preview${stackedBarLegendVertical ? " chart-preview--legend-side" : ""}${stackedBarLegendAtBottom ? " chart-preview--legend-after" : ""}`}
       style={{ opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100 }}
@@ -62,7 +64,14 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
       {!stackedBarLegendAtBottom && stackedBarLegendNode}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          <span className="bar-preview__plot" style={{ height: BAR_CHART_BOX.height }}>
+          {/* The authored plot region. Width is applied as well as height so
+              the visual genuinely occupies its authored size rather than
+              stretching to whatever the tile happens to be — presentation
+              scaling is what fits it to the UI, and it happens after this. */}
+          <span
+            className="bar-preview__plot"
+            style={{ width: BAR_CHART_BOX.width, height: BAR_CHART_BOX.height }}
+          >
             <ValueAxisGutter
               axis={stackedBarChartStyle.valueAxis}
               layout={layout}
@@ -175,5 +184,6 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
       </span>
       {stackedBarLegendAtBottom && stackedBarLegendNode}
     </span>
+    </PresentationScale>
   );
 }
