@@ -8,6 +8,8 @@ import {
 } from "../app/components/previews/cartesianLayout";
 import type { CartesianLayoutInput } from "../app/components/previews/cartesianLayout";
 import { authoredInnerBox, legendBandExtent } from "../app/components/previews/cartesianLayout";
+import { legendExtent } from "../app/lib/chartLayout";
+import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
 
 /**
  * Authored size versus presentation size.
@@ -154,4 +156,29 @@ test("the category scale still derives from ChartLayout at the authored size", (
   assert.ok(Math.abs(layout.scale.category(0, 4).start - layout.plot.y - 0.4 * step) < 1e-9, "leading inset");
   const thickness = extent / (4 + 0.8);
   assert.ok(Math.abs(layout.scale.categoryWidth(4) - thickness * 0.8) < 1e-9, "categoryWidth");
+});
+
+test("the renderer's legend band IS the engine's legend arithmetic", () => {
+  // Not "they agree today" — the adapter delegates, so there is no second
+  // implementation to drift. All it adds is the point-to-pixel conversion.
+  const legend = {
+    show: true,
+    position: "Top",
+    fontSize: 9,
+    fontFamily: "Segoe UI",
+    showTitle: true,
+    titleText: "Series",
+  };
+  const viaRenderer = legendBandExtent(legend as never, ["Online", "Phone", "Post"], measure);
+  const viaEngine = legendExtent(
+    { ...legend, fontSize: themeFontSizeToCssPx(legend.fontSize) } as never,
+    ["Online", "Phone", "Post"],
+    measure,
+  );
+  assert.equal(viaRenderer.width, viaEngine.width);
+  assert.equal(viaRenderer.height, viaEngine.height);
+
+  // And the engine reserves that same band off the correct edge.
+  assert.equal(viaEngine.vertical, false, "a Top legend is horizontal");
+  assert.equal(viaEngine.afterPlot, false, "and sits before the plot");
 });

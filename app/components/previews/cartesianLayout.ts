@@ -1,8 +1,7 @@
 import {
   computeChartLayout,
   estimateText,
-  DEFAULT_LABEL_GAP,
-  LEGEND_SWATCH_EXTENT,
+  legendExtent,
   type LegendLayoutStyle,
   type AxisLayoutStyle,
   type CartesianOrientation,
@@ -12,7 +11,7 @@ import {
 } from "../../lib/chartLayout";
 import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
-import { formatValue, legendIsVertical } from "../ChartParts";
+import { formatValue } from "../ChartParts";
 
 /**
  * The bridge between a preview component and the pure layout engine.
@@ -247,10 +246,11 @@ function inCssPixels<
  * claims to be. That is exactly the boundary error this replaced: an
  * authored 450 × 250 whose DOM measured 450 × 317.
  *
- * Deliberately the same arithmetic `computeChartLayout` uses for a legend
- * it owns, so the two cannot disagree about what a legend costs. The
- * caller applies the returned extent to BOTH the layout box and the
- * rendered band, which is what keeps CSS and geometry in step.
+ * A thin adapter over `legendExtent`, which is the one implementation of
+ * what a legend costs — the engine reserves its own legend rect with the
+ * same call. There is no second copy to drift. All this adds is the
+ * theme's point-to-pixel conversion, because the engine is given CSS
+ * pixels and a style object is not.
  */
 export function legendBandExtent(
   legend: LegendLayoutStyle | undefined,
@@ -258,19 +258,12 @@ export function legendBandExtent(
   measure: TextMeasure = canvasTextMeasure,
 ): { width: number; height: number } {
   if (!legend?.show) return { width: 0, height: 0 };
-  const entries = legend.showTitle && String(legend.titleText ?? "")
-    ? [String(legend.titleText), ...entryLabels]
-    : entryLabels;
-  if (!entries.length) return { width: 0, height: 0 };
-  const fontPx = themeFontSizeToCssPx(legend.fontSize);
-  const family = legend.fontFamily;
-  const widest = entries.reduce(
-    (best, label) => Math.max(best, measure(label, fontPx, family).width),
-    0,
+  const band = legendExtent(
+    { ...legend, fontSize: themeFontSizeToCssPx(legend.fontSize) },
+    entryLabels,
+    measure,
   );
-  return legendIsVertical(legend.position)
-    ? { width: widest + LEGEND_SWATCH_EXTENT + DEFAULT_LABEL_GAP, height: 0 }
-    : { width: 0, height: measure(entries[0], fontPx, family).height + DEFAULT_LABEL_GAP };
+  return { width: band.width, height: band.height };
 }
 
 /**
