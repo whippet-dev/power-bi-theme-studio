@@ -1545,6 +1545,71 @@ while the font *size* control beside it applies live. So
 in the label's allocated width — which is a real narrowing from "somewhere
 in the gutter". It does not yet have an owner.
 
+### 5.26 The cap, in the UI and in the geometry
+
+The remaining question — whether the `2 + 0.375 × labelPx` belongs to Power
+BI's text measurement or to axis geometry — needs text width varied while
+font size is held fixed. Two routes were tried this round.
+
+#### The font-family route is closed for now
+
+The theme pane's General font dropdown opens and lists all 26 families,
+but neither mouse nor keyboard selection commits: with the list open,
+arrowing to a family and pressing Enter leaves the control on its previous
+value, exactly as clicking does. Reaching that dropdown also depends on
+the Theme pane, which was itself unreachable for most of this session. The
+action stays `NOT_IMPLEMENTED`.
+
+#### `maxMarginFactor` is a per-visual control, and it says 25
+
+Found while looking for another route: **Y-axis → Values → "Maximum
+width"** reads **25**, with a range of **15..50**. That is
+`maxMarginFactor` as a percentage, exposed in the Format pane — the
+runtime value read back from the UI, and the first direct confirmation
+that the 0.25 default in the bundle is the same number a user sees.
+
+#### Narrowing the visual forces the cap to bite
+
+Title off, 12px labels, four categories, only the visual's width varying —
+so the font never changes but the rendered string eventually must:
+
+| visual | chart | widest label | gutter | 0.25 × chart |
+|---:|---:|---|---:|---:|
+| 600 | 590 | North West | **76** | 147.5 |
+| 340 | 330 | North West | **76** | 82.5 |
+| 300 | 290 | North West | **76** | 72.5 |
+| 280 | 270 | North West | **76** | 67.5 |
+| 260 | 250 | North **…** (truncated) | **73** | 62.5 |
+
+The uncapped model predicts **75.998** against a measured **76** at all
+four uncapped widths:
+
+```
+gutter = min(canvasWidth + 6.5, cap) + 9
+```
+
+and the label-to-plot anchor stayed at exactly **9** in every state,
+including the truncated one.
+
+#### What the capped state does not settle
+
+At 260 the cap bites and the label truncates, but the measured gutter of 73
+sits between the two candidate bases: `0.25 × chartWidth` predicts 71.5 and
+`0.25 × visualWidth` predicts 74. One capped state cannot choose between
+them, and further widths could not be measured — CDP input began timing
+out against the WebView partway through the second sweep.
+
+It also does not break the degeneracy. The margin is computed from the
+widest **value**, not from what is painted, so truncation changes the drawn
+string without changing the quantity the allocation is derived from. The
+260-wide state proves the cap is real; it does not vary the measured width
+of the widest value.
+
+**Classification: B**, unchanged. The uncapped model now predicts four
+independent viewport widths as well as six font sizes and both title
+states, and the anchor's fixed 9px survives every one — but the ownership
+of `2 + 0.375 × labelPx` is exactly where §5.25 left it.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1642,6 +1707,10 @@ refuted — only shown not to hold under the hero transform.
 | Whether that term is a measurement allowance or axis padding | `UNKNOWN` (§5.25) — needs text width varied at fixed font size |
 | The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
 | `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
+| `maxMarginFactor` is exposed per visual as "Maximum width", default 25, range 15..50 | `PROVEN-UI` (§5.26) |
+| `gutter = min(canvasWidth + 6.5, cap) + 9` at 12px | `PROVEN-EXPERIMENT` (§5.26) — four viewport widths, predicted 75.998 against 76 |
+| Which viewport the cap is a share of | `UNKNOWN` (§5.26) — one capped state falls between the chart-width and visual-width bases |
+| The margin follows the widest VALUE, not the widest painted label | `PROVEN-EXPERIMENT` (§5.26) — truncation changes the drawn string without changing the allocation |
 | Format-pane group names repeat across cards (`Layout` in Bars and Y-axis) | `PROVEN-EXPERIMENT` (§5.23) |
 | Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
 | Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
