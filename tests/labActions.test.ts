@@ -6,6 +6,7 @@ import {
   NotImplementedError,
   requireImplemented,
   SUPPORTED_BASE_THEMES,
+  SUPPORTED_LABEL_FONTS,
   checkVariantTheme,
   expandMatrix,
   selectLabVisual,
@@ -593,4 +594,39 @@ test("an unrestored title visibility is reported as a problem", () => {
   const result = verifyRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: false });
   assert.equal(result.restored, false);
   assert.match(result.problems.join(" "), /categoryAxisTitleVisible: expected true, found false/);
+});
+
+// ---------------------------------------------------------------------------
+// The theme label font family: allowlisted, not yet driveable
+// ---------------------------------------------------------------------------
+
+test("font families are allowlisted, not free text", () => {
+  // The point of this action is to move measured text width while holding
+  // font size fixed. That needs a handful of built-ins with different
+  // metrics, not a font API.
+  assert.ok(SUPPORTED_LABEL_FONTS.includes("Segoe UI"));
+  assert.ok(SUPPORTED_LABEL_FONTS.includes("Courier New"));
+  for (const family of ["Comic Sans", "'; DROP TABLE", "", 12, null]) {
+    assert.throws(() => validateAction({ type: "setThemeLabelFontFamily", family }), ActionError);
+  }
+  assert.equal(validateAction({ type: "setThemeLabelFontFamily", family: "Arial" }), true);
+});
+
+test("setThemeLabelFontFamily refuses until the selection actually takes", () => {
+  // The dropdown opens and reports all 26 families; clicking an option leaves
+  // the control on its old value, while the size control beside it applies
+  // live. Allowlisted means reviewed, not working.
+  assert.equal(ALLOWED_ACTIONS.setThemeLabelFontFamily.implemented, false);
+  assert.throws(() => requireImplemented("setThemeLabelFontFamily"), NotImplementedError);
+});
+
+test("a font family left alone is never restored", () => {
+  assert.deepEqual(planRestoration({ themeLabelFontFamily: "Segoe UI" }, {}), []);
+  assert.deepEqual(
+    planRestoration({ themeLabelFontFamily: "Segoe UI" }, { themeLabelFontFamily: "Arial" }),
+    [{ type: "setThemeLabelFontFamily", family: "Segoe UI" }],
+  );
+  const result = verifyRestoration({ themeLabelFontFamily: "Segoe UI" }, { themeLabelFontFamily: "Arial" });
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /themeLabelFontFamily: expected Segoe UI, found Arial/);
 });

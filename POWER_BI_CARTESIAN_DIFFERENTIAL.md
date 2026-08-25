@@ -1475,6 +1475,76 @@ which is exactly `min(natural, viewportWidth × maxMarginFactor)` from
 the cap is proven, and the title term is proven — but `0.375 × labelPx`
 still has no named owner, and the gate for A requires one.
 
+### 5.25 The label anchor — where the font-relative term is not
+
+Every gap measured so far came from `getBoundingClientRect`, which returns
+the painted glyph box. A right-aligned tick label is not positioned by its
+ink; it is positioned by its **anchor**, and the bearing between the two
+moves with the typeface. So the ink-based gaps were carrying a term that
+may never have been a gap at all.
+
+Anchors mapped through `getScreenCTM`, relative to the plot's own origin:
+
+```
+text-anchor: end     x = -9     for every category label
+```
+
+#### The anchor does not move with the font
+
+Title off, 600 × 600, the same six label sizes:
+
+| label px | anchor → plot | ink → plot | gutter |
+|---:|---:|---:|---:|
+| 9.6 | **9** | 8.084 | 63 |
+| 12 | **9** | 8.068 | 76 |
+| 14.4 | **9** | 8.891 | 89 |
+| 16.8 | **9** | 8.699 | 102 |
+| 19.2 | **9** | 8.506 | 115 |
+| 24 | **9** | 9.000 | 141 |
+
+**Spread in the anchor distance: 0.000.** The label-to-plot gap is a fixed
+**9px**, and the wandering 8.07–9.00 in the ink column is glyph bearing,
+not layout. The hypothesis that the font-relative term is a label-to-plot
+gap is **refuted**.
+
+#### Which relocates the term rather than naming it
+
+With the anchor fixed, the gutter decomposes as
+
+```
+gutter = (chart edge → text allocation) + allocatedTextWidth + 9
+```
+
+and since `gutter = 11 + 5.41667 × labelPx` (§5.24), whatever sits left of
+the anchor is `2 + 5.41667 × labelPx`. Against a canvas advance width of
+`5.0415 × labelPx` for this label, that leaves
+
+```
+allocation − advance = 2 + 0.375 × labelPx
+```
+
+— 6.5px at 12px, 11px at 24px. So the term lives on the **chart-edge side**
+of the text, not the plot side: either Power BI's `textWidthMeasurer`
+returns more than the advance width, or the axis pads the far side of the
+label band. The runtime already rules out the margin calculation itself
+adding anything (§5.24), which leaves those two.
+
+#### The experiment that would separate them, and why it did not run
+
+Vary the font family at a fixed 12px: text width then moves independently
+of font size, and the two readings predict different gutters. The lab can
+now navigate to the control — the theme pane's General font dropdown opens
+and reports all 26 families this build exposes, including Arial, Verdana,
+Georgia and Courier New — but **clicking an option does not take**. The
+control returns to its previous value, with or without a preceding hover,
+while the font *size* control beside it applies live. So
+`setThemeLabelFontFamily` is allowlisted, coded and marked
+`NOT_IMPLEMENTED` rather than reporting a change it did not make.
+
+**Classification: B.** The term now has a *location* — left of the anchor,
+in the label's allocated width — which is a real narrowing from "somewhere
+in the gutter". It does not yet have an owner.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1566,7 +1636,10 @@ refuted — only shown not to hold under the hero transform.
 | The category axis title costs `titleFontPx + 5` | `PROVEN-EXPERIMENT` (§5.21) — on/off at two title sizes, round trip reproduced |
 | The gutter with the title hidden is the same at 600×250 and 600×600 | `PROVEN-EXPERIMENT` (§5.21) |
 | The label side is `measuredWidth + 11 + 0.375 × labelPx` | `PROVEN-EXPERIMENT` (§5.24) — six uncapped sizes, title hidden, exact integers on a single line |
-| What the `0.375 × labelPx` term IS | `UNKNOWN` (§5.24) — one fixture string cannot separate text measurement from axis gap |
+| The category label-to-plot gap is a fixed **9px**, not font-relative | `PROVEN-EXPERIMENT` (§5.25) — anchor distance, six font sizes, spread 0.000 |
+| Category labels are `text-anchor: end` at `x = -9` from the plot origin | `PROVEN-EXPERIMENT` (§5.25) |
+| The `2 + 0.375 × labelPx` term sits left of the anchor, in the allocated label width | `PROVEN-EXPERIMENT` (§5.25) — by subtraction from a fixed anchor |
+| Whether that term is a measurement allowance or axis padding | `UNKNOWN` (§5.25) — needs text width varied at fixed font size |
 | The label margin is `max` of the measured label widths, with no padding added | `PROVEN-RUNTIME` (§5.24) |
 | `leftMargin = min(max(overflow, maxWidth), yMarginLimit)` | `PROVEN-RUNTIME` (§5.24) — the cap composition, read rather than inferred |
 | Format-pane group names repeat across cards (`Layout` in Bars and Y-axis) | `PROVEN-EXPERIMENT` (§5.23) |

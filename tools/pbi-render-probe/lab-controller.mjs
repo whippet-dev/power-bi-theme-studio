@@ -898,6 +898,140 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * Where the category labels are ANCHORED, as opposed to where their ink
+   * lands.
+   *
+   * A right-aligned tick label is positioned by its anchor; the painted
+   * glyph box sits a bearing's width to the left of it and moves with the
+   * typeface. Every gap measured off `getBoundingClientRect` so far has
+   * carried that bearing, which is exactly the contamination that keeps an
+   * axis term looking font-relative when it may not be.
+   *
+   * Anchors are mapped through `getScreenCTM`, so nested transforms and
+   * group translations resolve without assuming the `x` attribute is
+   * already plot-relative. Everything is returned in client pixels and
+   * relative to the plot's own origin, mapped the same way.
+   */
+  categoryLabelAnchors: () => `(() => { try {
+    const n = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(3) : null);
+    const el = ${VISUAL};
+    if (!el) return null;
+    const plot = el.querySelector('svg.mainGraphicsContext');
+    const root = el.querySelector('svg.cartesianChart');
+    if (!plot || !root) return null;
+
+    const originOf = (node) => {
+      const ctm = node.getScreenCTM();
+      if (!ctm) return null;
+      const pt = root.createSVGPoint();
+      pt.x = 0; pt.y = 0;
+      return pt.matrixTransform(ctm);
+    };
+    const plotOrigin = originOf(plot);
+    if (!plotOrigin) return null;
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const isTitleFace = (f) => /wf_standard-font/.test(f);
+
+    const labels = [...el.querySelectorAll('svg text')]
+      .map((t) => ({ t, r: t.getBoundingClientRect(), cs: getComputedStyle(t) }))
+      .filter(({ t, r, cs }) => own(t) && barLeft !== null && r.right <= barLeft + 2 && !isTitleFace(cs.fontFamily))
+      .map(({ t, r, cs }) => {
+        const ctm = t.getScreenCTM();
+        const pt = root.createSVGPoint();
+        // Attributes can carry units ('0.35em') or be absent entirely, and a
+        // non-finite value throws on assignment rather than being ignored.
+        const num = (v) => { const f = parseFloat(v); return Number.isFinite(f) ? f : 0; };
+        pt.x = num(t.getAttribute('x')) + num(t.getAttribute('dx'));
+        pt.y = num(t.getAttribute('y')) + num(t.getAttribute('dy'));
+        const anchor = ctm ? pt.matrixTransform(ctm) : null;
+        let bbox = null;
+        try { const b = t.getBBox(); bbox = { x: n(b.x), width: n(b.width) }; } catch (e) { bbox = null; }
+        return {
+          text: own(t),
+          fontPx: n(parseFloat(cs.fontSize)),
+          fontFamily: cs.fontFamily,
+          textAnchor: cs.textAnchor || t.getAttribute('text-anchor'),
+          xAttr: n(Number(t.getAttribute('x') || 0)),
+          dxAttr: t.getAttribute('dx'),
+          transform: t.getAttribute('transform'),
+          bbox,
+          // All relative to the plot's own origin, in client pixels.
+          anchorX: anchor ? n(anchor.x - plotOrigin.x) : null,
+          inkLeft: n(r.left - plotOrigin.x),
+          inkRight: n(r.right - plotOrigin.x),
+          inkWidth: n(r.width),
+        };
+      });
+    if (!labels.length) return null;
+
+    const widest = labels.reduce((best, l) => (!best || l.inkWidth > best.inkWidth ? l : best), null);
+    return {
+      plotOriginClientX: n(plotOrigin.x),
+      labels,
+      widest,
+      // The two quantities the whole question turns on.
+      anchorToPlot: widest ? n(-widest.anchorX) : null,
+      inkToPlot: widest ? n(-widest.inkRight) : null,
+      anchorToInk: widest ? n(widest.anchorX - widest.inkRight) : null,
+    };
+  } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
+
+  /** Every clickable control in the Format pane with its visible text. Read-only. */
+  paneControls: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=button],[role=combobox],button,select,pbi-dropdown,tri-dropdown')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.x > W * 0.62 && r.width > 8 && r.height > 8)
+      .map(({ el, r }) => ({
+        tag: el.tagName.toLowerCase(),
+        role: el.getAttribute('role'),
+        name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
+        expanded: el.getAttribute('aria-expanded'),
+        y: Math.round(r.y), x: Math.round(r.x + r.width / 2), w: Math.round(r.width),
+      }));
+  })()`,
+
+  /**
+   * The dropdown belonging to a named group in the theme pane.
+   *
+   * Same containment rule as everything else: find the heading, walk up to
+   * the smallest ancestor holding a dropdown, and require exactly one.
+   */
+  groupDropdown: (groupName) => `(() => {
+    const W = window.innerWidth;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const headings = [...document.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === ${JSON.stringify(groupName)}) && inPane(e));
+    if (headings.length !== 1) return { ok: false, reason: headings.length + ' headings named ' + ${JSON.stringify(groupName)} };
+    let owner = headings[0];
+    for (let i = 0; i < 6 && owner; i++) {
+      if (owner.querySelector('pbi-dropdown')) break;
+      owner = owner.parentElement;
+    }
+    const found = owner ? [...owner.querySelectorAll('pbi-dropdown')] : [];
+    if (found.length !== 1) return { ok: false, reason: found.length + ' dropdowns owned by ' + ${JSON.stringify(groupName)} };
+    const el = found[0];
+    const r = el.getBoundingClientRect();
+    let scroller = el.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight + 5) scroller = scroller.parentElement;
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    return {
+      ok: true,
+      value: (el.textContent || '').trim(),
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top >= box.top + 2 && r.bottom <= box.bottom - 2,
+      above: r.top < box.top + 2,
+    };
+  })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');
@@ -1489,6 +1623,57 @@ export class LabController {
   }
 
   /**
+   * Sets the report theme's primary label FONT FAMILY.
+   *
+   * The point is to move measured text width while holding font size
+   * fixed, which is the only way to tell a text-width term from a
+   * font-relative one — for a single string at a single size the two are
+   * the same line.
+   *
+   * The requested family must be allowlisted AND offered by this build's
+   * own dropdown; nothing is typed into it.
+   */
+  async setThemeLabelFontFamily(family) {
+    validateAction({ type: "setThemeLabelFontFamily", family });
+    requireImplemented("setThemeLabelFontFamily");
+    await this.requireLabVisual();
+
+    await this.openThemeTextControl();
+    let control = await this.session.read("groupDropdown", "General");
+    if (!control || !control.ok) {
+      throw new Error(`REFUSING TO CLICK — the theme's General font dropdown: ${control ? control.reason : "no result"}`);
+    }
+    if (this.initialState && this.initialState.themeLabelFontFamily === undefined) {
+      this.initialState.themeLabelFontFamily = control.value;
+    }
+    if (control.value === family) {
+      this.log(`theme label font already ${family}`);
+      await this.selectVisual();
+      return { family, changed: false, settled: true };
+    }
+
+    await this.session.click(control.x, control.y);
+    await sleep(700);
+    const options = await this.session.read("baseThemeOptions");
+    const option = (options ?? []).find((o) => o.label === family);
+    if (!option) {
+      await this.session.pressEscape();
+      throw new Error(`"${family}" is not offered by this build (saw ${(options ?? []).length} options)`);
+    }
+    await this.session.click(option.x, option.y);
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("groupDropdown", "General");
+    if (!after || !after.ok || after.value !== family) {
+      throw new Error(`theme label font did not take: asked for ${family}, control reports ${after && after.ok ? after.value : "nothing"}`);
+    }
+    this.mutated.themeLabelFontFamily = family;
+    this.log(`theme label font now ${after.value}`);
+    await this.selectVisual();
+    return { family, changed: true, settled: outcome.settled };
+  }
+
+  /**
    * Sets the report theme's primary text size, through Power BI's own
    * control.
    *
@@ -1772,6 +1957,7 @@ export class LabController {
       if (action.type === "setCategoryAxisTitleVisible") await this.setCategoryAxisTitleVisible(action.visible);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
       if (action.type === "setThemeTextSize") await this.setThemeTextSize(action.size);
+      if (action.type === "setThemeLabelFontFamily") await this.setThemeLabelFontFamily(action.family);
     }
     const current = await this.session.read("labState");
     current.baseTheme = await this.readBaseTheme();
@@ -1782,6 +1968,12 @@ export class LabController {
     if (this.mutated.categorySpacing !== undefined) {
       const spacing = await this.session.read("sliderControlAt", "Space between categories");
       if (spacing) current.categorySpacing = Number(spacing.value);
+    }
+    if (this.mutated.themeLabelFontFamily !== undefined) {
+      await this.openThemeTextControl();
+      const font = await this.session.read("groupDropdown", "General");
+      if (font && font.ok) current.themeLabelFontFamily = font.value;
+      await this.selectVisual();
     }
     if (this.mutated.themeTextSize !== undefined) {
       const text = await this.session.read("themeTextSizeControl");
