@@ -5,7 +5,7 @@ import { resolveBarChartStyle } from "../app/lib/barChartProperties";
 import { getBaseTheme } from "../app/lib/baseThemes";
 import { themeLayers } from "../app/lib/properties";
 import { BAR_CHART_BOX, computePreviewCartesianLayout } from "../app/components/previews/cartesianLayout";
-import { computeChartLayout } from "../app/lib/chartLayout";
+import { computeChartLayout, estimateText } from "../app/lib/chartLayout";
 import { formatValue } from "../app/components/ChartParts";
 import { resolveTheme, type PowerBITheme } from "../app/lib/theme";
 
@@ -135,6 +135,10 @@ test("BOUNDARY: the preview layout equals the engine driven with CSS pixels", ()
     valueAxis: style.valueAxis,
     categories,
     dataMax: 82_000,
+    // Pinned, not left to default. Previews measure with the browser now, and
+    // this equality is about the unit conversion - it must hold because both
+    // sides measure the same way, not because node happens to have no canvas.
+    measureText: estimateText,
   });
 
   const inPixels = <T extends { fontSize: number; titleFontSize: number }>(axis: T): T => ({
