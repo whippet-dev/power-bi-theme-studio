@@ -563,18 +563,18 @@ test("an unrestored category spacing is reported as a problem", () => {
 // The category-axis title toggle, declared but not driveable
 // ---------------------------------------------------------------------------
 
-test("setCategoryAxisTitleVisible refuses rather than clicking something unidentified", () => {
-  // The Y-axis Title card's toggle has no accessible name and does not sit
-  // inside the header's own card element, so there is no identification rule
-  // for it that is not a coordinate guess. Allowlisted means reviewed, not
-  // working - and an action that validates cleanly then does nothing would
-  // file measurements as though the title had been hidden.
+test("setCategoryAxisTitleVisible is allowlisted and implemented", () => {
+  // Driveable once the toggle's OWNER was found rather than its position: a
+  // formatting-card owns a named heading, a formatting-group inside it owns
+  // its own, and that group's header holds exactly one toggle.
   assert.ok(ALLOWED_ACTIONS.setCategoryAxisTitleVisible, "on the allowlist");
-  assert.equal(ALLOWED_ACTIONS.setCategoryAxisTitleVisible.implemented, false);
-  assert.throws(() => requireImplemented("setCategoryAxisTitleVisible"), NotImplementedError);
-  // Validation still applies, so a caller cannot pass nonsense either.
+  assert.equal(ALLOWED_ACTIONS.setCategoryAxisTitleVisible.mutates, true);
+  assert.equal(requireImplemented("setCategoryAxisTitleVisible"), true);
   assert.equal(validateAction({ type: "setCategoryAxisTitleVisible", visible: true }), true);
-  assert.throws(() => validateAction({ type: "setCategoryAxisTitleVisible", visible: "yes" }), ActionError);
+  assert.equal(validateAction({ type: "setCategoryAxisTitleVisible", visible: false }), true);
+  for (const visible of ["yes", 1, 0, null, undefined]) {
+    assert.throws(() => validateAction({ type: "setCategoryAxisTitleVisible", visible }), ActionError);
+  }
 });
 
 test("a title visibility left alone is never restored", () => {

@@ -26,11 +26,10 @@ export const ALLOWED_ACTIONS = Object.freeze({
   setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
   setThemeTextSize: { params: ["size"], mutates: true, implemented: true },
   setCategorySpacing: { params: ["spacing"], mutates: true, implemented: true },
-  // Declared and coded, but NOT driveable in this build: the Y-axis Title
-  // card's toggle carries no accessible name and is not inside the header's
-  // own card element, so there is no way to identify it that is not a naked
-  // coordinate guess. It refuses rather than clicking something unidentified.
-  setCategoryAxisTitleVisible: { params: ["visible"], mutates: true, implemented: false },
+  // Driveable once the toggle's OWNER was found rather than its position:
+  // a formatting-card owns a named heading, a formatting-group inside it
+  // owns its own heading, and that group's header holds exactly one toggle.
+  setCategoryAxisTitleVisible: { params: ["visible"], mutates: true, implemented: true },
   readState: { params: [], mutates: false, implemented: true },
 });
 

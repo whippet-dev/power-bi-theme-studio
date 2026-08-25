@@ -684,38 +684,63 @@ const PAYLOADS = {
   })()`,
 
   /**
-   * The on/off switch belonging to a named Format-pane sub-card.
+   * The on/off switch belonging to one formatting group inside one
+   * formatting card, both named.
    *
-   * Power BI gives these toggles no accessible name of their own, so the
-   * only safe handle is the card that owns one: find the header by its
-   * text, walk up to the nearest ancestor that contains a toggle, and take
-   * the toggle inside it. The same rule as the Layout sliders — never
-   * "the switch nearest this y coordinate", which would pick up the
-   * neighbouring card the moment the pane scrolls.
+   * Power BI's toggles carry no accessible name, so the only honest handle
+   * is ownership. The pane's structure supplies it: a `formatting-card` owns
+   * a named heading, a `formatting-group` inside it owns its own heading,
+   * and that group's header holds exactly one `pbi-toggle-button`. Walking
+   * card — group — toggle is a chain of containment, not a chain of guesses.
+   *
+   * Fails closed at every link: the card heading must be unique, the group
+   * heading must be unique inside that card, and the smallest ancestor of
+   * that heading which contains a toggle must contain exactly one. Anything
+   * else returns a reason instead of an element, because "the toggle near
+   * the Title text" is how the wrong axis gets switched off.
    */
-  cardToggle: (label) => `(() => {
+  groupToggle: (cardName, groupName) => `(() => {
     const W = window.innerWidth;
-    const header = [...document.querySelectorAll('[role=button],button')].find(
-      (e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === ${JSON.stringify(label)})
-        && e.getBoundingClientRect().x > W * 0.62,
-    );
-    if (!header) return null;
-    let card = header;
-    for (let i = 0; i < 5 && card; i++) {
-      if (card.querySelector('pbi-toggle-button')) break;
-      card = card.parentElement;
+    const inPane = (el) => el.getBoundingClientRect().x > W * 0.62;
+    const named = (root, wanted) => [...root.querySelectorAll('[role=button],button')]
+      .filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === wanted) && inPane(e));
+
+    const cardHeadings = named(document, ${JSON.stringify(cardName)});
+    if (cardHeadings.length !== 1) return { ok: false, reason: cardHeadings.length + ' headings named ' + ${JSON.stringify(cardName)} };
+    const card = cardHeadings[0].closest('formatting-card');
+    if (!card) return { ok: false, reason: 'the ' + ${JSON.stringify(cardName)} + ' heading is not inside a formatting-card' };
+
+    const groupHeadings = named(card, ${JSON.stringify(groupName)});
+    if (groupHeadings.length !== 1) {
+      return { ok: false, reason: groupHeadings.length + ' headings named ' + ${JSON.stringify(groupName)} + ' inside ' + ${JSON.stringify(cardName)} };
     }
-    const toggle = card && card.querySelector('pbi-toggle-button');
-    if (!toggle) return null;
-    const input = toggle.querySelector('input') || toggle;
+
+    // The smallest ancestor of the group heading that owns a toggle.
+    let owner = groupHeadings[0];
+    for (let i = 0; i < 6 && owner; i++) {
+      if (owner.querySelector('pbi-toggle-button')) break;
+      owner = owner.parentElement;
+    }
+    if (!owner || !owner.querySelector('pbi-toggle-button')) return { ok: false, reason: 'no toggle owned by the ' + ${JSON.stringify(groupName)} + ' group' };
+    if (!card.contains(owner)) return { ok: false, reason: 'the owning group escaped the ' + ${JSON.stringify(cardName)} + ' card' };
+
+    const toggles = [...owner.querySelectorAll('pbi-toggle-button')];
+    if (toggles.length !== 1) return { ok: false, reason: toggles.length + ' toggles inside the ' + ${JSON.stringify(groupName)} + ' group' };
+    const headingsInOwner = named(owner, ${JSON.stringify(groupName)});
+    if (headingsInOwner.length !== 1) return { ok: false, reason: 'the owning group holds ' + headingsInOwner.length + ' ' + ${JSON.stringify(groupName)} + ' headings' };
+
+    const toggle = toggles[0];
+    const input = toggle.querySelector('input');
     const r = toggle.getBoundingClientRect();
     return {
+      ok: true,
+      ownerTag: owner.tagName.toLowerCase(),
+      ownerClass: String(owner.className || '').slice(0, 40),
+      checked: input ? (input.getAttribute('aria-checked') ?? String(input.checked)) : null,
       x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
-      checked: input.getAttribute('aria-checked') ?? (input.checked === undefined ? null : String(input.checked)),
       visible: r.top > 60 && r.bottom < window.innerHeight - 20,
     };
   })()`,
-
   /**
    * Named controls along the right-hand pane strip.
    *
@@ -736,6 +761,7 @@ const PAYLOADS = {
         tag: el.tagName.toLowerCase(),
         expanded: el.getAttribute('aria-expanded'),
         x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+        w: Math.round(r.width), h: Math.round(r.height),
       }))
       .filter((e) => e.name);
   })()`,
@@ -926,8 +952,12 @@ export class LabController {
    */
   async ensureVisualizationsPane() {
     const strip = await this.session.read("paneStrip");
-    const pane = (strip ?? []).find((c) => c.name === "Visualizations");
-    if (!pane || pane.expanded !== "false") return false;
+    // A collapsed pane draws its name ROTATED, so its box is taller than it
+    // is wide. aria-expanded is not the signal it looks like: the open pane's
+    // header tab also reports false, and clicking that collapses the pane -
+    // which is exactly the loop this method used to create.
+    const pane = (strip ?? []).find((c) => c.name === "Visualizations" && c.h > c.w);
+    if (!pane) return false;
     this.log("the Visualizations pane was collapsed; reopening it");
     await this.session.click(pane.x, pane.y);
     await sleep(900);
@@ -1295,9 +1325,10 @@ export class LabController {
    * Shows or hides the category axis title, through the Y-axis card's own
    * Title toggle.
    *
-   * Verified by the render rather than by the control: the toggle carries
-   * no readable state, but a title either exists in the SVG or does not,
-   * and that is the thing the experiment cares about.
+   * Verified twice over, because neither check alone is enough: the toggle
+   * must report the requested state, AND a title must exist in the rendered
+   * SVG or not. A control can report a value the renderer refused, and a
+   * render can settle before a control commits.
    */
   async setCategoryAxisTitleVisible(visible) {
     validateAction({ type: "setCategoryAxisTitleVisible", visible });
@@ -1313,22 +1344,44 @@ export class LabController {
       return { visible, changed: false, settled: true };
     }
 
-    await this.openLayoutCard("Y-axis", "Title");
-    const toggle = await this.session.read("cardToggle", "Title");
-    if (!toggle) throw new Error("could not find the Y-axis Title toggle");
+    const toggle = await this.openGroupToggle("Y-axis", "Title");
     await this.session.click(toggle.x, toggle.y);
     const outcome = await this.settle({ timeoutMs: 30000 });
 
-    const after = await this.session.read("horizontalGeometry");
-    const shown = Boolean(after && after.categoryTitle);
+    const after = await this.session.read("groupToggle", "Y-axis", "Title");
+    if (!after || !after.ok) {
+      throw new Error(`the Title toggle could not be read back: ${after ? after.reason : "no result"}`);
+    }
+    if (String(after.checked) !== String(visible)) {
+      throw new Error(`Title toggle reports ${after.checked}, asked for ${visible}`);
+    }
+    const geometry = await this.session.read("horizontalGeometry");
+    const shown = Boolean(geometry && geometry.categoryTitle);
     if (shown !== visible) {
-      throw new Error(`category axis title did not ${visible ? "appear" : "disappear"}`);
+      throw new Error(`the toggle says ${visible} but the title ${shown ? "is still drawn" : "is not drawn"}`);
     }
     this.mutated.categoryAxisTitleVisible = visible;
     this.log(`category axis title now ${visible ? "shown" : "hidden"}`);
     return { visible, changed: true, settled: outcome.settled };
   }
 
+  /**
+   * Navigates to a named card and group and returns that group's toggle,
+   * scrolling the pane until it is on screen.
+   */
+  async openGroupToggle(card, group) {
+    await this.openLayoutCard(card, group);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const found = await this.session.read("groupToggle", card, group);
+      if (found && found.ok && found.visible) return found;
+      if (!(await this.scrollFormatPane(200))) break;
+    }
+    const final = await this.session.read("groupToggle", card, group);
+    if (!final || !final.ok) {
+      throw new Error(`REFUSING TO CLICK — ${card} → ${group}: ${final ? final.reason : "no result"}`);
+    }
+    return final;
+  }
   /** Selects the visual and expands one card and one of its sub-cards. */
   async openLayoutCard(card, section) {
     await this.selectVisual();
