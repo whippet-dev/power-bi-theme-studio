@@ -11,6 +11,7 @@ import {
   type TextMeasure,
 } from "../../lib/chartLayout";
 import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
+import type { ResolvedChromeStyle } from "../../lib/chromeProperties";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import { formatValue } from "../ChartParts";
 
@@ -287,20 +288,7 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
  * renderer honours is here, so a title moving into the authored visual
  * cannot quietly lose one.
  */
-export type VisualTitleChrome = {
-  show: boolean;
-  text: string;
-  fontSize: number;
-  fontFamily: string;
-  fontColor?: string;
-  background?: string;
-  alignment?: string | number;
-  heading?: string | number;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  titleWrap?: boolean;
-};
+export type VisualTitleChrome = ResolvedChromeStyle["title"];
 
 /**
  * The visual title's band, in the authored visual's own pixels.
