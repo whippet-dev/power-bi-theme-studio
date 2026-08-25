@@ -60,7 +60,17 @@ Identical data on both sides — Task 9's cartesian fixture:
 | Post | 12 | 9 | 8 | 5 |
 
 Native visual authored at **600 × 600**, default formatting. Theme Studio's
-`BAR_CHART_BOX` is **372 × 128** nominal, presented at hero scale **1.5004**.
+`BAR_CHART_BOX` was **372 × 128** nominal at the time of measurement,
+presented at hero scale **1.5004**.
+
+> **The Theme Studio half of this document is a snapshot, not current
+> state.** Every Theme Studio figure below was measured before the
+> authored-size migration. The Bar family is now authored at **450 × 250**
+> — the whole visual, title and legend included — and scaled DOWN into the
+> tile by `PresentationScale`, so a present-tense reading of any Theme
+> Studio number here will be wrong. The native figures are unaffected:
+> they were measured against Power BI, and nothing in this repository can
+> change them.
 
 ## 3. Coordinate systems
 
@@ -2165,9 +2175,26 @@ for either.
 
 ---
 
-## 9. Implementation candidates — **NOT YET IMPLEMENTED**
+## 9. Implementation candidates — **status as of 2026-08-25**
 
-Ranked by evidence strength × visible effect. None is done here.
+Ranked by evidence strength × visible effect. None was implemented *in this
+document* — it is measurement only — but several have since landed on main,
+and re-implementing them would be duplicated work:
+
+| # | Candidate | Status |
+|---|---|---|
+| 1 | Category axis label size | **Landed**, though not as a fallback edit: the category axis resolves from the `smallLightLabel` text class, proven by a 10pt→20pt theme experiment rather than by a size that happened to fit |
+| 1b | Category `innerPadding` | **Landed** as `CATEGORY_INNER_PADDING_DEFAULT = 20`, read from Power BI's own spacing control rather than inferred |
+| 1c | Automatic axis maximum | **Open.** Still rests on a single data maximum; §8.2 is still the prerequisite |
+| 2 | Progressive decluttering | **Open, and deliberately deprioritised.** The authored-size model addresses the same symptom differently: author at a size Power BI keeps everything at, then scale. Shedding is a real native behaviour, but tiny-hero reflow is not the route to it |
+| 2b | Responsive axis typography | **Open.** Still theme-specific and unimplemented. Classic 2026 holding its axis TITLE at 12px at 450 × 250 is the one state that matters for the current reference comparison |
+| 3 | `estimateText` calibration | **Landed**, and better than a calibration: previews measure with the browser's own canvas metrics. `estimateText` survives as the node-side fallback |
+| 4 | Tick count | **Open.** Still a fixed 4 |
+| 5 | Axis titles off by default | **Open** |
+| 6 | Legend default position | **Open** |
+
+The original ranking is kept below unedited, because it records the
+evidence each candidate rested on at the time.
 
 1. **Category axis label size: 10pt → 9pt.** Classic renders 12px at every
    measured size; Theme Studio's fallback is 13.3333px. One fallback value,

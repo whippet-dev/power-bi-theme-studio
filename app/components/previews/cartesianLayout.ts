@@ -228,10 +228,13 @@ function inCssPixels<
     // The engine hands the family to `measureText`, so it must receive the
     // same family the browser paints — the style model's effective value,
     // never a re-derivation from the string, which cannot tell an explicit
-    // `visualStyles` family from an inherited text-class one. Today's
-    // `estimateText` ignores the family, so this changes no number; the
-    // boundary exists so a future measurer cannot silently disagree with
-    // the renderer.
+    // `visualStyles` family from an inherited text-class one.
+    //
+    // This is load-bearing now, and was not when it was written: the
+    // measurer of the day was `estimateText`, which ignores the family
+    // entirely, so the value passed here changed no number. Previews now
+    // measure with `canvasTextMeasure`, which does honour it, so handing
+    // over the wrong family moves real gutters.
     fontFamily: axis.fontFamilyCss ?? axis.fontFamily,
     titleFontFamily: axis.titleFontFamilyCss ?? axis.titleFontFamily,
   };
