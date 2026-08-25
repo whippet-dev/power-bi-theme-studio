@@ -943,16 +943,17 @@ figure read back from `getBoundingClientRect` and divided by 1.5 cannot
 resolve better than about 0.001 of a step. The pure scale is exact — the
 unit tests assert 4.6000 and 0.4000 with a 1e-9 tolerance.
 
-#### The residual that remains
+#### The residual that remained — closed in §5.19
 
 `band ÷ step` is 0.799 against native's 0.767, and the two rows below it
 follow from that one: Theme Studio's series scale divides a slightly wider
-band, so its series step and bar thickness are proportionally larger. This
-is the declared-versus-effective inner padding recorded in §5.14 and now
-measured at six spacings in §5.16 — Theme Studio uses the property Power BI
-reports (20), and Power BI's own bands come out narrower than that property
-implies. It belongs to the series scale inside the category band, and
-deliberately did not move here.
+band, so its series step and bar thickness are proportionally larger.
+
+> The reading here — that this was the series scale, and a
+> declared-versus-effective discrepancy in the inner padding — was wrong.
+> §5.18 shows the mark is sized from a **category thickness** that carries
+> no inner padding, which is a third quantity; §5.19 measures the result
+> after implementing it.
 
 Nothing else moved: the plot rectangle, both gutters, the axis typography
 and the series `paddingInner` are identical before and after.
@@ -1063,6 +1064,55 @@ series    = clusteredSeriesBands(width, seriesCount, gap)
 The mark is anchored at the band **start**, not centred in it: native's
 leading edge is `0.4 × step` at every one of the twenty-one states measured
 across §5.16 and here, which centring cannot produce.
+
+### 5.19 The category axis, closed
+
+Theme Studio measured in the browser before and after the three-quantity
+change, at its natural preview size, Classic 2026, spacing 20, gap 10.
+Normalised by the category step throughout.
+
+| | before | after | native |
+|---|---:|---:|---:|
+| plot ÷ step | 4.5975 | **4.5975** | 4.6000 |
+| leading edge ÷ step | 0.3992 | **0.3992** | 0.4000 |
+| **category width ÷ step** | 0.7992 | **0.7658** | **0.7667** |
+| series step ÷ step | 0.2750 | **0.2633** | 0.2644 |
+| bar thickness ÷ step | 0.2475 | **0.2375** | 0.2379 |
+| trailing edge ÷ step | 0.4008 | **0.4342** | 0.4333 |
+| series `paddingInner` | 0.1 | 0.098 | 0.1 |
+
+Positioning did not move, which was the requirement: `plot ÷ step` and the
+leading edge are identical before and after. Only the mark extent changed,
+and the series step and bar thickness followed it through the existing
+series model without being touched.
+
+The `paddingInner` row reads 0.098 rather than 0.100 for the same reason
+the other rows land in the third decimal: the bars are 4.4px at this
+preview size, so a ratio read back from `getBoundingClientRect` cannot
+resolve better than about 0.002. The model is exact — the unit tests assert
+the gap ratio at 1e-9.
+
+#### Native acceptance
+
+The shipped scale is asserted against all nine native states in
+`tests/categoryWidth.test.ts`: for each, the category step and category
+width come from `ChartLayout`, the series step and bar thickness from
+`clusteredSeriesBands` fed that width, and all four are compared with what
+Power BI drew. They agree to the capture's three decimals.
+
+**The category-axis rectangular mark geometry is recovered for this
+fixture** — Clustered Bar, Classic 2026, four categories, across three
+category spacings and three series gaps. That is a statement about this
+fixture and this visual, not about Power BI's cartesian layout generally:
+Line is untested and untouched, and no other visual type, theme or category
+count has been measured.
+
+#### What is left on the category axis
+
+Nothing measured. The remaining cartesian deltas are elsewhere: the fixed
+non-plot axis width (native spends 110–114px where the widest label needs
+60.5px), responsive typography, and the shedding behaviour — all deferred,
+and none of them a category-scale question.
 
 ### 5.5 Text measurement
 
