@@ -650,6 +650,93 @@ Its baseline is Classic 2026, which renders axis titles and holds its
 category label at 12px — so the earlier findings against that theme stand,
 and the fallback comparisons in §5.10 and §5.11 are unaffected.
 
+### 5.14 The first corrections, verified against the oracle
+
+Three fidelity corrections landed on `p2-cartesian-native-fidelity`, and
+this is what they moved. Theme Studio measured in the browser at its
+natural preview size; native measured by the lab at gap 10, Classic 2026,
+100% zoom.
+
+#### Theme Studio, before and after
+
+| | before | after | native Classic 2026 |
+|---|---:|---:|---:|
+| category label | 13.333px | **12px** | **12px** |
+| value label | 12px | 12px | 12px |
+| legend | 13.333px | 13.333px | 13.333px |
+| axis title | 16px | 16px | 16px |
+| category `innerPadding` | 0.1007 | **0.2007** | 0.2334 effective / **20 declared** |
+| series `paddingInner` | 0.0984 | **0.1** | **0.1** |
+| category gutter | 98.92 | **86.09** | — |
+| plot width | 271.08 | **283.91** | — |
+| plot share of box | 0.733 | **0.767** | 0.756 at 450×250 |
+
+The four typography rows are now exact against native, and the three that
+were already right did not move — which is the check that the category
+correction went in at the role rather than at the class every other role
+shares.
+
+#### The native reference states
+
+Two sizes, both retaining the full furniture set, measured in one
+unattended run:
+
+| | 450 × 250 | 600 × 300 |
+|---|---:|---:|
+| plot | 340 × 141 | 486 × 185.667 |
+| category step | 30.652 | 40.362 |
+| band | 7.293 | 9.603 |
+| series step | 8.103 | 10.670 |
+| series `paddingInner` | 0.1 | 0.1 |
+| category `innerPadding` (effective) | 0.2334 | 0.2334 |
+| plot height ÷ category step | 4.600 | 4.600 |
+| band ÷ category step | 0.2379 | 0.2379 |
+| category label | 12px | 12px |
+| legend | 12px | 13.333px |
+| axis title | 12px | 16px |
+
+Every normalised ratio is identical at both sizes, which is what a scale-
+free layout model should produce and is a useful check on the measurements
+themselves. The typography rows differ because Classic 2026 shrinks legend
+and axis titles at a height threshold between 250 and 300 (§5.12) — the
+category label does not move, and neither does Theme Studio's.
+
+#### The category padding is a property, not a ratio
+
+Worth stating plainly, because it is the trap this correction nearly fell
+into. Power BI's **"Space between categories" control reads 20**, and the
+geometry it produces measures **23.34%** of the category step. Both numbers
+are correct; they are different quantities. The extra comes from Power BI
+insetting the cluster within its band and carrying an outer padding of
+about 0.4 × step at each end of the plot, neither of which this layout
+engine models.
+
+Fluent settles it independently: it **declares** `innerPadding` 50 in its
+own `visualStyles`, and its geometry **measures** 55.2%. The same gap
+between the declared property and the ratio it produces, in a theme where
+the declared value is not in doubt. So the fallback belongs on the declared
+property, and 20 is what Theme Studio now uses.
+
+The effective ratio is also **gap-independent**: 0.2334 at series gap 0 and
+0.2334 at gap 10, which is what §7.1 and §7.2 predict — the gap subdivides
+the category slot without resizing it.
+
+#### What is still different
+
+1. **The outer padding.** Native leaves 0.4 × step of empty plot at each end
+   of the category axis; Theme Studio tiles its categories edge to edge.
+   This is now a measured quantity rather than the "outer padding unknown"
+   that made §5.11's `innerPadding` an inference, and it is the largest
+   remaining geometric delta on the category axis.
+2. **Non-plot width.** Native spends 110px at 450 wide and 114px at 600 —
+   nearly constant, and far more than the 60.5px its widest label needs.
+   Theme Studio now spends 86px at 370 wide. Since the text component is
+   exact after the measurement fix, the residual is fixed padding around the
+   axis, not measurement. (Both figures are total non-plot width, so each
+   includes whatever margin its renderer leaves on the far side.)
+3. **Responsive typography.** Native shrinks legend and axis titles below a
+   height threshold; Theme Studio does not. Deferred deliberately (§9.2b).
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -730,6 +817,11 @@ refuted — only shown not to hold under the hero transform.
 | Classic 2018 renders no axis titles and uses 10.667px labels | `PROVEN-EXPERIMENT` (§5.13) |
 | Classic 2018 sheds hardest despite carrying least furniture | `PROVEN-EXPERIMENT` (§5.13) |
 | `paddingInner` = 0.1 across 3 themes × 6 sizes | `PROVEN-EXPERIMENT` (§5.13) |
+| Power BI's "Space between categories" default is **20**, read from its own control | `PROVEN-RUNTIME` (§5.14) |
+| The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
+| Native category outer padding ≈ 0.4 × step at each end | `STRONGLY-SUPPORTED` (§5.14) — derived from plot ÷ step = 4.600 at two sizes, not read from a control |
+| Category axis labels are a ×0.9 text class under Classic 2026 | `PROVEN-EXPERIMENT` (§5.13) — contradicts Microsoft's documented `lightLabel` association on size |
+| `estimateText`'s error is per-string, not a scale factor (0.453–0.561em) | `PROVEN-EXPERIMENT` (§5.14) |
 | Shedding differs by theme beyond what measured typography, furniture and plot area explain | `INFERENCE` (§5.13) — those three are ruled out as a complete explanation |
 | Whether the remaining cause is another theme-resolved default or theme-conditional renderer logic | `UNKNOWN` — unmeasured defaults (minimum category thickness, density or scroll thresholds, padding) would produce the same pattern |
 | Classic axis **titles** and **legend** DO scale with visual size | `PROVEN-EXPERIMENT` |
