@@ -812,6 +812,100 @@ This is the third finding to land on the same wall — shedding thresholds
 explains. `UNKNOWN`, and the most valuable single question the lab could
 answer next.
 
+### 5.16 The category scale — outer padding, solved
+
+§5.14 left the largest category-axis delta open: native reserves empty plot
+at each end of the category axis and Theme Studio tiled edge to edge. One
+state suggested 0.4 of a step at each end, which is a clean fit and exactly
+the kind of number that is a coincidence until it is varied.
+
+#### Twelve states, unattended
+
+Classic 2026, Clustered bar, four categories, series gap 10, 100% zoom, two
+visual sizes × six values of Power BI's own "Space between categories"
+control. `pOuter solved` inverts the band equation
+`plot / step = count − pInner + 2 × pOuter`; `pOuter lead` is the measured
+distance from the plot edge to the first band, divided by the step. They
+are independent of each other.
+
+| size | spacing | plot | step | band | plot / step | pOuter solved | pOuter lead |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 450×250 | 0 | 141 | 29.375 | 29.375 | **4.80** | **0.4000** | **0.4000** |
+| 450×250 | 10 | 141 | 30.000 | 26.438 | **4.70** | **0.4000** | **0.4000** |
+| 450×250 | 20 | 141 | 30.652 | 23.500 | **4.60** | **0.4000** | **0.4000** |
+| 450×250 | 30 | 141 | 31.333 | 20.563 | **4.50** | **0.4000** | **0.4000** |
+| 450×250 | 50 | 141 | 32.791 | 14.688 | **4.30** | **0.4000** | **0.4000** |
+| 450×250 | 75 | 141 | 34.815 | 7.344 | **4.05** | **0.4000** | **0.4000** |
+| 600×300 | 0 | 185.667 | 38.681 | 38.681 | **4.80** | **0.4000** | **0.4000** |
+| 600×300 | 10 | 185.667 | 39.504 | 34.813 | **4.70** | **0.4000** | **0.4000** |
+| 600×300 | 20 | 185.667 | 40.362 | 30.944 | **4.60** | **0.4000** | **0.4000** |
+| 600×300 | 30 | 185.667 | 41.259 | 27.076 | **4.50** | **0.4000** | **0.4000** |
+| 600×300 | 50 | 185.667 | 43.178 | 19.340 | **4.30** | **0.4000** | **0.4000** |
+| 600×300 | 75 | 185.667 | 45.844 | 9.670 | **4.05** | **0.4000** | **0.4000** |
+
+Spread in `pOuter solved` across all twelve: **0**. Spread in the
+leading-edge figure: **0**. Two independent routes to the same constant, at
+six different inner paddings and two sizes.
+
+**Classification: A — exact and stable.**
+
+The `plot / step` column is the point. It moves with the inner padding in
+exactly the way a band scale predicts and an "outer padding is a fixed
+share of the plot" model does not, and it lands on 4.80, 4.70, 4.60, 4.50,
+4.30 and 4.05 rather than near them.
+
+#### Runtime corroboration
+
+Power BI Desktop's own cartesian bundle resolves the term as
+
+> `outerPaddingRatio = explicit ?? (axesVisible !== false ? 0.4 : 0)`
+
+— the same 0.4, plus a rule the sweep could not reach: a hidden category
+axis takes **0**. It also converts between pixels and ratio as
+`ratio = outerPadding / categoryThickness` with an assertion that the ratio
+is in `[0, 4)`, and applies the pixel offset only when the axis is of
+category kind — so a value axis never receives it. `PROVEN-RUNTIME` for the
+shape of the rule; the constant itself is `PROVEN-EXPERIMENT` above.
+
+Two things worth recording rather than acting on:
+
+- `categoryAxis.outerPadding` **is** a registered Power BI property, with a
+  display name and an integer type, but it is gated behind a
+  `cartesianOuterPaddingControl` feature switch and does not appear in the
+  Format pane of this build. It is modelled here as scale behaviour, not
+  added to the theme editor.
+- The bundle's thickness helper is `available / max(1, count + 2 × ratio)`,
+  with no inner-padding term. That is a *candidate* thickness used while
+  fitting; the scale Power BI actually renders includes the inner padding,
+  as the twelve states show. Reading the minified source suggested one
+  formula and the experiment settled a different one — which is the order
+  those two should be trusted in.
+
+#### The rule, stated independently
+
+```
+pOuter = categoryAxisVisible ? 0.4 : 0
+step   = plotExtent / max(1, count − pInner + 2 × pOuter)
+start(i) = plotStart + pOuter × step + i × step
+size     = step × (1 − pInner)
+```
+
+The band sits **flush against the start of its step**, not centred in it:
+native's leading edge is exactly `pOuter × step` at every measured state,
+which centring cannot produce — centring would put it at
+`pOuter × step + (step − band) / 2`.
+
+#### What this does not explain
+
+The drawn cluster of bars is slightly narrower than `step × (1 − pInner)`,
+and by a margin that grows with the spacing: at spacing 20 the band measures
+0.7667 of a step against the 0.80 the declared property implies, and at 50
+it is 0.4479 against 0.50. The category scale is unaffected — solving for
+`pOuter` with the **declared** inner padding is what gives 0.4000 at every
+state — so this belongs to the series scale inside the band, not here. It
+is the same declared-versus-effective gap recorded in §5.14, now measured
+across six values instead of one.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -894,7 +988,12 @@ refuted — only shown not to hold under the hero transform.
 | `paddingInner` = 0.1 across 3 themes × 6 sizes | `PROVEN-EXPERIMENT` (§5.13) |
 | Power BI's "Space between categories" default is **20**, read from its own control | `PROVEN-RUNTIME` (§5.14) |
 | The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
-| Native category outer padding ≈ 0.4 × step at each end | `STRONGLY-SUPPORTED` (§5.14) — derived from plot ÷ step = 4.600 at two sizes, not read from a control |
+| Native category outer padding = **0.4 × step** at each end | `PROVEN-EXPERIMENT` (§5.16) — 12 states, two independent derivations, zero spread |
+| The category scale is a band scale: `step = plot / (count − pInner + 2 × pOuter)` | `PROVEN-EXPERIMENT` (§5.16) — predicts plot/step at six inner paddings |
+| Category bands sit flush at the start of their step, not centred | `PROVEN-EXPERIMENT` (§5.16) |
+| A hidden category axis takes outer padding 0 | `PROVEN-RUNTIME` (§5.16) — read from the bundle, not measured |
+| Outer padding never applies to a value axis | `PROVEN-RUNTIME` (§5.16) |
+| `categoryAxis.outerPadding` exists as a Power BI property but is feature-switched off | `PROVEN-RUNTIME` (§5.16) |
 | Category axis labels **derive from** the primary label class × 0.9 (`smallLightLabel`) | `PROVEN-EXPERIMENT` (§5.15) — theme label 10→20pt moved the axis 9→18pt and its own control to 18, while the legend moved 1:1; contradicts Microsoft's documented `lightLabel` association |
 | Legend text is the unscaled label class under Classic 2026 | `PROVEN-EXPERIMENT` (§5.15) |
 | Axis titles do not derive from the label class | `PROVEN-EXPERIMENT` (§5.15) — unmoved by a 2× label change |
