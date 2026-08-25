@@ -1196,12 +1196,14 @@ measured from *ink* boxes, and glyph bearing moves those by a pixel or so
 in exactly the direction that would corrupt the split: the title's box
 starts 1px left of the chart edge at 12px and flush at 16px.
 
-The experiment that would separate them is hiding the axis title and
+~~The experiment that would separate them is hiding the axis title and
 measuring what the plot gains. It is not available: the Y-axis Title card's
 toggle carries no accessible name and does not sit inside the header's own
 card element, so the lab refuses to click it rather than guessing at a
-coordinate. `setCategoryAxisTitleVisible` is therefore allowlisted, coded
-and marked `NOT_IMPLEMENTED`.
+coordinate.~~
+
+> **Run in §5.21.** The toggle is identifiable after all — not by its own
+> name, which it does not have, but by the group that owns it.
 
 **Classification: B — a small systematic residual resolved into a term that
 predicts every measured state but cannot yet be named.** No production
@@ -1239,6 +1241,77 @@ went, while at 600×600 it reached 36px. And at 450 wide with a 30pt theme
 label it dropped to 21.333px. That is responsive typography, deferred
 elsewhere, and noted here only because it bounds what the label sweep could
 reach.
+
+### 5.21 The title's contribution, measured
+
+§5.20 could predict the gutter but not explain it, because one term covered
+two gaps at once. Hiding the axis title separates them, and the toggle is
+reachable after all: not by its own accessible name, which it does not
+have, but by the **formatting-group that owns it**. A card owns a named
+heading, a group inside it owns its own heading, and that group's header
+holds exactly one toggle.
+
+#### Title on, off, on — at both title sizes
+
+Classic 2026, Clustered bar, spacing 20, gap 10, category label 12px.
+
+| size | title px | gutter ON | gutter OFF | **delta** | plot ON | plot OFF |
+|---|---:|---:|---:|---:|---:|---:|
+| 600×600 | 16 | 97 | **76** | **21** | 486 | 507 |
+| 600×250 | 12 | 93 | **76** | **17** | 490 | 507 |
+
+Both round trips reproduced the original geometry exactly.
+
+**The title's contribution is `titleFontPx + 5`.** 16 → 21, 12 → 17: the
+delta moves with the font one for one, and the five is what remains when
+the font is taken out. That is outcome **B** of the three the experiment
+was designed to distinguish — the title costs its own font size plus a
+fixed gap, not just its font size.
+
+And the gutter with the title hidden is **76 at both sizes**, as it must be
+if the title is the only thing that differs between them.
+
+#### Splitting the fitted term
+
+§5.20 fitted `16 + 0.375 × labelPx` on top of the title's font size and the
+measured text. With the title's own cost now known to be `titleFontPx + 5`,
+the five belongs to the title side and eleven to the label side:
+
+| state | title | label | measured text (canvas) | predicted gutter | native |
+|---|---:|---:|---:|---:|---:|
+| 600×250 | 12px | 12px | 60.498 | 92.998 | 93 |
+| 600×600 | 16px | 12px | 60.498 | 96.998 | 97 |
+| **title off** | — | 12px | 60.498 | **75.998** | **76** |
+| 600×600, theme 14pt | 16px | 16.8px | 84.647 | 122.947 | 123 |
+| 600×600, theme 20pt | 16px | 24px | 120.996 | 161.996 | 162 |
+
+```
+gutter = (titleShown ? titleFontPx + 5 : 0)
+       + measuredLabelWidth + 11 + 0.375 × labelFontPx
+```
+
+Every state to **≤0.05px**, including the two title-off states, which the
+earlier fit had no way to predict at all.
+
+#### Why this is still not an implementation
+
+The title term is now **measured**: two title sizes, a controlled on/off,
+and a clean round trip. The label side is not. `11 + 0.375 × labelPx`
+reproduces every state, but it comes from fitting two constants to three
+label sizes, and 0.375 has no named mechanism — it is a coefficient that
+works, which is precisely the thing §5.20 declined to ship.
+
+The confirming experiment — sweep the label size with the title hidden, so
+the label side is measured in isolation — did not run. The Format pane
+virtualises its cards: once an earlier operation has scrolled down to the
+Bars → Layout section, the Y-axis card is genuinely unmounted rather than
+merely off screen, and the locator correctly reports that it cannot find
+it. The title experiment itself is unaffected, because it runs before any
+Layout scrolling; only the combined sweep hits the ordering.
+
+**Classification: B**, and closer than it was. The title's half is settled;
+the label's half is one experiment away, and that experiment needs the pane
+navigation to survive a Layout scroll.
 
 ### 5.5 Text measurement
 
@@ -1328,7 +1401,9 @@ refuted — only shown not to hold under the hero transform.
 | The plot keeps a 7px inset on the far side | `PROVEN-EXPERIMENT` (§5.20) — five sizes |
 | The category gutter tracks the axis title's font size one for one | `PROVEN-EXPERIMENT` (§5.20) |
 | `maxMarginFactor` caps the label margin at `viewportWidth × factor`, default 0.25 | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.20) — three widths |
-| How the gutter's remaining `16 + 0.375 × labelPx` splits between the two gaps | `UNKNOWN` (§5.20) — needs the axis title hidden, which the lab cannot yet do |
+| The category axis title costs `titleFontPx + 5` | `PROVEN-EXPERIMENT` (§5.21) — on/off at two title sizes, round trip reproduced |
+| The gutter with the title hidden is the same at 600×250 and 600×600 | `PROVEN-EXPERIMENT` (§5.21) |
+| The label side is `measuredWidth + 11 + 0.375 × labelPx` | `INFERENCE` (§5.21) — reproduces every state, but two constants fitted to three label sizes |
 | Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
 | Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
 | The series gap cannot move the category scale | `PROVEN-EXPERIMENT` (§5.18) — 3 gaps × 3 spacings, width invariant |
