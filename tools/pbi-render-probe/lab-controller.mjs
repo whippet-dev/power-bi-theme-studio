@@ -1110,14 +1110,84 @@ export class LabController {
   }
 
   /** Scrolls the Format pane by one wheel notch. Internal only. */
+  /**
+   * Scrolls the Format pane by one wheel notch and reports where it landed.
+   *
+   * Returns the scroller AFTER the wheel, so a caller can tell movement
+   * from a no-op. Reading `scrollTop` is fine; writing it is not, because a
+   * pane that virtualises its cards has to be given real input events or it
+   * never mounts what scrolled into view.
+   */
   async scrollFormatPane(deltaY) {
     const scroller = await this.session.read("formatPaneScroller");
-    if (!scroller) return false;
+    if (!scroller) return null;
     await this.session.send("Input.dispatchMouseEvent", {
       type: "mouseWheel", x: scroller.x, y: scroller.y, deltaX: 0, deltaY,
     });
     await sleep(300);
-    return true;
+    return this.session.read("formatPaneScroller");
+  }
+
+  /**
+   * Brings a formatting card into the DOM, wherever the pane happens to be.
+   *
+   * The Format pane VIRTUALISES: a card scrolled far enough away is not off
+   * screen, it is unmounted, and querying for it returns nothing at all.
+   * Anything that scrolled down to Bars → Layout therefore leaves the axis
+   * cards genuinely absent, which is how the previous sweep died.
+   *
+   * So: rewind to the top, then walk down in bounded steps, checking after
+   * each whether the card has mounted. Movement is observed rather than
+   * assumed — each step compares `scrollTop` before and after, and the walk
+   * stops when the pane refuses to move. Position is only ever *read*; the
+   * scrolling itself is real wheel input, because a virtualising pane needs
+   * the events to mount anything.
+   *
+   * Order is used to navigate, never to identify: the card is always
+   * matched by its own heading, and a run that reaches the end without one
+   * fails rather than settling for whatever is on screen.
+   */
+  async seekFormattingCard(card) {
+    if (await this.session.read("controlAt", card)) return true;
+
+    // No scroller at all means the Format pane is not the one on display
+    // yet - it was just brought to the front and has not rendered. Give it a
+    // bounded moment rather than concluding the card does not exist.
+    for (let wait = 0; wait < 6; wait++) {
+      if (await this.session.read("formatPaneScroller")) break;
+      await sleep(500);
+      if (await this.session.read("controlAt", card)) return true;
+      // Halfway through, consider that the pane is not slow but gone: a click
+      // can collapse it, and no amount of waiting brings it back.
+      if (wait === 2) {
+        await this.ensureVisualizationsPane();
+        await this.selectVisual();
+        if (await this.session.read("controlAt", card)) return true;
+      }
+    }
+
+    // Rewind. Bounded, and stops as soon as the pane stops moving.
+    let previous = null;
+    for (let step = 0; step < 25; step++) {
+      const scroller = await this.scrollFormatPane(-400);
+      if (!scroller) break;
+      if (await this.session.read("controlAt", card)) return true;
+      if (previous !== null && scroller.scrollTop >= previous) break;
+      previous = scroller.scrollTop;
+      if (scroller.scrollTop <= 0) break;
+    }
+    if (await this.session.read("controlAt", card)) return true;
+
+    // Walk down until it mounts or the pane runs out.
+    previous = null;
+    for (let step = 0; step < 40; step++) {
+      const scroller = await this.scrollFormatPane(300);
+      if (!scroller) break;
+      if (await this.session.read("controlAt", card)) return true;
+      if (previous !== null && scroller.scrollTop <= previous) break;
+      previous = scroller.scrollTop;
+    }
+    return Boolean(await this.session.read("controlAt", card));
   }
 
   /**
@@ -1151,6 +1221,9 @@ export class LabController {
       if (!visual) break;
       await this.session.click(visual.x, visual.y);
       await sleep(700);
+    }
+    if (!(await this.seekFormattingCard("Bars"))) {
+      throw new Error('the "Bars" card never mounted, at any scroll position');
     }
     await step("controlAt", "Bars", (c) => c.expanded === "true");
     await step("controlAt", "Layout", (c) => c.expanded === "true");
@@ -1374,7 +1447,13 @@ export class LabController {
     for (let attempt = 0; attempt < 12; attempt++) {
       const found = await this.session.read("groupToggle", card, group);
       if (found && found.ok && found.visible) return found;
-      if (!(await this.scrollFormatPane(200))) break;
+      // Scroll TOWARDS it. Expanding a group scrolls its contents into view
+      // and can leave the group's own header above the fold, where scrolling
+      // down only pushes it further away - and a click at an off-screen
+      // coordinate lands on nothing while the toggle quietly reports the old
+      // value.
+      const towards = found && found.ok && found.y < 60 ? -200 : 200;
+      if (!(await this.scrollFormatPane(towards))) break;
     }
     const final = await this.session.read("groupToggle", card, group);
     if (!final || !final.ok) {
@@ -1382,7 +1461,13 @@ export class LabController {
     }
     return final;
   }
-  /** Selects the visual and expands one card and one of its sub-cards. */
+  /**
+   * Selects the visual and expands one card and one of its groups.
+   *
+   * Every step re-seeks before it acts, because expanding a card scrolls the
+   * pane and the pane virtualises: the group you are about to click can be
+   * unmounted by the click that revealed its own card.
+   */
   async openLayoutCard(card, section) {
     await this.selectVisual();
     const tab = await this.session.read("tabAt", "Format visual");
@@ -1395,12 +1480,22 @@ export class LabController {
       await sleep(700);
     }
     for (const label of [card, section]) {
-      for (let attempt = 0; attempt < 3; attempt++) {
+      let expanded = false;
+      for (let attempt = 0; attempt < 4 && !expanded; attempt++) {
+        if (!(await this.seekFormattingCard(label))) {
+          throw new Error(`the "${label}" section never mounted, at any scroll position`);
+        }
         const control = await this.session.read("controlAt", label);
         if (!control) { await sleep(400); continue; }
-        if (control.expanded === "true") break;
+        if (control.expanded === "true") { expanded = true; break; }
         await this.session.click(control.x, control.y);
-        await sleep(800);
+        await sleep(900);
+      }
+      if (!expanded) {
+        const final = await this.session.read("controlAt", label);
+        if (!final || final.expanded !== "true") {
+          throw new Error(`the "${label}" section would not expand`);
+        }
       }
     }
   }
