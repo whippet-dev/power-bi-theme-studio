@@ -1114,6 +1114,132 @@ non-plot axis width (native spends 110–114px where the widest label needs
 60.5px), responsive typography, and the shedding behaviour — all deferred,
 and none of them a category-scale question.
 
+### 5.20 The non-plot width, decomposed — and one term still unnamed
+
+Native Classic 2026 spends 110px of a 450- or 600-wide visual on things
+that are not the plot, and 114px once the axis title grows. The widest
+category label is 61.4px, so "label width" explains barely half of it. This
+section takes it apart.
+
+#### Every layer, five sizes
+
+Measured from the visual's own left edge. `plot` is the attribute width, not
+the rect — `getBoundingClientRect` on `svg.mainGraphicsContext` returns the
+union of its children, which is where the longest bar ends.
+
+| size | pad L | title px | gutter | plot | far inset | pad R | sum | non-plot |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 450×250 | 5 | 12 | 93 | 340 | 7 | 5 | 450 | 110 |
+| 600×250 | 5 | 12 | 93 | 490 | 7 | 5 | 600 | 110 |
+| 600×300 | 5 | 16 | 97 | 486 | 7 | 5 | 600 | 114 |
+| 600×600 | 5 | 16 | 97 | 486 | 7 | 5 | 600 | 114 |
+| 750×300 | 5 | 16 | 97 | 636 | 7 | 5 | 750 | 114 |
+
+The columns add to the visual width exactly at every size. So:
+
+- **container padding: 5px each side.** Constant. Belongs to the visual, not
+  the axis.
+- **far-side plot inset: 7px.** Constant. Belongs to the plot, not the axis.
+- **gutter: 93 or 97**, tracking the axis title's font size one for one.
+
+That last point is the clue §5.13 hinted at: the 4px difference between the
+600×250 and 600×300 states is exactly the 4px difference in title font size.
+
+#### Inside the gutter
+
+Sweeping the report theme's primary Label size at 600×600 moves the category
+labels while the axis title stays at 16px — the title comes from the `title`
+class and does not derive from `label` (§5.15), which makes it a control
+inside the same experiment.
+
+| theme label | category label | widest label (ink) | gutter |
+|---:|---:|---:|---:|
+| 10pt | 12px | 61.432 | 97 |
+| 14pt | 16.8px | 84.957 | 123 |
+| 20pt | 24px | 121.000 | 162 |
+| 30pt | 36px | 129.359 **truncated** | 179 |
+
+Canvas `measureText` reproduces the native ink boxes to within 0.93px at
+12px and 0.004px at 24px, so Theme Studio's own measurer is a fair stand-in
+for what Power BI measured.
+
+Subtracting the measured text and the title's font size leaves a residual
+that is **not constant**:
+
+| category label | residual after title px and text width |
+|---:|---:|
+| 12px | 20.502 |
+| 16.8px | 22.353 |
+| 24px | 25.004 |
+
+A straight line through the first and last gives `16 + 0.375 × labelPx`,
+which predicts the middle state to 0.05px and reproduces every measured
+gutter — including both title sizes — to the same precision:
+
+```
+gutter = titleFontPx + 16 + 0.375 × labelFontPx + measuredLabelWidth
+```
+
+| state | predicted | measured |
+|---|---:|---:|
+| title 12, label 12 | 92.998 | 93 |
+| title 16, label 12 | 96.998 | 97 |
+| title 16, label 16.8 | 122.947 | 123 |
+| title 16, label 24 | 161.996 | 162 |
+
+#### Why this is B and not A
+
+The formula fits, and that is not the same as being understood. `16 +
+0.375 × labelPx` is one number split between at least two gaps — title to
+labels, and labels to plot — and the DOM cannot say which. Both gaps are
+measured from *ink* boxes, and glyph bearing moves those by a pixel or so
+in exactly the direction that would corrupt the split: the title's box
+starts 1px left of the chart edge at 12px and flush at 16px.
+
+The experiment that would separate them is hiding the axis title and
+measuring what the plot gains. It is not available: the Y-axis Title card's
+toggle carries no accessible name and does not sit inside the header's own
+card element, so the lab refuses to click it rather than guessing at a
+coordinate. `setCategoryAxisTitleVisible` is therefore allowlisted, coded
+and marked `NOT_IMPLEMENTED`.
+
+**Classification: B — a small systematic residual resolved into a term that
+predicts every measured state but cannot yet be named.** No production
+change follows from it. Writing `gutter += 20.5` would reproduce today's
+four states and be wrong for the first theme a user edits, which is exactly
+the failure §5.15 was built to prevent.
+
+#### `maxMarginFactor`, answered
+
+The 30pt state truncated its labels, which made the cap measurable. Holding
+the label size and varying the visual width:
+
+| visual | chart | gutter | 0.25 × chart | gutter − 0.25 × chart |
+|---:|---:|---:|---:|---:|
+| 450 | 440 | 141 | 110.0 | 31.0 |
+| 600 | 590 | 179 | 147.5 | 31.5 |
+| 750 | 740 | 216 | 185.0 | 31.0 |
+
+So the **tick-label margin is capped at `chartViewportWidth × maxMarginFactor`**,
+and the title's allocation (~31px here) sits outside that cap. The runtime
+agrees exactly: it computes `marginLimits.left = viewport.width ×
+maxMarginFactor` with a default of **0.25**, and the Format pane surfaces it
+as `Math.round(100 × maxMarginFactor)` — a percentage. Labels that exceed the
+limit are truncated with an ellipsis rather than the plot shrinking further.
+
+`maxMarginFactor` is therefore **not** a padding or a margin in pixels: it is
+the maximum share of the chart viewport the axis labels may consume, per
+side. `PROVEN-RUNTIME` for the rule, `PROVEN-EXPERIMENT` for the 0.25.
+
+#### Recorded, not implemented
+
+The label sweep also exposed a **responsive font cap**: at 600×300 the
+category label stopped growing at 16px however large the theme's label class
+went, while at 600×600 it reached 36px. And at 450 wide with a 30pt theme
+label it dropped to 21.333px. That is responsive typography, deferred
+elsewhere, and noted here only because it bounds what the label sweep could
+reach.
+
 ### 5.5 Text measurement
 
 | | width of "North West" | per px of font |
@@ -1198,6 +1324,11 @@ refuted — only shown not to hold under the hero transform.
 | The declared category padding and the ratio it produces differ (20 → 23.34%, Fluent 50 → 55.2%) | `PROVEN-EXPERIMENT` (§5.14) |
 | Native category outer padding = **0.4 × step** at each end | `PROVEN-EXPERIMENT` (§5.16) — 12 states, two independent derivations, zero spread |
 | Category **thickness** = `plot / (count + 2 × pOuter)`, with no inner-padding term | `PROVEN-EXPERIMENT` (§5.18) — constant across six spacings at two sizes |
+| Visual container padding is 5px each side | `PROVEN-EXPERIMENT` (§5.20) — five sizes |
+| The plot keeps a 7px inset on the far side | `PROVEN-EXPERIMENT` (§5.20) — five sizes |
+| The category gutter tracks the axis title's font size one for one | `PROVEN-EXPERIMENT` (§5.20) |
+| `maxMarginFactor` caps the label margin at `viewportWidth × factor`, default 0.25 | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.20) — three widths |
+| How the gutter's remaining `16 + 0.375 × labelPx` splits between the two gaps | `UNKNOWN` (§5.20) — needs the axis title hidden, which the lab cannot yet do |
 | Category **width** = `thickness × (1 − pInner)`, and it is what the series scale divides | `PROVEN-EXPERIMENT` (§5.18) — predicts all 12 cluster extents to 5e-5 |
 | Step, thickness and width are three distinct quantities | `PROVEN-RUNTIME` + `PROVEN-EXPERIMENT` (§5.18) |
 | The series gap cannot move the category scale | `PROVEN-EXPERIMENT` (§5.18) — 3 gaps × 3 spacings, width invariant |
