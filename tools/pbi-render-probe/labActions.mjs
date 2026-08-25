@@ -26,6 +26,11 @@ export const ALLOWED_ACTIONS = Object.freeze({
   setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
   setThemeTextSize: { params: ["size"], mutates: true, implemented: true },
   setCategorySpacing: { params: ["spacing"], mutates: true, implemented: true },
+  // Declared and coded, but NOT driveable in this build: the Y-axis Title
+  // card's toggle carries no accessible name and is not inside the header's
+  // own card element, so there is no way to identify it that is not a naked
+  // coordinate guess. It refuses rather than clicking something unidentified.
+  setCategoryAxisTitleVisible: { params: ["visible"], mutates: true, implemented: false },
   readState: { params: [], mutates: false, implemented: true },
 });
 
@@ -97,6 +102,9 @@ export function validateAction(action) {
     if (!Number.isFinite(action.gap) || action.gap < 0 || action.gap > 75) {
       throw new ActionError("gap must be between 0 and 75");
     }
+  }
+  if (action.type === "setCategoryAxisTitleVisible") {
+    if (typeof action.visible !== "boolean") throw new ActionError("visible must be a boolean");
   }
   if (action.type === "setCategorySpacing") {
     // Power BI's "Space between categories", the user-facing property. Its
@@ -326,6 +334,10 @@ export function planRestoration(initial, mutated) {
   if (mutated?.categorySpacing !== undefined && initial.categorySpacing !== mutated.categorySpacing) {
     plan.push({ type: "setCategorySpacing", spacing: initial.categorySpacing });
   }
+  if (mutated?.categoryAxisTitleVisible !== undefined
+      && initial.categoryAxisTitleVisible !== mutated.categoryAxisTitleVisible) {
+    plan.push({ type: "setCategoryAxisTitleVisible", visible: initial.categoryAxisTitleVisible });
+  }
   // Theme last: it triggers the largest re-render, so putting it back after
   // the cheaper settings avoids paying for that settle more than once.
   if (mutated?.baseTheme !== undefined && initial.baseTheme !== mutated.baseTheme) {
@@ -348,6 +360,14 @@ export function verifyRestoration(initial, current, tolerance = 0.5) {
     if (initial?.[key] === undefined || current?.[key] === undefined) continue;
     if (Math.abs(initial[key] - current[key]) > tolerance) {
       problems.push(`${key}: expected ${initial[key]}, found ${current[key]}`);
+    }
+  }
+  // Booleans compare exactly, like the theme name below.
+  if (initial?.categoryAxisTitleVisible !== undefined && current?.categoryAxisTitleVisible !== undefined) {
+    if (initial.categoryAxisTitleVisible !== current.categoryAxisTitleVisible) {
+      problems.push(
+        `categoryAxisTitleVisible: expected ${initial.categoryAxisTitleVisible}, found ${current.categoryAxisTitleVisible}`,
+      );
     }
   }
   // Compared exactly: a theme is a name, and "close enough" is meaningless.

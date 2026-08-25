@@ -558,3 +558,39 @@ test("an unrestored category spacing is reported as a problem", () => {
   assert.equal(result.restored, false);
   assert.match(result.problems.join(" "), /categorySpacing: expected 20, found 75/);
 });
+
+// ---------------------------------------------------------------------------
+// The category-axis title toggle, declared but not driveable
+// ---------------------------------------------------------------------------
+
+test("setCategoryAxisTitleVisible refuses rather than clicking something unidentified", () => {
+  // The Y-axis Title card's toggle has no accessible name and does not sit
+  // inside the header's own card element, so there is no identification rule
+  // for it that is not a coordinate guess. Allowlisted means reviewed, not
+  // working - and an action that validates cleanly then does nothing would
+  // file measurements as though the title had been hidden.
+  assert.ok(ALLOWED_ACTIONS.setCategoryAxisTitleVisible, "on the allowlist");
+  assert.equal(ALLOWED_ACTIONS.setCategoryAxisTitleVisible.implemented, false);
+  assert.throws(() => requireImplemented("setCategoryAxisTitleVisible"), NotImplementedError);
+  // Validation still applies, so a caller cannot pass nonsense either.
+  assert.equal(validateAction({ type: "setCategoryAxisTitleVisible", visible: true }), true);
+  assert.throws(() => validateAction({ type: "setCategoryAxisTitleVisible", visible: "yes" }), ActionError);
+});
+
+test("a title visibility left alone is never restored", () => {
+  assert.deepEqual(planRestoration({ categoryAxisTitleVisible: true }, {}), []);
+  assert.deepEqual(
+    planRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: true }),
+    [],
+  );
+  assert.deepEqual(
+    planRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: false }),
+    [{ type: "setCategoryAxisTitleVisible", visible: true }],
+  );
+});
+
+test("an unrestored title visibility is reported as a problem", () => {
+  const result = verifyRestoration({ categoryAxisTitleVisible: true }, { categoryAxisTitleVisible: false });
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /categoryAxisTitleVisible: expected true, found false/);
+});

@@ -587,6 +587,159 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * The horizontal layer chain, from the visual's own edge to the plot's.
+   *
+   * "Non-plot width" is not one thing. Between the visual's edge and the
+   * plot rectangle sit a container padding, a chart viewport, the category
+   * labels, the axis title and whatever margin the renderer keeps on the
+   * far side — and calling the sum of them "axis padding" is how a layout
+   * model ends up with a magic constant. This reads every layer that is
+   * observable, relative to the visual's left edge, so the terms can be
+   * separated rather than inferred.
+   *
+   * Read-only.
+   */
+  horizontalGeometry: () => `(() => {
+    const n3 = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(3) : null);
+    const el = ${VISUAL};
+    if (!el) return null;
+    const vis = el.getBoundingClientRect();
+    const rel = (node) => {
+      if (!node) return null;
+      const r = node.getBoundingClientRect();
+      return { left: n3(r.left - vis.left), right: n3(r.right - vis.left), width: n3(r.width),
+               top: n3(r.top - vis.top), bottom: n3(r.bottom - vis.top), height: n3(r.height) };
+    };
+    const q = (sel) => rel(el.querySelector(sel));
+
+    const own = (node) => {
+      const direct = [...node.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
+      if (direct) return direct;
+      return node.children.length === 0 ? (node.textContent || '').trim() : '';
+    };
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
+    const isTitleFace = (f) => /wf_standard-font/.test(f);
+    const texts = [...el.querySelectorAll('svg text')]
+      .map((t) => ({ text: own(t), node: t, r: t.getBoundingClientRect(), face: getComputedStyle(t).fontFamily,
+                     px: parseFloat(getComputedStyle(t).fontSize) }))
+      .filter((t) => t.text);
+    const catLabels = texts.filter((t) => barLeft !== null && t.r.right <= barLeft + 2 && !isTitleFace(t.face));
+    const catTitle = texts.find((t) => barLeft !== null && t.r.right <= barLeft + 2 && isTitleFace(t.face));
+
+    const widest = catLabels.reduce((best, t) => (!best || t.r.width > best.r.width ? t : best), null);
+    const labelsRight = catLabels.length ? Math.max(...catLabels.map((t) => t.r.right - vis.left)) : null;
+    const labelsLeft = catLabels.length ? Math.min(...catLabels.map((t) => t.r.left - vis.left)) : null;
+
+    const plot = el.querySelector('svg.mainGraphicsContext');
+    const chart = el.querySelector('svg.cartesianChart');
+    const plotRect = rel(plot);
+    const chartRect = rel(chart);
+
+    return {
+      visual: { width: n3(vis.width), height: n3(vis.height) },
+      vcBody: q('[class*="vcBody"]'),
+      visualWrapper: q('[class*="visualWrapper"]'),
+      innerViewport: q('[class*="customPadding"]'),
+      chart: chartRect,
+      chartAttrWidth: chart ? n3(Number(chart.getAttribute('width'))) : null,
+      scrollable: q('svg.svgScrollable'),
+      plot: plotRect,
+      plotAttrWidth: plot ? n3(Number(plot.getAttribute('width'))) : null,
+      categoryLabels: catLabels.map((t) => ({ text: t.text, left: n3(t.r.left - vis.left), right: n3(t.r.right - vis.left), width: n3(t.r.width), px: n3(t.px) })),
+      widestLabel: widest ? { text: widest.text, width: n3(widest.r.width), left: n3(widest.r.left - vis.left), right: n3(widest.r.right - vis.left), px: n3(widest.px) } : null,
+      labelsLeft: n3(labelsLeft),
+      labelsRight: n3(labelsRight),
+      categoryTitle: catTitle ? { text: catTitle.text, px: n3(catTitle.px), ...rel(catTitle.node) } : null,
+      // The derived decomposition, all relative to the visual's left edge.
+      leftOfChart: chartRect ? n3(chartRect.left) : null,
+      rightOfChart: chartRect ? n3(vis.width - chartRect.right) : null,
+      plotInsetFromChartLeft: chartRect && plotRect ? n3(plotRect.left - chartRect.left) : null,
+      plotInsetFromChartRight: chartRect && plotRect ? n3(chartRect.right - plotRect.right) : null,
+      labelToPlotGap: plotRect && labelsRight !== null ? n3(plotRect.left - labelsRight) : null,
+      titleToLabelGap: catTitle && labelsLeft !== null ? n3(labelsLeft - (catTitle.r.right - vis.left)) : null,
+      totalNonPlot: plotRect ? n3(vis.width - plotRect.width) : null,
+    };
+  })()`,
+
+  /**
+   * Every on/off control in the Format pane, with its accessible name and
+   * state. Read-only; used to find a named toggle rather than guess at one.
+   */
+  paneToggles: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=switch],input[type=checkbox],button[aria-pressed],[aria-checked],[class*=toggle],[class*=Toggle],[class*=switch]')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.x > W * 0.62 && r.width > 2 && r.height > 2)
+      .map(({ el, r }) => ({
+        role: el.getAttribute('role') || el.tagName.toLowerCase(),
+        ariaLabel: el.getAttribute('aria-label'),
+        checked: el.getAttribute('aria-checked') ?? (el.checked === undefined ? null : String(el.checked)),
+        title: el.getAttribute('title'),
+        cls: String(el.className).slice(0, 40),
+        text: (el.textContent || '').trim().slice(0, 24),
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      }));
+  })()`,
+
+  /**
+   * The on/off switch belonging to a named Format-pane sub-card.
+   *
+   * Power BI gives these toggles no accessible name of their own, so the
+   * only safe handle is the card that owns one: find the header by its
+   * text, walk up to the nearest ancestor that contains a toggle, and take
+   * the toggle inside it. The same rule as the Layout sliders — never
+   * "the switch nearest this y coordinate", which would pick up the
+   * neighbouring card the moment the pane scrolls.
+   */
+  cardToggle: (label) => `(() => {
+    const W = window.innerWidth;
+    const header = [...document.querySelectorAll('[role=button],button')].find(
+      (e) => ((e.getAttribute('aria-label') || e.textContent || '').trim() === ${JSON.stringify(label)})
+        && e.getBoundingClientRect().x > W * 0.62,
+    );
+    if (!header) return null;
+    let card = header;
+    for (let i = 0; i < 5 && card; i++) {
+      if (card.querySelector('pbi-toggle-button')) break;
+      card = card.parentElement;
+    }
+    const toggle = card && card.querySelector('pbi-toggle-button');
+    if (!toggle) return null;
+    const input = toggle.querySelector('input') || toggle;
+    const r = toggle.getBoundingClientRect();
+    return {
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      checked: input.getAttribute('aria-checked') ?? (input.checked === undefined ? null : String(input.checked)),
+      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+    };
+  })()`,
+
+  /**
+   * Named controls along the right-hand pane strip.
+   *
+   * When a pane is collapsed the Format tabs do not exist at all, so the
+   * controller cannot recover by selecting the visual again. This lists what
+   * is actually there, by accessible name, so the reopen is a named action
+   * rather than a coordinate.
+   */
+  paneStrip: () => `(() => {
+    const W = window.innerWidth;
+    return [...document.querySelectorAll('[role=button],button,[role=tab],[aria-label]')]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      // Below the window chrome: the title bar carries the signed-in
+      // account name, and the lab has no business reading it.
+      .filter(({ r }) => r.x > W * 0.85 && r.y > 140 && r.width > 2 && r.height > 2)
+      .map(({ el, r }) => ({
+        name: (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim().slice(0, 40),
+        tag: el.tagName.toLowerCase(),
+        expanded: el.getAttribute('aria-expanded'),
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      }))
+      .filter((e) => e.name);
+  })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');
@@ -763,6 +916,25 @@ export class LabController {
   }
 
   /**
+   * Reopens the Visualizations pane if something collapsed it.
+   *
+   * A collapsed pane removes the Format tabs from the DOM entirely, so
+   * `selectVisual` cannot recover on its own — it selects the visual
+   * successfully and then waits forever for a tab that cannot exist. Found
+   * by the strip control's own accessible name, and only clicked when it
+   * reports itself collapsed.
+   */
+  async ensureVisualizationsPane() {
+    const strip = await this.session.read("paneStrip");
+    const pane = (strip ?? []).find((c) => c.name === "Visualizations");
+    if (!pane || pane.expanded !== "false") return false;
+    this.log("the Visualizations pane was collapsed; reopening it");
+    await this.session.click(pane.x, pane.y);
+    await sleep(900);
+    return true;
+  }
+
+  /**
    * Selects the lab visual, verified by the Format visual tab appearing.
    *
    * That tab only exists while a visual is selected, so its presence is a
@@ -772,6 +944,8 @@ export class LabController {
   async selectVisual() {
     for (let attempt = 0; attempt < 4; attempt++) {
       if (await this.session.read("tabAt", "Format visual")) return true;
+      // A collapsed pane is the one failure selecting again cannot fix.
+      if (attempt === 1) await this.ensureVisualizationsPane();
       const selection = await this.session.read("selection");
       if (!selection) throw new Error("the lab visual is no longer on the page");
       await this.session.click(selection.x, selection.y);
@@ -1117,6 +1291,67 @@ export class LabController {
     return { size: Number(after.value), changed: true, settled: outcome.settled };
   }
 
+  /**
+   * Shows or hides the category axis title, through the Y-axis card's own
+   * Title toggle.
+   *
+   * Verified by the render rather than by the control: the toggle carries
+   * no readable state, but a title either exists in the SVG or does not,
+   * and that is the thing the experiment cares about.
+   */
+  async setCategoryAxisTitleVisible(visible) {
+    validateAction({ type: "setCategoryAxisTitleVisible", visible });
+    requireImplemented("setCategoryAxisTitleVisible");
+    await this.requireLabVisual();
+
+    const before = await this.session.read("horizontalGeometry");
+    if (this.initialState && this.initialState.categoryAxisTitleVisible === undefined) {
+      this.initialState.categoryAxisTitleVisible = Boolean(before && before.categoryTitle);
+    }
+    if (Boolean(before && before.categoryTitle) === visible) {
+      this.log(`category axis title already ${visible ? "shown" : "hidden"}`);
+      return { visible, changed: false, settled: true };
+    }
+
+    await this.openLayoutCard("Y-axis", "Title");
+    const toggle = await this.session.read("cardToggle", "Title");
+    if (!toggle) throw new Error("could not find the Y-axis Title toggle");
+    await this.session.click(toggle.x, toggle.y);
+    const outcome = await this.settle({ timeoutMs: 30000 });
+
+    const after = await this.session.read("horizontalGeometry");
+    const shown = Boolean(after && after.categoryTitle);
+    if (shown !== visible) {
+      throw new Error(`category axis title did not ${visible ? "appear" : "disappear"}`);
+    }
+    this.mutated.categoryAxisTitleVisible = visible;
+    this.log(`category axis title now ${visible ? "shown" : "hidden"}`);
+    return { visible, changed: true, settled: outcome.settled };
+  }
+
+  /** Selects the visual and expands one card and one of its sub-cards. */
+  async openLayoutCard(card, section) {
+    await this.selectVisual();
+    const tab = await this.session.read("tabAt", "Format visual");
+    if (tab && tab.selected !== "true") { await this.session.click(tab.x, tab.y); await sleep(700); }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", card)) break;
+      const visual = await this.session.read("controlAt", "Visual");
+      if (!visual) break;
+      await this.session.click(visual.x, visual.y);
+      await sleep(700);
+    }
+    for (const label of [card, section]) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const control = await this.session.read("controlAt", label);
+        if (!control) { await sleep(400); continue; }
+        if (control.expanded === "true") break;
+        await this.session.click(control.x, control.y);
+        await sleep(800);
+      }
+    }
+  }
+
   async setVisualSize(width, height) {
     await this.requireLabVisual();
     validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
@@ -1176,11 +1411,16 @@ export class LabController {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
       if (action.type === "setSeriesGap") await this.setSeriesGap(action.gap);
       if (action.type === "setCategorySpacing") await this.setCategorySpacing(action.spacing);
+      if (action.type === "setCategoryAxisTitleVisible") await this.setCategoryAxisTitleVisible(action.visible);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
       if (action.type === "setThemeTextSize") await this.setThemeTextSize(action.size);
     }
     const current = await this.session.read("labState");
     current.baseTheme = await this.readBaseTheme();
+    if (this.mutated.categoryAxisTitleVisible !== undefined) {
+      const geometry = await this.session.read("horizontalGeometry");
+      current.categoryAxisTitleVisible = Boolean(geometry && geometry.categoryTitle);
+    }
     if (this.mutated.categorySpacing !== undefined) {
       const spacing = await this.session.read("sliderControlAt", "Space between categories");
       if (spacing) current.categorySpacing = Number(spacing.value);
