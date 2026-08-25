@@ -12,6 +12,8 @@ import {
   selectLabVisual,
   detectBreakpoints,
   expandExperiment,
+  FIXTURE_CATEGORY_SETS,
+  fixtureVariantOf,
   identifyLabEnvironment,
   isStable,
   planRestoration,
@@ -101,7 +103,7 @@ test("anything unrecognised refuses to be mutated", () => {
 
   const foreign = identifyLabEnvironment({ ...LAB, categories: ["Revenue", "Cost"] });
   assert.equal(foreign.ok, false);
-  assert.match(foreign.reasons.join(" "), /unexpected categories/);
+  assert.match(foreign.reasons.join(" "), /not a known fixture variant/);
 });
 
 test("an empty render is not treated as a match", () => {
@@ -629,4 +631,70 @@ test("a font family left alone is never restored", () => {
   const result = verifyRestoration({ themeLabelFontFamily: "Segoe UI" }, { themeLabelFontFamily: "Arial" });
   assert.equal(result.restored, false);
   assert.match(result.problems.join(" "), /themeLabelFontFamily: expected Segoe UI, found Arial/);
+});
+
+// ---------------------------------------------------------------------------
+// Known fixture variants
+// ---------------------------------------------------------------------------
+
+test("each known fixture variant identifies, and nothing else does", () => {
+  // The gutter experiment needs the widest label's width varied by hand,
+  // because Power BI's font controls could not be driven to do it. Identity
+  // has to recognise the edited fixture without degrading into "any four
+  // categories".
+  const base = {
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+  };
+  for (const [name, categories] of Object.entries(FIXTURE_CATEGORY_SETS)) {
+    const result = identifyLabEnvironment({ ...base, categories: [...categories] });
+    assert.equal(result.ok, true, `${name}: ${result.reasons.join("; ")}`);
+    assert.equal(fixtureVariantOf([...categories]), name);
+  }
+});
+
+test("a category set that is not a known variant is refused", () => {
+  const base = {
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+  };
+  for (const categories of [
+    ["Paris", "Berlin", "Madrid", "Rome"],
+    ["London", "North West", "Scotland", "Cardiff"],
+    // A mixture of two variants must not pass either.
+    ["London", "NW", "Loughborough", "Wales"],
+    [],
+  ]) {
+    const result = identifyLabEnvironment({ ...base, categories });
+    assert.equal(result.ok, false, `${categories.join(",") || "(empty)"} should be refused`);
+  }
+  assert.equal(fixtureVariantOf(["Paris"]), null);
+  assert.equal(fixtureVariantOf([]), null);
+});
+
+test("a shed subset of one variant still identifies", () => {
+  // Power BI drops categories when space is tight; that must not read as a
+  // different fixture.
+  const result = identifyLabEnvironment({
+    visualType: "cartesian",
+    seriesCount: 3,
+    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+    categories: ["London", "Loughborough"],
+  });
+  assert.equal(result.ok, true, result.reasons.join("; "));
+});
+
+test("an explicit expectation still overrides the variant list", () => {
+  const result = identifyLabEnvironment(
+    {
+      visualType: "cartesian",
+      seriesCount: 3,
+      sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+      categories: ["London", "NW", "Scotland", "Wales"],
+    },
+    { categories: ["London", "North West", "Scotland", "Wales"] },
+  );
+  assert.equal(result.ok, false, "a caller asking for BASELINE must not get SHORT");
 });

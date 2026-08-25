@@ -163,10 +163,43 @@ export function validateAction(action) {
  * production report, so the check is deliberately conjunctive: every
  * expectation must hold, and an absent field fails rather than passes.
  */
+/**
+ * The category sets this lab will accept, and no others.
+ *
+ * The gutter experiment needs the widest label's width varied while every
+ * other input is held still, and Power BI's own font controls could not be
+ * driven to do it. So the synthetic fixture's text is edited by hand
+ * instead — which means identity has to recognise the edited fixture without
+ * becoming an "any four categories" check.
+ *
+ * Each variant is listed in full and matched exactly. `SHORT` replaces the
+ * widest value with a shorter one so a different existing string becomes
+ * the maximum; `LONG` replaces it with a clearly wider one. Everything else
+ * — series names, series count, visual type, the sentinel — is unchanged, so a
+ * report that merely happens to plot four UK regions still fails.
+ */
+export const FIXTURE_CATEGORY_SETS = Object.freeze({
+  BASELINE: Object.freeze(["London", "North West", "Scotland", "Wales"]),
+  SHORT: Object.freeze(["London", "NW", "Scotland", "Wales"]),
+  LONG: Object.freeze(["London", "Loughborough", "Scotland", "Wales"]),
+});
+
+/** Which known variant a rendered category set belongs to, or null. */
+export function fixtureVariantOf(categories) {
+  if (!Array.isArray(categories) || !categories.length) return null;
+  for (const [name, values] of Object.entries(FIXTURE_CATEGORY_SETS)) {
+    // Power BI sheds categories when space is tight, so membership rather
+    // than equality - but every rendered value must belong to ONE variant,
+    // which stops a mixture passing.
+    if (categories.every((c) => values.includes(c))) return name;
+  }
+  return null;
+}
+
 export function identifyLabEnvironment(state, expected = {}) {
   const reasons = [];
   const want = {
-    categories: ["London", "North West", "Scotland", "Wales"],
+    categories: null,
     series: ["Online", "Phone", "Post"],
     seriesCount: 3,
     visualType: "cartesian",
@@ -180,13 +213,20 @@ export function identifyLabEnvironment(state, expected = {}) {
     reasons.push(`visual type ${JSON.stringify(state.visualType)} is not ${want.visualType}`);
   }
   if (!Array.isArray(state.categories)) reasons.push("no categories read from the visual");
+  else if (state.categories.length === 0) reasons.push("no categories rendered");
   else {
     // Power BI may render a subset when space is tight, so the check is that
-    // every rendered category belongs to the fixture — not that all of the
-    // fixture is on screen.
-    const unexpected = state.categories.filter((c) => !want.categories.includes(c));
-    if (unexpected.length) reasons.push(`unexpected categories: ${unexpected.join(", ")}`);
-    if (state.categories.length === 0) reasons.push("no categories rendered");
+    // every rendered category belongs to ONE known variant — not that all of
+    // the variant is on screen, and not that any four strings will do.
+    const allowed = want.categories ? { EXPECTED: want.categories } : FIXTURE_CATEGORY_SETS;
+    const variant = Object.entries(allowed)
+      .find(([, values]) => state.categories.every((c) => values.includes(c)));
+    if (!variant) {
+      reasons.push(
+        `categories ${state.categories.join(", ")} are not a known fixture variant ` +
+          `(${Object.keys(allowed).join(", ")})`,
+      );
+    }
   }
   if (state.seriesCount !== want.seriesCount) {
     reasons.push(`series count ${state.seriesCount} is not ${want.seriesCount}`);
