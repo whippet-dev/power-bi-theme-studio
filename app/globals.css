@@ -2823,3 +2823,23 @@ button { color: inherit; }
 .authored-visual__content > .chart-preview {
   height: auto;
 }
+
+/* A cartesian visual whose AUTHORED size is the whole visual, not just its
+   chart box. Nothing may add extent outside it: the legend gets exactly the
+   band that was subtracted before layout, and the margins that used to sit
+   between the legend, the body and the plot would otherwise make the
+   finished visual taller than the size it claims. */
+.chart-preview--authored {
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-preview--authored .chart-preview__body,
+.chart-preview--authored .bar-preview__plot {
+  margin-top: 0;
+}
+
+.chart-preview__legend-band {
+  display: block;
+  overflow: hidden;
+}

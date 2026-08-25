@@ -7,6 +7,7 @@ import {
   computePreviewCartesianLayout,
 } from "../app/components/previews/cartesianLayout";
 import type { CartesianLayoutInput } from "../app/components/previews/cartesianLayout";
+import { authoredInnerBox, legendBandExtent } from "../app/components/previews/cartesianLayout";
 
 /**
  * Authored size versus presentation size.
@@ -18,6 +19,11 @@ import type { CartesianLayoutInput } from "../app/components/previews/cartesianL
  * the browser: the same authored geometry is measured at presentation scales
  * of 1.2333 and 0.3778.
  */
+
+const measure = (text: string, fontSize: number) => ({
+  width: text.length * fontSize * 0.5,
+  height: fontSize * 1.35,
+});
 
 const axis = {
   show: true,
@@ -62,7 +68,33 @@ test("clustered and stacked bar author at the same size", () => {
   assert.deepEqual(clustered.categoryAxis, stacked.categoryAxis);
 });
 
-test("the layout is computed against the authored box, and accounts for all of it", () => {
+test("the legend band comes out of the authored visual before the chart is laid out", () => {
+  // The boundary error this fixes: 450 x 250 was applied to the inner chart
+  // box while the legend was drawn outside it, so the finished visual
+  // measured 450 x 317 and was being compared with a native 450 x 250.
+  const legend = { show: true, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" };
+  const band = legendBandExtent(legend as never, ["Online", "Phone", "Post"], measure);
+  assert.ok(band.height > 0, "a top legend costs height");
+  assert.equal(band.width, 0, "and no width");
+
+  const inner = authoredInnerBox(BAR_CHART_BOX, band);
+  assert.equal(inner.width, BAR_CHART_BOX.width);
+  assert.equal(inner.height, BAR_CHART_BOX.height - band.height);
+
+  // Complete visual = legend band + inner chart box, exactly.
+  assert.equal(band.height + inner.height, BAR_CHART_BOX.height);
+});
+
+test("a hidden legend costs nothing, and a side legend costs width not height", () => {
+  const hidden = { show: false, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" };
+  assert.deepEqual(legendBandExtent(hidden as never, ["Online"], measure), { width: 0, height: 0 });
+  const side = { show: true, position: "Right", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" };
+  const band = legendBandExtent(side as never, ["Online", "Phone", "Post"], measure);
+  assert.ok(band.width > 0 && band.height === 0, "a side legend takes width");
+  assert.equal(authoredInnerBox(BAR_CHART_BOX, band).height, BAR_CHART_BOX.height, "and leaves the height alone");
+});
+
+test("the layout is computed against the inner box, and accounts for all of it", () => {
   const layout = computePreviewCartesianLayout(inputFor());
   const gutter = layout.categoryAxis?.width ?? 0;
   const valueGutter = layout.valueAxis?.height ?? 0;

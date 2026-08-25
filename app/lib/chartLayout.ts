@@ -373,9 +373,10 @@ export function horizontalCategoryLabelAllowance(labelFontPx: number): number {
 }
 
 export const DEFAULT_TICK_COUNT = 4;
-const DEFAULT_LABEL_GAP = 4;
+/** The gap between a label and what it labels. */
+export const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */
-const LEGEND_SWATCH_EXTENT = 14;
+export const LEGEND_SWATCH_EXTENT = 14;
 
 /** Axis start/end arrive as strings from the schema and are blank unless pinned. */
 function parseBound(value: string | number | undefined): number | null {

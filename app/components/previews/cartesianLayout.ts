@@ -1,6 +1,9 @@
 import {
   computeChartLayout,
   estimateText,
+  DEFAULT_LABEL_GAP,
+  LEGEND_SWATCH_EXTENT,
+  type LegendLayoutStyle,
   type AxisLayoutStyle,
   type CartesianOrientation,
   type ChartLayout,
@@ -9,7 +12,7 @@ import {
 } from "../../lib/chartLayout";
 import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
-import { formatValue } from "../ChartParts";
+import { formatValue, legendIsVertical } from "../ChartParts";
 
 /**
  * The bridge between a preview component and the pure layout engine.
@@ -231,6 +234,63 @@ function inCssPixels<
     fontFamily: axis.fontFamilyCss ?? axis.fontFamily,
     titleFontFamily: axis.titleFontFamilyCss ?? axis.titleFontFamily,
   };
+}
+
+/**
+ * How much of the authored visual a renderer-owned legend takes.
+ *
+ * The authored size describes the WHOLE visual, the way Power BI's own
+ * 450 × 250 does. The legend is drawn by the preview rather than by
+ * ChartLayout, so it has to come out of that budget before the chart is
+ * laid out — otherwise the chart is given the whole visual, the legend is
+ * added outside it, and the finished result is taller than the size it
+ * claims to be. That is exactly the boundary error this replaced: an
+ * authored 450 × 250 whose DOM measured 450 × 317.
+ *
+ * Deliberately the same arithmetic `computeChartLayout` uses for a legend
+ * it owns, so the two cannot disagree about what a legend costs. The
+ * caller applies the returned extent to BOTH the layout box and the
+ * rendered band, which is what keeps CSS and geometry in step.
+ */
+export function legendBandExtent(
+  legend: LegendLayoutStyle | undefined,
+  entryLabels: readonly string[],
+  measure: TextMeasure = canvasTextMeasure,
+): { width: number; height: number } {
+  if (!legend?.show) return { width: 0, height: 0 };
+  const entries = legend.showTitle && String(legend.titleText ?? "")
+    ? [String(legend.titleText), ...entryLabels]
+    : entryLabels;
+  if (!entries.length) return { width: 0, height: 0 };
+  const fontPx = themeFontSizeToCssPx(legend.fontSize);
+  const family = legend.fontFamily;
+  const widest = entries.reduce(
+    (best, label) => Math.max(best, measure(label, fontPx, family).width),
+    0,
+  );
+  return legendIsVertical(legend.position)
+    ? { width: widest + LEGEND_SWATCH_EXTENT + DEFAULT_LABEL_GAP, height: 0 }
+    : { width: 0, height: measure(entries[0], fontPx, family).height + DEFAULT_LABEL_GAP };
+}
+
+/**
+ * The rectangle ChartLayout is given, once renderer-owned chrome has been
+ * taken out of the authored visual.
+ */
+export function authoredInnerBox(box: Rect, chrome: { width: number; height: number }): Rect {
+  return {
+    x: box.x,
+    y: box.y,
+    width: Math.max(0, box.width - chrome.width),
+    height: Math.max(0, box.height - chrome.height),
+  };
+}
+
+/** The band a renderer-owned legend occupies, as an inline style. */
+export function legendBandStyle(band: { width: number; height: number }): { width?: number; height?: number } {
+  if (band.width > 0) return { width: band.width };
+  if (band.height > 0) return { height: band.height };
+  return {};
 }
 
 export function computePreviewCartesianLayout(input: CartesianLayoutInput): ChartLayout {

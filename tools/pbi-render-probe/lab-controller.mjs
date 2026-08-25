@@ -1597,6 +1597,68 @@ export class LabController {
   }
 
   /**
+   * Selects the visual and expands one card and one of its groups.
+   *
+   * Every step re-seeks before it acts, because expanding a card scrolls the
+   * pane and the pane virtualises: the group you are about to click can be
+   * unmounted by the click that revealed its own card.
+   */
+  async openLayoutCard(card, section) {
+    await this.selectVisual();
+    const tab = await this.session.read("tabAt", "Format visual");
+    if (tab && tab.selected !== "true") { await this.session.click(tab.x, tab.y); await sleep(700); }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await this.session.read("controlAt", card)) break;
+      const visual = await this.session.read("controlAt", "Visual");
+      if (!visual) break;
+      await this.session.click(visual.x, visual.y);
+      await sleep(700);
+    }
+    for (const label of [card, section]) {
+      let expanded = false;
+      for (let attempt = 0; attempt < 4 && !expanded; attempt++) {
+        if (!(await this.seekFormattingCard(label))) {
+          throw new Error(`the "${label}" section never mounted, at any scroll position`);
+        }
+        const control = await this.session.read("controlAt", label);
+        if (!control) { await sleep(400); continue; }
+        if (control.expanded === "true") { expanded = true; break; }
+        await this.session.click(control.x, control.y);
+        await sleep(900);
+      }
+      if (!expanded) {
+        const final = await this.session.read("controlAt", label);
+        if (!final || final.expanded !== "true") {
+          throw new Error(`the "${label}" section would not expand`);
+        }
+      }
+    }
+  }
+
+  async setVisualSize(width, height) {
+    await this.requireLabVisual();
+    validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
+    const map = await this.resolveSizeFields();
+    const fields = await this.openSizeControls();
+
+    await this.session.typeInto(fields[map.width].x, fields[map.width].y, String(Math.round(width)));
+    await sleep(400);
+    const fields2 = await this.session.read("sizeFields");
+    await this.session.typeInto(fields2[map.height].x, fields2[map.height].y, String(Math.round(height)));
+    const outcome = await this.settle();
+
+    // State verification: the click happening is not success.
+    const geometry = await this.session.read("geometry");
+    const ok = Math.abs(geometry.w - width) <= 1 && Math.abs(geometry.h - height) <= 1;
+    if (!ok) {
+      throw new Error(`Power BI did not accept ${width}x${height} — visual is ${geometry.w}x${geometry.h}`);
+    }
+    this.mutated.width = Math.round(width);
+    this.mutated.height = Math.round(height);
+    return { ...outcome, width: geometry.w, height: geometry.h };
+  }
+
+  /**
    * Sets "Space between categories" — Power BI's own user-facing property,
    * not the effective ratio its geometry produces.
    *
@@ -1868,59 +1930,6 @@ export class LabController {
     }
     return final;
   }
-  /**
-   * Selects the visual, expands one card, then that card's own group.
-   *
-   * The group is resolved **within the card**, because group names repeat:
-   * Bars has a Layout group and so does Y-axis. Every step re-seeks first,
-   * since expanding a card scrolls the pane and the pane virtualises.
-   */
-  async openLayoutCard(card, section) {
-    await this.selectVisual();
-    const tab = await this.session.read("tabAt", "Format visual");
-    if (tab && tab.selected !== "true") { await this.session.click(tab.x, tab.y); await sleep(700); }
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (await this.session.read("controlAt", card)) break;
-      const visual = await this.session.read("controlAt", "Visual");
-      if (!visual) break;
-      await this.session.click(visual.x, visual.y);
-      await sleep(700);
-    }
-
-    // The card, by its own heading.
-    let cardOpen = false;
-    for (let attempt = 0; attempt < 4 && !cardOpen; attempt++) {
-      if (!(await this.seekFormattingCard(card))) {
-        throw new Error(`the "${card}" card never mounted, at any scroll position`);
-      }
-      const control = await this.session.read("controlAt", card);
-      if (!control) { await sleep(400); continue; }
-      if (control.expanded === "true") { cardOpen = true; break; }
-      await this.session.click(control.x, control.y);
-      await sleep(900);
-    }
-    if (!cardOpen) throw new Error(`the "${card}" card would not expand`);
-
-    // The group, scoped to that card.
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const group = await this.session.read("cardGroup", card, section);
-      if (!group || !group.ok) {
-        throw new Error(`REFUSING TO CLICK — ${card} → ${section}: ${group ? group.reason : "no result"}`);
-      }
-      if (group.expanded === "true") return;
-      if (!group.visible) {
-        if (!(await this.scrollFormatPane(group.above ? -200 : 200))) break;
-        continue;
-      }
-      await this.session.click(group.x, group.y);
-      await sleep(900);
-    }
-    const final = await this.session.read("cardGroup", card, section);
-    if (!final || !final.ok || final.expanded !== "true") {
-      throw new Error(`the "${card} → ${section}" group would not expand`);
-    }
-  }
-
   /**
    * Leaves the Format pane in a state the next action can start from.
    *
