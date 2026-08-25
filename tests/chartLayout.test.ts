@@ -8,6 +8,7 @@ import {
   clampedValueCoordinate,
   computeChartLayout,
   estimateText,
+  CATEGORY_OUTER_PADDING,
   type AxisLayoutStyle,
   type CartesianOrientation,
   type ChartLayout,
@@ -444,11 +445,21 @@ test("horizontal and vertical layouts are exact transposes, so bar and column ca
   // Each value scale spans its own plot fully, in the transposed direction.
   assert.ok(near(v.scale.value(0) - v.scale.value(DATA_MAX), v.plot.height), "vertical value scale must span the plot");
   assert.ok(near(h.scale.value(DATA_MAX) - h.scale.value(0), h.plot.width), "horizontal value scale must span the plot");
-  // And each category scale fills its own plot in the other direction.
+  // And each category scale is inset from both ends of its own plot by the
+  // same outer padding, in the transposed direction. Native reserves 0.4 of
+  // a step at each end rather than tiling edge to edge, and a transpose that
+  // did not would put a bar chart's bands where a column chart's are not.
+  const vFirst = v.scale.category(0, 4);
   const vLast = v.scale.category(3, 4);
+  const hFirst = h.scale.category(0, 4);
   const hLast = h.scale.category(3, 4);
-  assert.ok(near(vLast.start + vLast.size, v.plot.x + v.plot.width), "vertical categories must fill the plot width");
-  assert.ok(near(hLast.start + hLast.size, h.plot.y + h.plot.height), "horizontal categories must fill the plot height");
+  const vStep = v.scale.category(1, 4).start - vFirst.start;
+  const hStep = h.scale.category(1, 4).start - hFirst.start;
+  const inset = CATEGORY_OUTER_PADDING;
+  assert.ok(near(vFirst.start - v.plot.x, inset * vStep), "vertical leading inset");
+  assert.ok(near(v.plot.x + v.plot.width - (vLast.start + vLast.size), inset * vStep), "vertical trailing inset");
+  assert.ok(near(hFirst.start - h.plot.y, inset * hStep), "horizontal leading inset");
+  assert.ok(near(h.plot.y + h.plot.height - (hLast.start + hLast.size), inset * hStep), "horizontal trailing inset");
 });
 
 test("swapping orientation with identical inputs swaps which dimension each gutter takes", () => {

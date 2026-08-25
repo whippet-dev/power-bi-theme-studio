@@ -252,6 +252,33 @@ export function categoryPercent(
   return { offset: ((slot.start - origin) / total) * 100, size: (slot.size / total) * 100 };
 }
 
+/**
+ * Power BI reserves this much empty plot at each end of the category axis,
+ * measured in category steps.
+ *
+ * Categories do not tile the plot. Power BI's category scale is a band
+ * scale with an outer padding, so the first band starts 0.4 of a step in
+ * from the plot edge and the last ends 0.4 of a step before the far edge.
+ *
+ * Measured across twelve native states — two visual sizes × six values of
+ * "Space between categories" (0, 10, 20, 30, 50, 75) — where
+ * `plotExtent / step` came out as 4.80, 4.70, 4.60, 4.50, 4.30 and 4.05 for
+ * four categories. Solving each for the outer term gives **0.4000 in every
+ * one**, and the measured distance from the plot edge to the first band is
+ * **0.4000 × step in every one**: two independent routes to the same
+ * number, at every state. See POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.16.
+ *
+ * Corroborated in Power BI Desktop's own cartesian bundle, which resolves
+ * the ratio as `explicit ?? (axesVisible !== false ? 0.4 : 0)` — the same
+ * 0.4, and the reason a hidden category axis takes 0 below.
+ *
+ * Not a theme property here. Power BI does register `categoryAxis.
+ * outerPadding` in its property metadata, but it is gated behind a feature
+ * switch and absent from the Format pane, so it is modelled as scale
+ * behaviour rather than added to the editor.
+ */
+export const CATEGORY_OUTER_PADDING = 0.4;
+
 export const DEFAULT_TICK_COUNT = 4;
 const DEFAULT_LABEL_GAP = 4;
 /** Swatch plus its gap, for sizing a legend band. */
@@ -456,14 +483,28 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     if (count <= 0) return { start: vertical ? plot.x : plot.y, size: 0 };
     const total = vertical ? plot.width : plot.height;
     const origin = vertical ? plot.x : plot.y;
-    const slot = total / count;
-    // innerPadding is a percentage of the slot left empty, so half of it
-    // sits either side of the mark and every slot stays inside the plot.
-    const padding = slot * (Math.max(0, Math.min(100, innerPadding)) / 100);
+    const pInner = Math.max(0, Math.min(100, innerPadding)) / 100;
+    // A hidden category axis takes no outer padding, which is the rule
+    // Power BI's own bundle states; the twelve measured states all had the
+    // axis visible, so that half is runtime-corroborated rather than
+    // measured here.
+    const pOuter = categoryAxis.show ? CATEGORY_OUTER_PADDING : 0;
+    // Band-scale semantics, matching native: the step absorbs the inner
+    // padding once and the outer padding twice, so the plot holds
+    // `count - pInner + 2 * pOuter` steps. The guard mirrors Power BI's own
+    // `Math.max(1, ...)`, which stops a single heavily padded category from
+    // producing a step wider than the plot.
+    const step = total / Math.max(1, count - pInner + 2 * pOuter);
     // Inversion changes which slot the index lands in, not the slot's size:
     // index 0 takes the last slot, index 1 the second-last, and so on.
     const position = categoryInverted ? count - 1 - index : index;
-    return { start: origin + position * slot + padding / 2, size: Math.max(0, slot - padding) };
+    // The band sits flush against the start of its step, not centred in it.
+    // Native's leading edge is exactly pOuter x step at every measured
+    // state, which centring could not produce.
+    return {
+      start: origin + pOuter * step + position * step,
+      size: Math.max(0, step * (1 - pInner)),
+    };
   };
 
   return {

@@ -509,3 +509,52 @@ test("an unrestored theme text size is reported as a problem", () => {
   assert.equal(result.restored, false);
   assert.match(result.problems.join(" "), /themeTextSize: expected 10, found 20/);
 });
+
+// ---------------------------------------------------------------------------
+// "Space between categories" — the other Layout slider
+// ---------------------------------------------------------------------------
+
+test("setCategorySpacing is allowlisted and implemented", () => {
+  assert.ok(ALLOWED_ACTIONS.setCategorySpacing, "on the allowlist");
+  assert.equal(ALLOWED_ACTIONS.setCategorySpacing.mutates, true);
+  assert.equal(requireImplemented("setCategorySpacing"), true);
+});
+
+test("category spacing is validated against the range Power BI's control reports", () => {
+  // 0..75, read from the slider itself. The same range as the series gap,
+  // which sits 28px above it and is a different level of the layout.
+  for (const spacing of [-1, 76, 100, Number.NaN, "20", undefined]) {
+    assert.throws(
+      () => validateAction({ type: "setCategorySpacing", spacing }),
+      ActionError,
+      `spacing ${String(spacing)} should be refused`,
+    );
+  }
+  for (const spacing of [0, 20, 75]) {
+    assert.equal(validateAction({ type: "setCategorySpacing", spacing }), true);
+  }
+});
+
+test("category spacing and series gap restore independently", () => {
+  // Conflating them would silently file one level of the layout under the
+  // other, which is the whole reason they are separate actions.
+  const plan = planRestoration(
+    { width: 600, height: 600, gap: 10, categorySpacing: 20 },
+    { gap: 40, categorySpacing: 75 },
+  );
+  assert.deepEqual(plan, [
+    { type: "setSeriesGap", gap: 10 },
+    { type: "setCategorySpacing", spacing: 20 },
+  ]);
+});
+
+test("a category spacing left where it was found is never restored", () => {
+  assert.deepEqual(planRestoration({ categorySpacing: 20 }, { categorySpacing: 20 }), []);
+  assert.deepEqual(planRestoration({ categorySpacing: 20 }, {}), []);
+});
+
+test("an unrestored category spacing is reported as a problem", () => {
+  const result = verifyRestoration({ categorySpacing: 20 }, { categorySpacing: 75 });
+  assert.equal(result.restored, false);
+  assert.match(result.problems.join(" "), /categorySpacing: expected 20, found 75/);
+});

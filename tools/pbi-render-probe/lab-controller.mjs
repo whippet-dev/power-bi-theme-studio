@@ -516,6 +516,77 @@ const PAYLOADS = {
     };
   })()`,
 
+  /**
+   * The category scale, edge to edge.
+   *
+   * Power BI does not tile categories across the plot: it leaves space
+   * before the first band and after the last. Measuring that needs the
+   * band positions AND the plot's own extent in one read, so the two
+   * cannot drift between calls.
+   *
+   * Bands are grouped by series fill rather than by proximity: at low
+   * category spacing the gap between clusters is smaller than the gap
+   * between series inside one, so any proximity rule silently regroups.
+   * Reported in both the SVG attribute space the geometry is authored in
+   * and the CSS pixels it paints to, so a coordinate assumption cannot
+   * hide.
+   */
+  categoryScale: () => `(() => {
+    const num = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(4) : null);
+    const el = ${VISUAL};
+    if (!el) return null;
+    const plot = el.querySelector('svg.mainGraphicsContext');
+    const bars = [...el.querySelectorAll('svg rect.bar')];
+    if (!plot || !bars.length) return null;
+    const pr = plot.getBoundingClientRect();
+
+    const byFill = new Map();
+    for (const b of bars) {
+      const f = getComputedStyle(b).fill;
+      const list = byFill.get(f) ?? [];
+      list.push({
+        y: Number(b.getAttribute('y')),
+        h: Number(b.getAttribute('height')),
+        top: b.getBoundingClientRect().top - pr.top,
+        bottom: b.getBoundingClientRect().bottom - pr.top,
+      });
+      byFill.set(f, list);
+    }
+    const series = [...byFill.values()].map((list) => list.sort((a, b) => a.y - b.y));
+    const count = Math.min(...series.map((s) => s.length));
+    if (!count) return null;
+
+    const clusters = [];
+    for (let i = 0; i < count; i++) {
+      const members = series.map((s) => s[i]);
+      clusters.push({
+        start: Math.min(...members.map((m) => m.y)),
+        end: Math.max(...members.map((m) => m.y + m.h)),
+        cssStart: Math.min(...members.map((m) => m.top)),
+        cssEnd: Math.max(...members.map((m) => m.bottom)),
+      });
+    }
+
+    const plotExtent = Number(plot.getAttribute('height'));
+    const step = clusters.length >= 2 ? clusters[1].start - clusters[0].start : null;
+    const last = clusters[clusters.length - 1];
+    return {
+      categoryCount: clusters.length,
+      seriesCount: series.length,
+      plotExtent: num(plotExtent),
+      plotExtentCss: num(pr.height),
+      step: num(step),
+      bandExtent: num(clusters[0].end - clusters[0].start),
+      firstBandStart: num(clusters[0].start),
+      lastBandEnd: num(last.end),
+      leadingEdge: num(clusters[0].start),
+      trailingEdge: num(plotExtent - last.end),
+      leadingEdgeCss: num(clusters[0].cssStart),
+      trailingEdgeCss: num(pr.height - last.cssEnd),
+      clusters: clusters.map((c) => ({ start: num(c.start), end: num(c.end) })),
+    };
+  })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');
@@ -847,13 +918,15 @@ export class LabController {
 
   /**
    * Opens Format visual -> Visual -> Bars -> Layout and scrolls until the
-   * gap control is on screen.
+   * named slider is on screen.
    *
    * Layout's contents sit below the fold once Bars is expanded, so the pane
    * has to be scrolled; the control is then located by its own label rather
-   * than by where the scroll happened to land.
+   * than by where the scroll happened to land. "Space between categories"
+   * and "Space between series" are 28px apart and identical, so the label
+   * is the only safe handle.
    */
-  async openSeriesGapControl() {
+  async openLayoutSlider(label) {
     await this.selectVisual();
 
     const step = async (payload, label, done) => {
@@ -880,13 +953,64 @@ export class LabController {
 
     // Scroll until the control is both present and on screen.
     for (let attempt = 0; attempt < 12; attempt++) {
-      const control = await this.session.read("seriesGapControl");
+      const control = await this.session.read("sliderControlAt", label);
       if (control && control.visible) return control;
       if (!(await this.scrollFormatPane(200))) break;
     }
-    const final = await this.session.read("seriesGapControl");
-    if (!final) throw new Error('could not find the "Space between series" control');
+    const final = await this.session.read("sliderControlAt", label);
+    if (!final) throw new Error(`could not find the "${label}" control`);
     return final;
+  }
+
+  /** Back-compatible alias: the gap slider is one of the Layout sliders. */
+  async openSeriesGapControl() {
+    return this.openLayoutSlider("Space between series");
+  }
+
+  /**
+   * Sets "Space between categories" — Power BI's own user-facing property,
+   * not the effective ratio its geometry produces.
+   *
+   * A different level of the layout from `setSeriesGap`: this one moves the
+   * category scale, that one subdivides a category between series. They sit
+   * next to each other in the pane and look identical, which is exactly why
+   * each is found through its own label.
+   */
+  async setCategorySpacing(spacing) {
+    validateAction({ type: "setCategorySpacing", spacing });
+    requireImplemented("setCategorySpacing");
+    await this.requireLabVisual();
+
+    const control = await this.openLayoutSlider("Space between categories");
+    if (this.initialState && this.initialState.categorySpacing === undefined) {
+      this.initialState.categorySpacing = Number(control.value);
+    }
+    if (Number(control.value) === Number(spacing)) {
+      this.log(`category spacing already ${spacing}`);
+      return { spacing, changed: false, settled: true };
+    }
+
+    const before = await this.session.read("categoryScale");
+    await this.session.typeInto(control.x, control.y, String(spacing));
+    const outcome = await this.settle();
+
+    const after = await this.session.read("sliderControlAt", "Space between categories");
+    if (!after || Number(after.value) !== Number(spacing)) {
+      throw new Error(
+        `category spacing did not take: asked for ${spacing}, control reports ${after ? after.value : "nothing"}`,
+      );
+    }
+    // The control agreeing is not the same as the renderer moving: this
+    // property changes the category band, so the band must change with it.
+    const geometry = await this.session.read("categoryScale");
+    if (before && geometry && Math.abs(geometry.bandExtent - before.bandExtent) < 0.01) {
+      throw new Error(
+        `category spacing reported ${spacing} but the category band did not move (${before.bandExtent})`,
+      );
+    }
+    this.mutated.categorySpacing = Number(spacing);
+    this.log(`category spacing now ${after.value} (range ${after.min}..${after.max})`);
+    return { spacing: Number(after.value), changed: true, settled: outcome.settled };
   }
 
   /**
@@ -1051,11 +1175,16 @@ export class LabController {
     for (const action of plan) {
       if (action.type === "setVisualSize") await this.setVisualSize(action.width, action.height);
       if (action.type === "setSeriesGap") await this.setSeriesGap(action.gap);
+      if (action.type === "setCategorySpacing") await this.setCategorySpacing(action.spacing);
       if (action.type === "setBaseTheme") await this.setBaseTheme(action.theme);
       if (action.type === "setThemeTextSize") await this.setThemeTextSize(action.size);
     }
     const current = await this.session.read("labState");
     current.baseTheme = await this.readBaseTheme();
+    if (this.mutated.categorySpacing !== undefined) {
+      const spacing = await this.session.read("sliderControlAt", "Space between categories");
+      if (spacing) current.categorySpacing = Number(spacing.value);
+    }
     if (this.mutated.themeTextSize !== undefined) {
       const text = await this.session.read("themeTextSizeControl");
       if (text) current.themeTextSize = Number(text.value);
