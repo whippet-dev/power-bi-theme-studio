@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
+import { headingAria } from "../lib/headingAria";
 import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
@@ -327,11 +328,6 @@ function formatCardValue(
  * them as real ARIA heading semantics is the only faithful way to reflect
  * them, so the preview matches what the property actually does.
  */
-function headingAria(heading: string | number): { role?: string; "aria-level"?: number } {
-  const match = /^Heading([2-6])$/.exec(String(heading));
-  if (!match) return {};
-  return { role: "heading", "aria-level": Number(match[1]) };
-}
 
 /**
  * Describes a visual's configured action, naming the destination where the
@@ -856,6 +852,7 @@ export function VisualGallery({
       palette={palette}
       titleChrome={chromeStyles.bar.title}
       titleFallback="Applications by region"
+      spaceBelowTitle={chromeStyles.bar.spacing.customizeSpacing ? chromeStyles.bar.spacing.spaceBelowTitle : 0}
     />
   );
 
@@ -866,6 +863,7 @@ export function VisualGallery({
       palette={palette}
       titleChrome={chromeStyles.stackedBar.title}
       titleFallback="Applications by region"
+      spaceBelowTitle={chromeStyles.stackedBar.spacing.customizeSpacing ? chromeStyles.stackedBar.spacing.spaceBelowTitle : 0}
     />
   );
 

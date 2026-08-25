@@ -29,8 +29,10 @@ import {
   legendBandExtent,
   legendBandStyle,
   visualTitleBandExtent,
+  type VisualTitleChrome,
   visualTitleStyle,
 } from "./cartesianLayout";
+import { headingAria } from "../../lib/headingAria";
 import { PresentationScale } from "./PresentationScale";
 import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedBarChartStyle } from "../../lib/barChartProperties";
@@ -41,11 +43,13 @@ type Props = {
    * of its own 450 x 250 budget. Theme Studio's tile heading is a
    * different thing and stays outside.
    */
-  titleChrome?: { show: boolean; text: string; fontSize: number; fontFamily: string; fontColor?: string; alignment?: string | number; bold?: boolean; italic?: boolean; underline?: boolean; background?: string };
+  titleChrome?: VisualTitleChrome;
   titleFallback?: string;
+  /** Only applies when the theme's "Customize spacing" is on, as in the tile. */
+  spaceBelowTitle?: number;
   barChartStyle: ResolvedBarChartStyle; palette: string[] };
 
-export function BarChartPreview({ barChartStyle, palette, titleChrome, titleFallback = "" }: Props) {
+export function BarChartPreview({ barChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
   // The legend describes the series the chart actually draws. It used to
   // carry one synthetic "Applications" entry while the chart drew one bar,
   // which made the legend properties unreviewable against a real cluster.
@@ -67,7 +71,7 @@ export function BarChartPreview({ barChartStyle, palette, titleChrome, titleFall
   // comes out of that budget first and the chart is laid out in what is
   // left - otherwise the finished visual is taller than the size it claims.
   const legendBand = legendBandExtent(barChartStyle.legend, legendItems.map((item) => item.label));
-  const titleBand = visualTitleBandExtent(titleChrome, titleFallback);
+  const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
   const authoredInner = authoredInnerBox(BAR_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
 
   const layout = computePreviewCartesianLayout({
@@ -135,7 +139,11 @@ export function BarChartPreview({ barChartStyle, palette, titleChrome, titleFall
       }}
     >
       {titleBand.height > 0 && (
-        <span className="chart-preview__visual-title" style={visualTitleStyle(titleChrome, titleBand)}>
+        <span
+          className="chart-preview__visual-title"
+          {...headingAria(titleChrome?.heading ?? "")}
+          style={visualTitleStyle(titleChrome, titleBand)}
+        >
           {String(titleChrome?.text ?? "") || titleFallback}
         </span>
       )}

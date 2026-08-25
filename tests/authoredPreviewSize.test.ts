@@ -15,6 +15,7 @@ import {
   visualTitleStyle,
 } from "../app/components/previews/cartesianLayout";
 import { legendExtent } from "../app/lib/chartLayout";
+import { headingAria } from "../app/lib/headingAria";
 import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
 
 /**
@@ -204,7 +205,7 @@ const titleOf = (over: Record<string, unknown> = {}) => ({
 test("a shown visual title takes a band out of the authored budget", () => {
   // Native Classic 2026 at 450 x 250 spends 35px on its title band for a 16px
   // title. This is the same money coming out of the same pocket.
-  const band = visualTitleBandExtent(titleOf() as never, "fallback", measure);
+  const band = visualTitleBandExtent(titleOf() as never, "fallback", 0, measure);
   assert.ok(band.height > 0, "a title costs height");
   assert.equal(band.width, 0, "and no width");
 
@@ -215,22 +216,22 @@ test("a shown visual title takes a band out of the authored budget", () => {
 
 test("a hidden title costs exactly zero", () => {
   assert.deepEqual(
-    visualTitleBandExtent(titleOf({ show: false }) as never, "fallback", measure),
-    { width: 0, height: 0 },
+    visualTitleBandExtent(titleOf({ show: false }) as never, "fallback", 0, measure),
+    { width: 0, height: 0, textHeight: 0, spaceBelow: 0 },
   );
   const inner = authoredInnerBox(BAR_CHART_BOX, { width: 0, height: 0 });
   assert.equal(inner.height, BAR_CHART_BOX.height, "and the chart gets the whole budget");
 });
 
 test("an empty title falls back to the visual's default name, and still costs a band", () => {
-  const explicit = visualTitleBandExtent(titleOf({ text: "" }) as never, "Applications by region", measure);
-  const named = visualTitleBandExtent(titleOf() as never, "ignored", measure);
+  const explicit = visualTitleBandExtent(titleOf({ text: "" }) as never, "Applications by region", 0, measure);
+  const named = visualTitleBandExtent(titleOf() as never, "ignored", 0, measure);
   assert.equal(explicit.height, named.height, "same text, same band");
 });
 
 test("a bigger title font takes a bigger band, and the chart pays for it", () => {
-  const small = visualTitleBandExtent(titleOf({ fontSize: 9 }) as never, "", measure);
-  const large = visualTitleBandExtent(titleOf({ fontSize: 20 }) as never, "", measure);
+  const small = visualTitleBandExtent(titleOf({ fontSize: 9 }) as never, "", 0, measure);
+  const large = visualTitleBandExtent(titleOf({ fontSize: 20 }) as never, "", 0, measure);
   assert.ok(large.height > small.height, "the band follows the font");
   assert.ok(
     authoredInnerBox(BAR_CHART_BOX, large).height < authoredInnerBox(BAR_CHART_BOX, small).height,
@@ -240,13 +241,14 @@ test("a bigger title font takes a bigger band, and the chart pays for it", () =>
   const longer = visualTitleBandExtent(
     titleOf({ fontSize: 20, text: "A considerably longer visual title than the other one" }) as never,
     "",
+    0,
     measure,
   );
   assert.equal(longer.height, large.height);
 });
 
 test("title and legend bands compose into one chrome extent", () => {
-  const title = visualTitleBandExtent(titleOf() as never, "", measure);
+  const title = visualTitleBandExtent(titleOf() as never, "", 0, measure);
   const legend = legendBandExtent(
     { show: true, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" } as never,
     ["Online", "Phone", "Post"],
@@ -266,7 +268,80 @@ test("the rendered title band IS the reserved band", () => {
   // Not two numbers that agree — the style helper is handed the band that was
   // subtracted, so a rendered title cannot be a different height from the
   // space made for it.
-  const band = visualTitleBandExtent(titleOf() as never, "", measure);
+  const band = visualTitleBandExtent(titleOf() as never, "", 0, measure);
   const style = visualTitleStyle(titleOf() as never, band);
   assert.equal(style.height, band.height);
+});
+
+// ---------------------------------------------------------------------------
+// Title behaviour that must survive the move out of the tile
+// ---------------------------------------------------------------------------
+
+test("space below the title is paid for out of the authored budget", () => {
+  // It is space the visual cannot draw in, so it comes from the same 250.
+  const without = visualTitleBandExtent(titleOf() as never, "", 0, measure);
+  const withGap = visualTitleBandExtent(titleOf() as never, "", 12, measure);
+  assert.equal(withGap.height, without.height + 12, "the band grows by the gap");
+  assert.equal(withGap.textHeight, without.textHeight, "the title itself is unchanged");
+  assert.equal(withGap.spaceBelow, 12);
+  assert.equal(
+    authoredInnerBox(BAR_CHART_BOX, withGap).height,
+    authoredInnerBox(BAR_CHART_BOX, without).height - 12,
+    "and the chart loses exactly that",
+  );
+});
+
+test("the rendered title and its gap are the two halves that were reserved", () => {
+  const band = visualTitleBandExtent(titleOf() as never, "", 12, measure);
+  const style = visualTitleStyle(titleOf() as never, band);
+  assert.equal(style.height, band.textHeight, "the element is the text band");
+  assert.equal(style.marginBottom, band.spaceBelow, "the margin is the gap");
+  assert.equal(
+    Number(style.height) + Number(style.marginBottom),
+    band.height,
+    "together they are exactly what came out of the budget",
+  );
+});
+
+test("titleWrap is preserved, and cannot spill outside its band", () => {
+  const wrapped = visualTitleStyle(titleOf({ titleWrap: true }) as never, { textHeight: 36, spaceBelow: 0 });
+  assert.equal(wrapped.whiteSpace, "normal");
+  assert.equal(wrapped.textOverflow, "clip");
+  const clipped = visualTitleStyle(titleOf({ titleWrap: false }) as never, { textHeight: 36, spaceBelow: 0 });
+  assert.equal(clipped.whiteSpace, "nowrap");
+  assert.equal(clipped.textOverflow, "ellipsis");
+  // Known limitation, deliberate: the band is reserved for one line either
+  // way, so overflow must contain a wrapped title rather than let it push
+  // into the plot.
+  assert.equal(wrapped.overflow, "hidden");
+  assert.equal(clipped.overflow, "hidden");
+});
+
+test("the heading level travels with the title", () => {
+  // Accessibility semantics belong to the title, not to where it is painted.
+  assert.deepEqual(headingAria("Heading3"), { role: "heading", "aria-level": 3 });
+  assert.deepEqual(headingAria("Heading6"), { role: "heading", "aria-level": 6 });
+  assert.deepEqual(headingAria("Off"), {});
+  assert.deepEqual(headingAria(""), {});
+});
+
+test("every styling field the tile honoured is still honoured", () => {
+  const style = visualTitleStyle(
+    titleOf({
+      fontColor: "#112233",
+      background: "#eeeeee",
+      alignment: "center",
+      bold: true,
+      italic: true,
+      underline: true,
+    }) as never,
+    { textHeight: 36, spaceBelow: 0 },
+  );
+  assert.equal(style.color, "#112233");
+  assert.equal(style.backgroundColor, "#eeeeee");
+  assert.equal(style.textAlign, "center");
+  assert.equal(style.fontWeight, 700);
+  assert.equal(style.fontStyle, "italic");
+  assert.equal(style.textDecoration, "underline");
+  assert.equal(style.fontFamily, "Segoe UI");
 });

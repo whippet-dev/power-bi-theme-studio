@@ -281,6 +281,28 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
 }
 
 /**
+ * The resolved Power BI title, as the chrome model produces it.
+ *
+ * Structural rather than a hand-kept subset: every field the shared title
+ * renderer honours is here, so a title moving into the authored visual
+ * cannot quietly lose one.
+ */
+export type VisualTitleChrome = {
+  show: boolean;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  fontColor?: string;
+  background?: string;
+  alignment?: string | number;
+  heading?: string | number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  titleWrap?: boolean;
+};
+
+/**
  * The visual title's band, in the authored visual's own pixels.
  *
  * A thin adapter over `visualTitleExtent`, adding only the theme's
@@ -289,11 +311,12 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
  * AND applies it to the rendered band, so the two cannot differ.
  */
 export function visualTitleBandExtent(
-  title: { show: boolean; text: string; fontSize: number; fontFamily: string } | undefined,
+  title: VisualTitleChrome | undefined,
   fallbackText: string,
+  spaceBelowTitle = 0,
   measure: TextMeasure = canvasTextMeasure,
-): { width: number; height: number } {
-  if (!title?.show) return { width: 0, height: 0 };
+): { width: number; height: number; textHeight: number; spaceBelow: number } {
+  if (!title?.show) return { width: 0, height: 0, textHeight: 0, spaceBelow: 0 };
   const band = visualTitleExtent(
     {
       show: true,
@@ -302,8 +325,9 @@ export function visualTitleBandExtent(
       fontFamily: title.fontFamily,
     },
     measure,
+    spaceBelowTitle,
   );
-  return { width: 0, height: band.height };
+  return { width: 0, height: band.height, textHeight: band.textHeight, spaceBelow: band.spaceBelow };
 }
 
 /** Two renderer-owned chrome bands, summed for the authored budget. */
@@ -321,11 +345,15 @@ export function authoredChromeExtent(
  * the title styling the theme resolved.
  */
 export function visualTitleStyle(
-  title: { fontSize: number; fontFamily: string; fontColor?: string; alignment?: string | number; bold?: boolean; italic?: boolean; underline?: boolean; background?: string } | undefined,
-  band: { height: number },
+  title: VisualTitleChrome | undefined,
+  band: { textHeight: number; spaceBelow: number },
 ): Record<string, string | number | undefined> {
   return {
-    height: band.height,
+    // The band this element occupies, and the gap below it, are the two
+    // halves the extent calculation returned - so what is rendered is
+    // exactly what was reserved.
+    height: band.textHeight,
+    marginBottom: band.spaceBelow || undefined,
     fontSize: title ? themeFontSizeToCssPx(title.fontSize) : undefined,
     fontFamily: title?.fontFamily,
     color: title?.fontColor,
@@ -334,6 +362,17 @@ export function visualTitleStyle(
     fontWeight: title?.bold ? 700 : 400,
     fontStyle: title?.italic ? "italic" : "normal",
     textDecoration: title?.underline ? "underline" : "none",
+    // Wrapping is preserved as a setting, but the band is still reserved
+    // for a single line: measuring a wrapped height needs a real
+    // line-breaking pass, and guessing one would put the rendered title
+    // and the space reserved for it back out of step. `overflow: hidden`
+    // is what keeps a wrapped title inside the band it was given rather
+    // than spilling over the chart. Multi-line reservation is its own
+    // task; until then a long wrapped title is clipped rather than
+    // silently stealing the plot's space.
+    whiteSpace: title?.titleWrap ? "normal" : "nowrap",
+    overflow: "hidden",
+    textOverflow: title?.titleWrap ? "clip" : "ellipsis",
   };
 }
 

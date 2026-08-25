@@ -443,11 +443,19 @@ export const VISUAL_TITLE_PADDING = 14;
 export function visualTitleExtent(
   title: VisualTitleLayoutStyle | undefined,
   measureText: TextMeasure,
-): { height: number } {
-  if (!title?.show) return { height: 0 };
+  spaceBelowTitle = 0,
+): { height: number; textHeight: number; spaceBelow: number } {
+  if (!title?.show) return { height: 0, textHeight: 0, spaceBelow: 0 };
   const text = String(title.text ?? "");
-  if (!text) return { height: 0 };
-  return { height: measureText(text, title.fontSize, title.fontFamily).height + VISUAL_TITLE_PADDING };
+  if (!text) return { height: 0, textHeight: 0, spaceBelow: 0 };
+  const textHeight = measureText(text, title.fontSize, title.fontFamily).height + VISUAL_TITLE_PADDING;
+  // Space below the title is space the visual cannot draw in, so it comes
+  // out of the same budget. Returned separately as well as in the total,
+  // because the renderer needs the two halves — the band for the title
+  // element and the gap for its margin — and taking them from one
+  // calculation is what stops the reserved and rendered heights differing.
+  const spaceBelow = Math.max(0, spaceBelowTitle);
+  return { height: textHeight + spaceBelow, textHeight, spaceBelow };
 }
 
 export const DEFAULT_TICK_COUNT = 4;
