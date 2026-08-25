@@ -7,6 +7,7 @@ import {
   type Rect,
   type TextMeasure,
 } from "../../lib/chartLayout";
+import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import { formatValue } from "../ChartParts";
 
@@ -161,10 +162,13 @@ export type CartesianLayoutInput = {
   valueAxisTitleFallback?: string;
   categoryAxisTitleFallback?: string;
   /**
-   * Overrides the engine's deterministic measurer. Production never passes
-   * one — this exists so a test can observe WHICH font the measurement
-   * boundary is handed. Today's `estimateText` ignores the family, so no
-   * assertion about geometry could catch a family going astray here.
+   * Overrides the measurer. Left unset, previews measure with the browser's
+   * own metrics (`canvasTextMeasure`), which fall back to the engine's
+   * deterministic estimator wherever there is no canvas — so a node test
+   * that passes nothing still gets `estimateText`.
+   *
+   * Pass one to pin the measurement: to observe WHICH font the boundary is
+   * handed, or to compare against the engine on equal terms.
    */
   measureText?: TextMeasure;
 };
@@ -240,7 +244,10 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     categories,
     dataMax,
     innerPadding,
-    ...(measureText ? { measureText } : {}),
+    // The browser draws the text, so the browser measures it. `estimateText`
+    // assumes 0.55em per glyph and is out by up to 21.5% on the strings
+    // these previews draw, which lands directly in the axis gutters.
+    measureText: measureText ?? canvasTextMeasure,
     // The gutter must be as wide as the label the renderer draws, so the
     // engine is handed the renderer's own formatter.
     formatTick: (value) => formatValue(value, valueAxis.labelDisplayUnits, valueAxis.labelPrecision),

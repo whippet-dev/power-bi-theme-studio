@@ -170,9 +170,18 @@ mapping is **not** “everything comes from `label`”:
 | Text class | Supplies |
 |---|---|
 | `title` | category axis title, value axis title |
-| `lightLabel` | legend text, category axis labels |
-| `smallLightLabel` | data labels, value axis labels |
+| `lightLabel` | legend text, ~~category axis labels~~ |
+| `smallLightLabel` | data labels, value axis labels, **category axis labels** |
 | `smallLabel` | reference-line labels |
+
+> **Corrected against the runtime, 2026-08-25.** The category-axis row is
+> the one place this table and Power BI Desktop disagree. Raising the report
+> theme's primary text size from 10pt to 20pt under Classic 2026 moved the
+> category axis to 18pt (×0.9) and its own font-size control to 18, while
+> the legend moved 1:1 to 26.667px and the axis titles did not move. The
+> documented association is kept above, struck through, because knowing the
+> published table says otherwise is worth more than a silently corrected
+> row. See POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.15.
 
 Secondary classes (`lightLabel`, `smallLightLabel`, `smallLabel`, and the
 rest) **derive automatically from their associated primary class** when a

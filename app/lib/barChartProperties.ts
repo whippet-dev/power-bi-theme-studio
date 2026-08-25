@@ -10,6 +10,7 @@ import {
   isGroupSetBy,
 } from "./properties";
 import { effectiveFontFamily } from "./fontFamilies";
+import { CATEGORY_INNER_PADDING_DEFAULT } from "./seriesBands";
 import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
@@ -831,7 +832,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       gridlineStyle: resolvePropertyValue(theme, p.categoryAxis.gridlineStyle, "solid"),
       gridlineThickness: resolvePropertyValue(theme, p.categoryAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.categoryAxis.gridlineTransparency, 0),
-      innerPadding: resolvePropertyValue(theme, p.categoryAxis.innerPadding, 10),
+      innerPadding: resolvePropertyValue(theme, p.categoryAxis.innerPadding, CATEGORY_INNER_PADDING_DEFAULT),
       invertAxis: resolvePropertyValue(theme, p.categoryAxis.invertAxis, false),
       italic: resolvePropertyValue(theme, p.categoryAxis.italic, false),
       labelColor: resolvePropertyValue(theme, p.categoryAxis.labelColor, categoryAxisLabelText.color),

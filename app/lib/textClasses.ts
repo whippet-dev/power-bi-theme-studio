@@ -103,9 +103,41 @@ export type ResolvedTextClass = {
  * BI's, not any one visual's — a value axis label comes from
  * `smallLightLabel` on every cartesian visual that has one. Renderers name a
  * *role*; this module owns which class serves it.
+ *
+ * `categoryAxisLabel` is `smallLightLabel` because Power BI was **made to
+ * demonstrate the derivation**, not because the baseline number happens to
+ * fit. Microsoft's published table associates this role with `lightLabel`;
+ * the runtime disagrees.
+ *
+ * The test that settles it: raise the report theme's primary text size from
+ * 10pt to 20pt in Power BI Desktop, under Classic 2026, touching nothing
+ * else (§5.15). What follows it:
+ *
+ * | role | before | after | scale |
+ * |---|---|---|---|
+ * | category axis | 9pt / 12px | **18pt / 24px** | ×0.9 |
+ * | value axis | 9pt / 12px | 18pt / 24px | ×0.9 |
+ * | legend | 10pt / 13.333px | 26.667px | ×1.0 |
+ * | axis titles | 12pt / 16px | 16px | unmoved |
+ *
+ * Power BI's own font-size control for the category axis reads **18** after
+ * the change, so this is its resolution, not our reading of pixels. The
+ * legend is the control in the experiment: it moved 1:1 in the same run,
+ * which rules out "everything scaled" and shows the two roles genuinely
+ * take different classes. Axis titles did not move at all, which is
+ * `title` behaving as documented.
+ *
+ * This matters beyond Classic 2026: a custom theme that sets `label` to
+ * 20pt must render its category axis at 18pt, and only the class mapping
+ * reproduces that. A visual-property default of 9pt would have stayed at
+ * 9pt and been wrong for every theme but the baseline.
+ *
+ * Classic 2018 remains unexplained: it declares `label` 10pt like 2026, yet
+ * its category axis control reads **8pt**, which no class scale produces.
+ * Recorded, not modelled — see POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.15.
  */
 export const TEXT_ROLE_CLASS = {
-  categoryAxisLabel: "lightLabel",
+  categoryAxisLabel: "smallLightLabel",
   categoryAxisTitle: "title",
   valueAxisLabel: "smallLightLabel",
   valueAxisTitle: "title",

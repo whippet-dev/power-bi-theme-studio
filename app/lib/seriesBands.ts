@@ -69,6 +69,28 @@ const MAX_GAP = 75;
 const MAX_GAP_OVERLAPPING = 100;
 
 /** One series' share of a category slot, in the slot's own coordinates. */
+/**
+ * Power BI's default for "Space between categories", as a percentage.
+ *
+ * Read from the Format pane's own control in Power BI Desktop rather than
+ * inferred from pixels: the slider reports **20** (range 0..75) for a
+ * default Clustered bar under Classic 2026.
+ *
+ * That is deliberately not the ~23.33% the native geometry measures. The
+ * measured figure is the *effective* ratio of cluster to category step, and
+ * Power BI reaches it by also insetting the cluster inside its band and
+ * carrying an outer padding of roughly 0.4 × step at each end of the plot —
+ * neither of which this layout engine models. Copying 23.33 into a property
+ * that means "space between categories" would encode a layout artefact as a
+ * user-facing setting, and the editor would then show a number Power BI
+ * never shows. The remaining gap belongs to the outer-padding work, not
+ * here. See POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.11 and §5.14.
+ *
+ * Not to be confused with [[clusteredSeriesBands]]'s `paddingInner`, which
+ * subdivides one category between series and is a proven 0.1 at gap 10.
+ */
+export const CATEGORY_INNER_PADDING_DEFAULT = 20;
+
 export type SeriesBand = {
   /** Distance from the slot's origin edge. */
   offset: number;

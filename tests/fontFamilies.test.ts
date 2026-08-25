@@ -220,7 +220,7 @@ test("BOUNDARY: the font-size conversion is unchanged and independent", () => {
   assert.equal(themeFontSizeToCssPx(12), 16);
   const src = CLASSIC(EMPTY);
   const s = resolveBarChartStyle(src, resolveTheme(src.roots));
-  assert.equal(s.categoryAxis.fontSize, 10, "still points in the resolved value");
+  assert.equal(s.categoryAxis.fontSize, 9, "still points in the resolved value");
 });
 
 test("an explicit visualStyles family still beats the text class", () => {

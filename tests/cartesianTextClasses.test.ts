@@ -101,7 +101,9 @@ for (const entry of CARTESIAN) {
     }
 
     // And the values are the ones Classic's text classes actually specify.
-    assert.equal(s.categoryAxis.fontSize, 10, "lightLabel, i.e. label");
+    // Both axis labels are small classes: native Classic 2026 renders both at
+    // 12px = 9pt at every tested size, against a declared label of 10pt.
+    assert.equal(s.categoryAxis.fontSize, 9, "smallLightLabel, label x 0.9");
     assert.equal(s.categoryAxis.fontFamily, "Segoe UI");
     assert.equal(s.valueAxis.fontSize, 9, "smallLightLabel, label x 0.9");
     assert.equal(s.categoryAxis.titleFontSize, 12, "title");
@@ -164,7 +166,9 @@ for (const entry of CARTESIAN) {
   test(`${entry.name}: a custom text class reaches the visual where no visualStyles value exists`, () => {
     const s = styleOf(entry, LOUD, "classic2026");
     assert.equal(s.categoryAxis.fontFamily, "Comic Sans MS");
-    assert.equal(s.categoryAxis.fontSize, 14);
+    // 14 x 0.9: the custom class still reaches the visual, through the small
+    // variant both axis labels now take.
+    assert.equal(s.categoryAxis.fontSize, 12.6, "smallLightLabel");
     assert.equal(s.valueAxis.fontSize, 12.6, "smallLightLabel");
     assert.equal(s.categoryAxis.titleFontFamily, "Courier New", "title class");
     assert.equal(s.categoryAxis.titleFontSize, 22);

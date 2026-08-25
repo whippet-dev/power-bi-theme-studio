@@ -234,7 +234,18 @@ test("foregroundNeutralSecondary layers custom over base for light classes", () 
 test("the semantic roles map to the classes Microsoft documents", () => {
   assert.equal(TEXT_ROLE_CLASS.categoryAxisTitle, "title");
   assert.equal(TEXT_ROLE_CLASS.valueAxisTitle, "title");
-  assert.equal(TEXT_ROLE_CLASS.categoryAxisLabel, "lightLabel");
+  // Microsoft's published table associates category axis labels with
+  // `lightLabel`. The runtime disagrees, and was made to prove it rather
+  // than inferred from one baseline number: raising the report theme's
+  // primary text size from 10pt to 20pt in Power BI Desktop moved the
+  // category axis to 18pt/24px (x0.9) and its own font-size control to 18,
+  // while the legend moved to 26.667px (x1.0) in the same run and the axis
+  // titles did not move at all. A custom theme setting label 20pt must
+  // therefore render its category axis at 18pt, which only the class
+  // mapping reproduces. The documented association is recorded as
+  // contradicted in BASE_THEME_DIFFERENTIAL_AUDIT.md 4.1; colour is
+  // identical either way, so only the scale moves.
+  assert.equal(TEXT_ROLE_CLASS.categoryAxisLabel, "smallLightLabel");
   assert.equal(TEXT_ROLE_CLASS.legendText, "lightLabel");
   assert.equal(TEXT_ROLE_CLASS.valueAxisLabel, "smallLightLabel");
   assert.equal(TEXT_ROLE_CLASS.dataLabel, "smallLightLabel");
@@ -252,7 +263,7 @@ test("PILOT: Classic no longer falls to 6px in an unnamed font", () => {
   // The audit's headline defect. Classic 2026 declares no fontSize anywhere in
   // visualStyles, so every one of these used to be the literal 6.
   const s = barStyle(EMPTY, "classic2026");
-  assert.equal(s.categoryAxis.fontSize, 10, "from lightLabel, i.e. label");
+  assert.equal(s.categoryAxis.fontSize, 9, "from smallLightLabel, label x 0.9");
   assert.equal(s.categoryAxis.fontFamily, "Segoe UI");
   assert.equal(s.valueAxis.fontSize, 9, "from smallLightLabel, label x 0.9");
   assert.equal(s.categoryAxis.titleFontSize, 12, "from title");
@@ -324,7 +335,7 @@ test("PILOT: the private theme + Classic uses that theme's own Arial typography"
 test("PILOT: reset returns an overridden property to its text-class value", () => {
   const path = ["visualStyles", "clusteredBarChart", "*", "categoryAxis", 0, "fontSize"] as Array<string | number>;
   const derived = barStyle(PRIMARY_ONLY, "classic2026").categoryAxis.fontSize;
-  assert.equal(derived, 14);
+  assert.equal(derived, 12.6, "the primary's 14, through the x0.9 class");
 
   const overridden = updateThemeValue(PRIMARY_ONLY, path, 31);
   assert.equal(hasThemeValueAtPath(overridden, path), true, "the editor sees an explicit value");
@@ -340,7 +351,7 @@ test("PILOT: a text-class-derived value is never an explicit override", () => {
   // next export would materialise defaults the author never wrote.
   const path = ["visualStyles", "clusteredBarChart", "*", "categoryAxis", 0, "fontSize"] as Array<string | number>;
   assert.equal(hasThemeValueAtPath(PRIMARY_ONLY, path), false);
-  assert.equal(barStyle(PRIMARY_ONLY, "classic2026").categoryAxis.fontSize, 14);
+  assert.equal(barStyle(PRIMARY_ONLY, "classic2026").categoryAxis.fontSize, 12.6);
   assert.equal(hasThemeValueAtPath(PRIMARY_ONLY, path), false, "resolving must not have set anything");
 });
 
