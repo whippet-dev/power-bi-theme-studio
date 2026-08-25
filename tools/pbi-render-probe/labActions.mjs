@@ -25,6 +25,7 @@ export const ALLOWED_ACTIONS = Object.freeze({
   setBaseTheme: { params: ["theme"], mutates: true, implemented: true },
   setSeriesGap: { params: ["gap"], mutates: true, implemented: true },
   setThemeTextSize: { params: ["size"], mutates: true, implemented: true },
+  setCategorySpacing: { params: ["spacing"], mutates: true, implemented: true },
   readState: { params: [], mutates: false, implemented: true },
 });
 
@@ -95,6 +96,15 @@ export function validateAction(action) {
   if (action.type === "setSeriesGap") {
     if (!Number.isFinite(action.gap) || action.gap < 0 || action.gap > 75) {
       throw new ActionError("gap must be between 0 and 75");
+    }
+  }
+  if (action.type === "setCategorySpacing") {
+    // Power BI's "Space between categories", the user-facing property. Its
+    // own control reports 0..75, the same range as the series gap - which
+    // is a neighbouring, visually identical slider and a different level of
+    // the layout entirely.
+    if (!Number.isFinite(action.spacing) || action.spacing < 0 || action.spacing > 75) {
+      throw new ActionError("category spacing must be between 0 and 75");
     }
   }
   if (action.type === "setThemeTextSize") {
@@ -313,6 +323,9 @@ export function planRestoration(initial, mutated) {
   if (mutated?.gap !== undefined && initial.gap !== mutated.gap) {
     plan.push({ type: "setSeriesGap", gap: initial.gap });
   }
+  if (mutated?.categorySpacing !== undefined && initial.categorySpacing !== mutated.categorySpacing) {
+    plan.push({ type: "setCategorySpacing", spacing: initial.categorySpacing });
+  }
   // Theme last: it triggers the largest re-render, so putting it back after
   // the cheaper settings avoids paying for that settle more than once.
   if (mutated?.baseTheme !== undefined && initial.baseTheme !== mutated.baseTheme) {
@@ -331,7 +344,7 @@ export function planRestoration(initial, mutated) {
 /** Did restoration actually work? Compared, never assumed. */
 export function verifyRestoration(initial, current, tolerance = 0.5) {
   const problems = [];
-  for (const key of ["width", "height", "gap", "themeTextSize"]) {
+  for (const key of ["width", "height", "gap", "categorySpacing", "themeTextSize"]) {
     if (initial?.[key] === undefined || current?.[key] === undefined) continue;
     if (Math.abs(initial[key] - current[key]) > tolerance) {
       problems.push(`${key}: expected ${initial[key]}, found ${current[key]}`);
