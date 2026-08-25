@@ -1120,6 +1120,41 @@ const PAYLOADS = {
     };
   } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
 
+  /**
+   * The band above the chart: the visual's own title, the legend, and
+   * whatever padding sits around them. Read-only.
+   *
+   * Everything is relative to the visual's top edge, because the question is
+   * how a Power BI visual spends the vertical budget its author gave it.
+   */
+  visualTitleBand: () => `(() => { try {
+    const n = (v) => (typeof v === 'number' && isFinite(v) ? +v.toFixed(2) : null);
+    const el = ${VISUAL};
+    if (!el) return { error: 'no lab visual' };
+    const vis = el.getBoundingClientRect();
+    const rel = (node) => {
+      if (!node) return null;
+      const r = node.getBoundingClientRect();
+      const cs = getComputedStyle(node);
+      return { top: n(r.top - vis.top), bottom: n(r.bottom - vis.top), h: n(r.height),
+               left: n(r.left - vis.left), w: n(r.width),
+               fontPx: n(parseFloat(cs.fontSize)), family: cs.fontFamily.split(',')[0],
+               text: (node.textContent || '').trim().slice(0, 60) };
+    };
+    const chart = el.querySelector('svg.cartesianChart');
+    // The title is the text above the chart that is not inside the SVG.
+    const candidates = [...el.querySelectorAll('div,span,h1,h2,h3,p')]
+      .filter((n2) => !n2.querySelector('svg') && (n2.textContent || '').trim())
+      .map((n2) => ({ node: n2, r: n2.getBoundingClientRect() }))
+      .filter(({ r }) => chart && r.bottom <= chart.getBoundingClientRect().top + 2 && r.height > 4)
+      .sort((a, b) => a.r.top - b.r.top);
+    return {
+      visual: { w: n(vis.width), h: n(vis.height) },
+      chartTop: chart ? n(chart.getBoundingClientRect().top - vis.top) : null,
+      aboveChart: candidates.map(({ node }) => rel(node)).slice(0, 8),
+    };
+  } catch (error) { return { error: String(error && error.message ? error.message : error) }; } })()`,
+
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
     const c = document.querySelector('[class*="displayArea"]');

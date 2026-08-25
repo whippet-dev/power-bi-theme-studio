@@ -2,6 +2,7 @@ import {
   computeChartLayout,
   estimateText,
   legendExtent,
+  visualTitleExtent,
   type LegendLayoutStyle,
   type AxisLayoutStyle,
   type CartesianOrientation,
@@ -10,6 +11,7 @@ import {
   type TextMeasure,
 } from "../../lib/chartLayout";
 import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
+import type { ResolvedChromeStyle } from "../../lib/chromeProperties";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import { formatValue } from "../ChartParts";
 
@@ -276,6 +278,89 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
     y: box.y,
     width: Math.max(0, box.width - chrome.width),
     height: Math.max(0, box.height - chrome.height),
+  };
+}
+
+/**
+ * The resolved Power BI title, as the chrome model produces it.
+ *
+ * Structural rather than a hand-kept subset: every field the shared title
+ * renderer honours is here, so a title moving into the authored visual
+ * cannot quietly lose one.
+ */
+export type VisualTitleChrome = ResolvedChromeStyle["title"];
+
+/**
+ * The visual title's band, in the authored visual's own pixels.
+ *
+ * A thin adapter over `visualTitleExtent`, adding only the theme's
+ * point-to-pixel conversion — the same relationship `legendBandExtent` has
+ * with `legendExtent`. The caller subtracts this from the authored budget
+ * AND applies it to the rendered band, so the two cannot differ.
+ */
+export function visualTitleBandExtent(
+  title: VisualTitleChrome | undefined,
+  fallbackText: string,
+  spaceBelowTitle = 0,
+  measure: TextMeasure = canvasTextMeasure,
+): { width: number; height: number; textHeight: number; spaceBelow: number } {
+  if (!title?.show) return { width: 0, height: 0, textHeight: 0, spaceBelow: 0 };
+  const band = visualTitleExtent(
+    {
+      show: true,
+      text: String(title.text ?? "") || fallbackText,
+      fontSize: themeFontSizeToCssPx(title.fontSize),
+      fontFamily: title.fontFamily,
+    },
+    measure,
+    spaceBelowTitle,
+  );
+  return { width: 0, height: band.height, textHeight: band.textHeight, spaceBelow: band.spaceBelow };
+}
+
+/** Two renderer-owned chrome bands, summed for the authored budget. */
+export function authoredChromeExtent(
+  bands: ReadonlyArray<{ width: number; height: number }>,
+): { width: number; height: number } {
+  return bands.reduce(
+    (total, band) => ({ width: total.width + band.width, height: total.height + band.height }),
+    { width: 0, height: 0 },
+  );
+}
+
+/**
+ * The rendered visual-title band: exactly the height that was reserved, and
+ * the title styling the theme resolved.
+ */
+export function visualTitleStyle(
+  title: VisualTitleChrome | undefined,
+  band: { textHeight: number; spaceBelow: number },
+): Record<string, string | number | undefined> {
+  return {
+    // The band this element occupies, and the gap below it, are the two
+    // halves the extent calculation returned - so what is rendered is
+    // exactly what was reserved.
+    height: band.textHeight,
+    marginBottom: band.spaceBelow || undefined,
+    fontSize: title ? themeFontSizeToCssPx(title.fontSize) : undefined,
+    fontFamily: title?.fontFamily,
+    color: title?.fontColor,
+    backgroundColor: title?.background,
+    textAlign: title?.alignment === undefined ? undefined : String(title.alignment),
+    fontWeight: title?.bold ? 700 : 400,
+    fontStyle: title?.italic ? "italic" : "normal",
+    textDecoration: title?.underline ? "underline" : "none",
+    // Wrapping is preserved as a setting, but the band is still reserved
+    // for a single line: measuring a wrapped height needs a real
+    // line-breaking pass, and guessing one would put the rendered title
+    // and the space reserved for it back out of step. `overflow: hidden`
+    // is what keeps a wrapped title inside the band it was given rather
+    // than spilling over the chart. Multi-line reservation is its own
+    // task; until then a long wrapped title is clipped rather than
+    // silently stealing the plot's space.
+    whiteSpace: title?.titleWrap ? "normal" : "nowrap",
+    overflow: "hidden",
+    textOverflow: title?.titleWrap ? "clip" : "ellipsis",
   };
 }
 

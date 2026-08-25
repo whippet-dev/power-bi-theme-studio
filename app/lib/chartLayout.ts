@@ -408,6 +408,56 @@ export function legendExtent(
     : { width: 0, height: (entries.length ? text.height : 0) + labelGap, vertical, afterPlot };
 }
 
+/** Just enough of a visual title to size its band. */
+export type VisualTitleLayoutStyle = {
+  show: boolean;
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+};
+
+/**
+ * What Power BI's visual header costs beyond the title text itself.
+ *
+ * Calibrated from one native state and honest about it: Classic 2026 at
+ * 450 × 250 gives its title band **35px** for a 16px title, and the same
+ * canvas that measures the text reports 21px of font height for it. The
+ * remainder is this. One measurement cannot tell a fixed padding from a
+ * font-relative one — if a second title size is ever measured and
+ * disagrees, this is the constant that should change.
+ */
+export const VISUAL_TITLE_PADDING = 14;
+
+/**
+ * The band a visual's own title takes out of its authored height.
+ *
+ * The Power BI visual title, not Theme Studio's tile heading: this one is
+ * driven by the theme's title properties and is part of the authored
+ * visual, so it is paid for out of the visual's own budget. The editor's
+ * name-and-select chrome is not, and stays outside.
+ *
+ * The one implementation, like `legendExtent`: whatever reserves the band
+ * and whatever renders it call this, so a rendered title cannot end up a
+ * different height from the space made for it.
+ */
+export function visualTitleExtent(
+  title: VisualTitleLayoutStyle | undefined,
+  measureText: TextMeasure,
+  spaceBelowTitle = 0,
+): { height: number; textHeight: number; spaceBelow: number } {
+  if (!title?.show) return { height: 0, textHeight: 0, spaceBelow: 0 };
+  const text = String(title.text ?? "");
+  if (!text) return { height: 0, textHeight: 0, spaceBelow: 0 };
+  const textHeight = measureText(text, title.fontSize, title.fontFamily).height + VISUAL_TITLE_PADDING;
+  // Space below the title is space the visual cannot draw in, so it comes
+  // out of the same budget. Returned separately as well as in the total,
+  // because the renderer needs the two halves — the band for the title
+  // element and the gap for its margin — and taking them from one
+  // calculation is what stops the reserved and rendered heights differing.
+  const spaceBelow = Math.max(0, spaceBelowTitle);
+  return { height: textHeight + spaceBelow, textHeight, spaceBelow };
+}
+
 export const DEFAULT_TICK_COUNT = 4;
 /** The gap between a label and what it labels. */
 export const DEFAULT_LABEL_GAP = 4;

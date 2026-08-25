@@ -19,14 +19,33 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { authoredInnerBox, legendBandExtent, legendBandStyle } from "./cartesianLayout";
+import {
+  authoredChromeExtent,
+  authoredInnerBox,
+  legendBandExtent,
+  legendBandStyle,
+  visualTitleBandExtent,
+  type VisualTitleChrome,
+  visualTitleStyle,
+} from "./cartesianLayout";
+import { headingAria } from "../../lib/headingAria";
 import { PresentationScale } from "./PresentationScale";
 import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
 import type { ResolvedStackedBarChartStyle } from "../../lib/stackedBarChartProperties";
 
-type Props = { stackedBarChartStyle: ResolvedStackedBarChartStyle; palette: string[] };
+type Props = {
+  /**
+   * The Power BI visual TITLE - part of the authored visual, paid for out
+   * of its own 450 x 250 budget. Theme Studio's tile heading is a
+   * different thing and stays outside.
+   */
+  titleChrome?: VisualTitleChrome;
+  titleFallback?: string;
+  /** Only applies when the theme's "Customize spacing" is on, as in the tile. */
+  spaceBelowTitle?: number;
+  stackedBarChartStyle: ResolvedStackedBarChartStyle; palette: string[] };
 
-export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props) {
+export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
   // Every legend entry has a segment and every segment has an entry: both
   // come from the same fixture series, in the same order, with the same
   // palette slots the clustered charts use.
@@ -46,7 +65,8 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
   // comes out of that budget first and the chart is laid out in what is
   // left - otherwise the finished visual is taller than the size it claims.
   const legendBand = legendBandExtent(stackedBarChartStyle.legend, stackedBarSeries.map((item) => item.label));
-  const authoredInner = authoredInnerBox(BAR_CHART_BOX, legendBand);
+  const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
+  const authoredInner = authoredInnerBox(BAR_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
 
   const layout = computePreviewCartesianLayout({
     box: authoredInner,
@@ -73,6 +93,15 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette }: Props)
         height: BAR_CHART_BOX.height,
       }}
     >
+      {titleBand.height > 0 && (
+        <span
+          className="chart-preview__visual-title"
+          {...headingAria(titleChrome?.heading ?? "")}
+          style={visualTitleStyle(titleChrome, titleBand)}
+        >
+          {String(titleChrome?.text ?? "") || titleFallback}
+        </span>
+      )}
       {!stackedBarLegendAtBottom && (
         <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>
           {stackedBarLegendNode}
