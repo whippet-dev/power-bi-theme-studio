@@ -105,10 +105,10 @@ test("property resolution still returns RAW theme values", () => {
   // user who typed 10 would see 13.333 and export it.
   const src = themeLayers(LOUD, getBaseTheme("classic2026"));
   const s = resolveBarChartStyle(src, resolveTheme(src.roots));
-  assert.equal(s.categoryAxis.fontSize, 15, "lightLabel, in points");
+  assert.equal(s.categoryAxis.fontSize, 13.5, "smallLightLabel: 15 x 0.9, still points");
   assert.equal(s.categoryAxis.titleFontSize, 22, "title, in points");
   assert.equal(s.valueAxis.fontSize, 13.5, "smallLightLabel: 15 x 0.9, still points");
-  assert.notEqual(s.categoryAxis.fontSize, 20, "not 15 x 4/3");
+  assert.notEqual(s.categoryAxis.fontSize, 18, "not 13.5 x 4/3");
 });
 
 test("BOUNDARY: the preview layout equals the engine driven with CSS pixels", () => {
@@ -125,8 +125,8 @@ test("BOUNDARY: the preview layout equals the engine driven with CSS pixels", ()
   const style = resolveBarChartStyle(src, resolveTheme(src.roots));
   const categories = ["London", "North West", "Scotland", "Wales"];
 
-  assert.equal(style.categoryAxis.fontSize, 15, "the resolved value is still points");
-  assert.ok(near(themeFontSizeToCssPx(15), 20), "which renders as 20px");
+  assert.equal(style.categoryAxis.fontSize, 13.5, "the resolved value is still points");
+  assert.ok(near(themeFontSizeToCssPx(13.5), 18), "which renders as 18px");
 
   const viaPreview = computePreviewCartesianLayout({
     box: BAR_CHART_BOX,

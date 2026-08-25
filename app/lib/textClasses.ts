@@ -103,9 +103,20 @@ export type ResolvedTextClass = {
  * BI's, not any one visual's — a value axis label comes from
  * `smallLightLabel` on every cartesian visual that has one. Renderers name a
  * *role*; this module owns which class serves it.
+ *
+ * `categoryAxisLabel` is `smallLightLabel` on the evidence of Power BI's own
+ * output, not by symmetry with the value axis. Native Classic 2026 renders
+ * **both** axis labels at 12px across twelve tested visual sizes, while its
+ * legend renders at 13.333px and its axis titles at 16px — and Classic
+ * 2026's own theme declares `label` 10pt and `title` 12pt. So the legend is
+ * the unscaled label class (10pt = 13.333px), the titles are `title`
+ * (12pt = 16px), and 12px = 9pt = label × 0.9 is the small variant. Three
+ * roles agreeing on one theme's declared classes is what makes this a
+ * derivation rather than a guess. See POWER_BI_CARTESIAN_DIFFERENTIAL.md
+ * §5.13.
  */
 export const TEXT_ROLE_CLASS = {
-  categoryAxisLabel: "lightLabel",
+  categoryAxisLabel: "smallLightLabel",
   categoryAxisTitle: "title",
   valueAxisLabel: "smallLightLabel",
   valueAxisTitle: "title",

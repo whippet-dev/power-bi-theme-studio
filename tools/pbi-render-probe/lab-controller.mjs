@@ -180,6 +180,40 @@ const VISUAL =
   "  });" +
   "  return named.length === 1 ? named[0] : null; })()";
 
+/**
+ * A Format-pane slider card, located through the label that owns it.
+ *
+ * Position alone is not enough: 'Space between categories' and 'Space
+ * between series' sit 28px apart with identical sliders, so each is found
+ * by its own label and then by the nearest ancestor that contains inputs -
+ * the card. Shared by both so neither can drift into its own rule.
+ */
+const SLIDER_CONTROL = (label) => `(() => {
+    const W = window.innerWidth;
+    const labelEl = [...document.querySelectorAll('*')].find(
+      (e) => !e.children.length && (e.textContent || '').trim() === ${JSON.stringify(label)}
+        && e.getBoundingClientRect().x > W * 0.62,
+    );
+    if (!labelEl) return null;
+    let card = labelEl;
+    for (let i = 0; i < 6 && card; i++) {
+      if (card.querySelectorAll('input').length) break;
+      card = card.parentElement;
+    }
+    if (!card) return null;
+    const spin = [...card.querySelectorAll('input')].find((i) => i.getAttribute('role') === 'spinbutton');
+    const range = [...card.querySelectorAll('input')].find((i) => i.type === 'range');
+    if (!spin) return null;
+    const r = spin.getBoundingClientRect();
+    return {
+      value: spin.value,
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
+      min: range ? range.getAttribute('min') : null,
+      max: range ? range.getAttribute('max') : null,
+    };
+  })()`;
+
 const PAYLOADS = {
   /** Enough to decide whether this is the lab, plus the geometry we sweep. */
   labState: () => `(() => {
@@ -402,31 +436,14 @@ const PAYLOADS = {
    * label's nearest ancestor containing inputs is the card, and the
    * spinbutton inside it is the value.
    */
-  seriesGapControl: () => `(() => {
-    const W = window.innerWidth;
-    const label = [...document.querySelectorAll('*')].find(
-      (e) => !e.children.length && (e.textContent || '').trim() === 'Space between series'
-        && e.getBoundingClientRect().x > W * 0.62,
-    );
-    if (!label) return null;
-    let card = label;
-    for (let i = 0; i < 6 && card; i++) {
-      if (card.querySelectorAll('input').length) break;
-      card = card.parentElement;
-    }
-    if (!card) return null;
-    const spin = [...card.querySelectorAll('input')].find((i) => i.getAttribute('role') === 'spinbutton');
-    const range = [...card.querySelectorAll('input')].find((i) => i.type === 'range');
-    if (!spin) return null;
-    const r = spin.getBoundingClientRect();
-    return {
-      value: spin.value,
-      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
-      visible: r.top > 60 && r.bottom < window.innerHeight - 20,
-      min: range ? range.getAttribute('min') : null,
-      max: range ? range.getAttribute('max') : null,
-    };
-  })()`,
+  seriesGapControl: () => SLIDER_CONTROL("Space between series"),
+
+  /**
+   * Any Format-pane slider, by its label. Read-only: nothing in the
+   * controller writes through this, and it exists so a value Power BI
+   * already knows can be read instead of inferred from geometry.
+   */
+  sliderControlAt: (label) => SLIDER_CONTROL(label),
 
   /** Somewhere empty on the canvas, to deselect. */
   canvasPoint: () => `(() => {
