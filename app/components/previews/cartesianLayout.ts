@@ -2,6 +2,7 @@ import {
   computeChartLayout,
   estimateText,
   legendExtent,
+  visualTitleExtent,
   type LegendLayoutStyle,
   type AxisLayoutStyle,
   type CartesianOrientation,
@@ -276,6 +277,63 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
     y: box.y,
     width: Math.max(0, box.width - chrome.width),
     height: Math.max(0, box.height - chrome.height),
+  };
+}
+
+/**
+ * The visual title's band, in the authored visual's own pixels.
+ *
+ * A thin adapter over `visualTitleExtent`, adding only the theme's
+ * point-to-pixel conversion — the same relationship `legendBandExtent` has
+ * with `legendExtent`. The caller subtracts this from the authored budget
+ * AND applies it to the rendered band, so the two cannot differ.
+ */
+export function visualTitleBandExtent(
+  title: { show: boolean; text: string; fontSize: number; fontFamily: string } | undefined,
+  fallbackText: string,
+  measure: TextMeasure = canvasTextMeasure,
+): { width: number; height: number } {
+  if (!title?.show) return { width: 0, height: 0 };
+  const band = visualTitleExtent(
+    {
+      show: true,
+      text: String(title.text ?? "") || fallbackText,
+      fontSize: themeFontSizeToCssPx(title.fontSize),
+      fontFamily: title.fontFamily,
+    },
+    measure,
+  );
+  return { width: 0, height: band.height };
+}
+
+/** Two renderer-owned chrome bands, summed for the authored budget. */
+export function authoredChromeExtent(
+  bands: ReadonlyArray<{ width: number; height: number }>,
+): { width: number; height: number } {
+  return bands.reduce(
+    (total, band) => ({ width: total.width + band.width, height: total.height + band.height }),
+    { width: 0, height: 0 },
+  );
+}
+
+/**
+ * The rendered visual-title band: exactly the height that was reserved, and
+ * the title styling the theme resolved.
+ */
+export function visualTitleStyle(
+  title: { fontSize: number; fontFamily: string; fontColor?: string; alignment?: string | number; bold?: boolean; italic?: boolean; underline?: boolean; background?: string } | undefined,
+  band: { height: number },
+): Record<string, string | number | undefined> {
+  return {
+    height: band.height,
+    fontSize: title ? themeFontSizeToCssPx(title.fontSize) : undefined,
+    fontFamily: title?.fontFamily,
+    color: title?.fontColor,
+    backgroundColor: title?.background,
+    textAlign: title?.alignment === undefined ? undefined : String(title.alignment),
+    fontWeight: title?.bold ? 700 : 400,
+    fontStyle: title?.italic ? "italic" : "normal",
+    textDecoration: title?.underline ? "underline" : "none",
   };
 }
 

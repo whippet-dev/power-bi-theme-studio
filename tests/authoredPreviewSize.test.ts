@@ -7,7 +7,13 @@ import {
   computePreviewCartesianLayout,
 } from "../app/components/previews/cartesianLayout";
 import type { CartesianLayoutInput } from "../app/components/previews/cartesianLayout";
-import { authoredInnerBox, legendBandExtent } from "../app/components/previews/cartesianLayout";
+import {
+  authoredChromeExtent,
+  authoredInnerBox,
+  legendBandExtent,
+  visualTitleBandExtent,
+  visualTitleStyle,
+} from "../app/components/previews/cartesianLayout";
 import { legendExtent } from "../app/lib/chartLayout";
 import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
 
@@ -181,4 +187,86 @@ test("the renderer's legend band IS the engine's legend arithmetic", () => {
   // And the engine reserves that same band off the correct edge.
   assert.equal(viaEngine.vertical, false, "a Top legend is horizontal");
   assert.equal(viaEngine.afterPlot, false, "and sits before the plot");
+});
+
+// ---------------------------------------------------------------------------
+// The Power BI visual title, inside the authored boundary
+// ---------------------------------------------------------------------------
+
+const titleOf = (over: Record<string, unknown> = {}) => ({
+  show: true,
+  text: "Applications by region",
+  fontSize: 12,
+  fontFamily: "Segoe UI",
+  ...over,
+});
+
+test("a shown visual title takes a band out of the authored budget", () => {
+  // Native Classic 2026 at 450 x 250 spends 35px on its title band for a 16px
+  // title. This is the same money coming out of the same pocket.
+  const band = visualTitleBandExtent(titleOf() as never, "fallback", measure);
+  assert.ok(band.height > 0, "a title costs height");
+  assert.equal(band.width, 0, "and no width");
+
+  const inner = authoredInnerBox(BAR_CHART_BOX, band);
+  assert.equal(inner.height, BAR_CHART_BOX.height - band.height);
+  assert.equal(band.height + inner.height, BAR_CHART_BOX.height, "the visual is still 250 tall");
+});
+
+test("a hidden title costs exactly zero", () => {
+  assert.deepEqual(
+    visualTitleBandExtent(titleOf({ show: false }) as never, "fallback", measure),
+    { width: 0, height: 0 },
+  );
+  const inner = authoredInnerBox(BAR_CHART_BOX, { width: 0, height: 0 });
+  assert.equal(inner.height, BAR_CHART_BOX.height, "and the chart gets the whole budget");
+});
+
+test("an empty title falls back to the visual's default name, and still costs a band", () => {
+  const explicit = visualTitleBandExtent(titleOf({ text: "" }) as never, "Applications by region", measure);
+  const named = visualTitleBandExtent(titleOf() as never, "ignored", measure);
+  assert.equal(explicit.height, named.height, "same text, same band");
+});
+
+test("a bigger title font takes a bigger band, and the chart pays for it", () => {
+  const small = visualTitleBandExtent(titleOf({ fontSize: 9 }) as never, "", measure);
+  const large = visualTitleBandExtent(titleOf({ fontSize: 20 }) as never, "", measure);
+  assert.ok(large.height > small.height, "the band follows the font");
+  assert.ok(
+    authoredInnerBox(BAR_CHART_BOX, large).height < authoredInnerBox(BAR_CHART_BOX, small).height,
+    "and the inner budget shrinks by the difference",
+  );
+  // Text length must not matter to the height, only the font does.
+  const longer = visualTitleBandExtent(
+    titleOf({ fontSize: 20, text: "A considerably longer visual title than the other one" }) as never,
+    "",
+    measure,
+  );
+  assert.equal(longer.height, large.height);
+});
+
+test("title and legend bands compose into one chrome extent", () => {
+  const title = visualTitleBandExtent(titleOf() as never, "", measure);
+  const legend = legendBandExtent(
+    { show: true, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" } as never,
+    ["Online", "Phone", "Post"],
+    measure,
+  );
+  const both = authoredChromeExtent([title, legend]);
+  assert.equal(both.height, title.height + legend.height);
+  assert.equal(both.width, 0);
+  assert.equal(
+    authoredInnerBox(BAR_CHART_BOX, both).height,
+    BAR_CHART_BOX.height - title.height - legend.height,
+    "the chart is laid out in what is left after BOTH bands",
+  );
+});
+
+test("the rendered title band IS the reserved band", () => {
+  // Not two numbers that agree — the style helper is handed the band that was
+  // subtracted, so a rendered title cannot be a different height from the
+  // space made for it.
+  const band = visualTitleBandExtent(titleOf() as never, "", measure);
+  const style = visualTitleStyle(titleOf() as never, band);
+  assert.equal(style.height, band.height);
 });

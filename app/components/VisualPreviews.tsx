@@ -95,6 +95,11 @@ type PreviewShellProps = {
   selected: boolean;
   theme: ResolvedTheme;
   chrome: ResolvedChromeStyle;
+  /**
+   * The visual draws its own Power BI title, inside its authored bounds.
+   * The tile must not draw a second one above it.
+   */
+  titleInsideVisual?: boolean;
   onSelect: (visual: VisualKind) => void;
   children: ReactNode;
 };
@@ -378,6 +383,7 @@ function PreviewShell({
   selected,
   theme,
   chrome,
+  titleInsideVisual = false,
   onSelect,
   children,
 }: PreviewShellProps) {
@@ -628,7 +634,7 @@ function PreviewShell({
             {headerTooltipNode}
           </span>
         )}
-        {chrome.title.show && (
+        {chrome.title.show && !titleInsideVisual && (
           <span
             className="preview-title"
             {...headingAria(chrome.title.heading)}
@@ -842,10 +848,26 @@ export function VisualGallery({
     </span>
   );
 
-  const barContent = <BarChartPreview barChartStyle={barChartStyle} palette={palette} />;
+  // The Power BI visual title is part of the authored visual for these two,
+  // so it is handed to the preview rather than drawn by the tile.
+  const barContent = (
+    <BarChartPreview
+      barChartStyle={barChartStyle}
+      palette={palette}
+      titleChrome={chromeStyles.bar.title}
+      titleFallback="Applications by region"
+    />
+  );
 
 
-  const stackedBarContent = <StackedBarChartPreview stackedBarChartStyle={stackedBarChartStyle} palette={palette} />;
+  const stackedBarContent = (
+    <StackedBarChartPreview
+      stackedBarChartStyle={stackedBarChartStyle}
+      palette={palette}
+      titleChrome={chromeStyles.stackedBar.title}
+      titleFallback="Applications by region"
+    />
+  );
 
 
   const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} />;
@@ -1817,11 +1839,13 @@ export function VisualGallery({
     defaultTitle: string;
     chrome: ResolvedChromeStyle;
     content: ReactNode;
+    /** The visual draws its own Power BI title inside its authored bounds. */
+    titleInsideVisual?: boolean;
   }> = [
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
-    { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent },
+    { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent, titleInsideVisual: true },
     { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent },
-    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent },
+    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent, titleInsideVisual: true },
     { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent },
     {
       id: "line",
@@ -1879,6 +1903,7 @@ export function VisualGallery({
           selected
           theme={theme}
           chrome={hero.chrome}
+          titleInsideVisual={hero.titleInsideVisual}
           onSelect={onSelect}
         >
           {hero.content}
@@ -1896,6 +1921,7 @@ export function VisualGallery({
               selected={false}
               theme={theme}
               chrome={d.chrome}
+              titleInsideVisual={d.titleInsideVisual}
               onSelect={onSelect}
             >
               {d.content}

@@ -2843,3 +2843,15 @@ button { color: inherit; }
   display: block;
   overflow: hidden;
 }
+
+/* The Power BI visual title, drawn INSIDE the authored visual because that
+   is what it is part of. Its height is the band that was subtracted from the
+   authored budget, so the two cannot disagree. Theme Studio's own tile
+   heading is a different element outside this boundary. */
+.chart-preview__visual-title {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
