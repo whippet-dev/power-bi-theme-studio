@@ -185,7 +185,8 @@ export const FIXTURE_CATEGORY_SETS = Object.freeze({
 });
 
 /**
- * Classifies the two native cartesian renderers the synthetic lab supports.
+ * Classifies the native Bar and Column cartesian renderers the synthetic lab
+ * supports.
  *
  * This is intentionally positive evidence, not a fallback: Column is only
  * recognised when rendered `rect.column` marks exist and rendered `rect.bar`
@@ -198,7 +199,12 @@ export function classifyCartesianRenderer({
   columnMarkCount,
   seriesCount,
   categoryPositionCount,
+  lineEvidencePresent = false,
 }) {
+  // A mixed DOM is not a Bar or Column fallback. Line has its own positive
+  // classifier below, and seeing any of its evidence makes the state
+  // ambiguous rather than an excuse to ignore it.
+  if (lineEvidencePresent) return null;
   const bar = Number.isInteger(barMarkCount) && barMarkCount > 0;
   const column = Number.isInteger(columnMarkCount) && columnMarkCount > 0;
   if (bar === column) return null;
@@ -235,6 +241,45 @@ export function classifyCartesianRenderer({
         marksRendered,
         categoriesRendered,
       };
+}
+
+/**
+ * Classifies the observed native Line renderer, and only that renderer.
+ *
+ * Desktop emits a Line-specific visual/SVG/group hierarchy and three painted
+ * `path.line` series. Generic SVG paths are deliberately not accepted. The
+ * interactivity paths are corroborating evidence only, because a UI state may
+ * legitimately omit them.
+ */
+export function classifyLineRenderer({
+  barMarkCount,
+  columnMarkCount,
+  lineVisualCount,
+  lineSvgCount,
+  lineAxisGroupCount,
+  linePathCount,
+  paintedLinePathCount,
+  lineVertexCounts,
+}) {
+  if (barMarkCount !== 0 || columnMarkCount !== 0) return null;
+  if (lineVisualCount !== 1 || lineSvgCount !== 1 || lineAxisGroupCount !== 1) return null;
+  if (linePathCount !== 3 || paintedLinePathCount !== 3
+      || !Array.isArray(lineVertexCounts) || lineVertexCounts.length !== 3) return null;
+  if (!lineVertexCounts.every((count) => count === 4)) return null;
+
+  return {
+    renderer: "line",
+    orientation: "vertical",
+    markType: "line",
+    grouping: null,
+    categoryAxisSide: "bottom",
+    valueAxisSide: "left",
+    marksRendered: 12,
+    categoriesRendered: 4,
+    seriesCount: 3,
+    linePathCount,
+    lineVerticesPerPath: 4,
+  };
 }
 
 /**
@@ -303,12 +348,18 @@ export function identifyLabEnvironment(state, expected = {}) {
   if (state.visualType !== want.visualType) {
     reasons.push(`visual type ${JSON.stringify(state.visualType)} is not ${want.visualType}`);
   }
+  const expectsLine = expected.renderer === "line";
+  if (expected.renderer !== undefined && !expectsLine) {
+    reasons.push(`renderer expectation ${JSON.stringify(expected.renderer)} is unsupported`);
+  }
   const orientationModels = {
     horizontal: { markType: "bar", categoryAxisSide: "left", valueAxisSide: "bottom" },
     vertical: { markType: "column", categoryAxisSide: "bottom", valueAxisSide: "left" },
   };
-  const model = orientationModels[state.orientation];
-  if (!model) {
+  const model = expectsLine
+    ? { markType: "line", categoryAxisSide: "bottom", valueAxisSide: "left" }
+    : orientationModels[state.orientation];
+  if (!model || (expectsLine && state.orientation !== "vertical")) {
     reasons.push(`cartesian orientation ${JSON.stringify(state.orientation)} is not positively identified`);
   } else {
     if (state.markType !== model.markType) {
@@ -321,7 +372,20 @@ export function identifyLabEnvironment(state, expected = {}) {
       );
     }
   }
-  if (state.grouping !== want.grouping) {
+  if (expectsLine) {
+    if (state.renderer !== "line") reasons.push(`renderer ${JSON.stringify(state.renderer)} is not line`);
+    if (state.grouping !== null) reasons.push(`Line grouping ${JSON.stringify(state.grouping)} is not null`);
+    if (state.barMarkCount !== 0 || state.columnMarkCount !== 0) {
+      reasons.push(`Line renderer has Bar/Column marks (${state.barMarkCount}/${state.columnMarkCount})`);
+    }
+    if (state.lineVisualCount !== 1 || state.lineSvgCount !== 1 || state.lineAxisGroupCount !== 1) {
+      reasons.push("Line hierarchy is not exactly visual-lineChart / lineChartSVG / axisGraphicsContext.lineChart");
+    }
+    if (state.linePathCount !== 3 || state.paintedLinePathCount !== 3 || !Array.isArray(state.lineVertexCounts)
+        || state.lineVertexCounts.length !== 3 || !state.lineVertexCounts.every((count) => count === 4)) {
+      reasons.push("Line paths are not exactly three painted four-vertex series");
+    }
+  } else if (state.grouping !== want.grouping) {
     reasons.push(`cartesian grouping ${JSON.stringify(state.grouping)} is not ${want.grouping}`);
   }
   if (!Array.isArray(state.categories)) reasons.push("no categories read from the visual");

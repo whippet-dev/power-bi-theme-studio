@@ -10,6 +10,7 @@ import {
   cartesianAxisBandBounds,
   checkVariantTheme,
   classifyCartesianRenderer,
+  classifyLineRenderer,
   expandMatrix,
   selectLabVisual,
   detectBreakpoints,
@@ -80,6 +81,7 @@ test("visual sizes outside a safe range are rejected", () => {
 
 const LAB = {
   visualType: "cartesian",
+  renderer: "barOrColumn",
   orientation: "horizontal",
   markType: "bar",
   grouping: "clustered",
@@ -109,6 +111,24 @@ const STACKED_COLUMN_LAB = {
   grouping: "stacked",
 };
 
+const LINE_LAB = {
+  ...COLUMN_LAB,
+  renderer: "line",
+  markType: "line",
+  grouping: null,
+  marksRendered: 12,
+  categoriesRendered: 4,
+  barMarkCount: 0,
+  columnMarkCount: 0,
+  lineVisualCount: 1,
+  lineSvgCount: 1,
+  lineAxisGroupCount: 1,
+  linePathCount: 3,
+  paintedLinePathCount: 3,
+  lineVertexCounts: [4, 4, 4],
+  interactivityLineCount: 3,
+};
+
 type FakeLabSession = {
   open: () => Promise<void>;
   close: () => void;
@@ -116,15 +136,17 @@ type FakeLabSession = {
 };
 
 function controllerForIdentity({
+  expectedRenderer,
   expectedGrouping,
   labVisuals,
   labState,
 }: {
+  expectedRenderer?: string;
   expectedGrouping?: string;
   labVisuals: unknown;
   labState: unknown;
 }) {
-  const controller = new LabController({ expectedGrouping, verbose: false });
+  const controller = new LabController({ expectedRenderer, expectedGrouping, verbose: false });
   const session: FakeLabSession = {
     async open() {},
     close() {},
@@ -198,6 +220,49 @@ test("a theme mutation invalidates the preflight before a required size action",
   assert.throws(() => controller.requireVerifiedThemeForSize(), /missing or was invalidated/);
 });
 
+test("a successfully verified theme mutation refreshes the Base-theme proof", async () => {
+  const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
+  controller.verifiedBaseTheme = "Classic 2026";
+  controller.requireLabVisual = async () => {};
+  controller.openThemeControls = async () => ({ value: "Classic 2026", expanded: "false", x: 1, y: 1 });
+  controller.settle = async () => ({ settled: true, observations: 3 });
+  controller.selectVisual = async () => true;
+  Object.defineProperty(controller, "session", { value: {
+    async click() {},
+    async read(name: string) {
+      if (name === "baseThemeOptions") return [{ label: "Classic 2018", x: 2, y: 2 }];
+      if (name === "baseThemeValue") return { value: "Classic 2018" };
+      throw new Error(`unexpected lab read: ${name}`);
+    },
+  }, writable: true });
+
+  const result = await controller.setBaseTheme("Classic 2018");
+  assert.equal(result.theme, "Classic 2018");
+  assert.equal(controller.verifiedBaseTheme, "Classic 2018");
+  assert.doesNotThrow(() => controller.requireVerifiedThemeForSize());
+});
+
+test("an unverified theme mutation leaves the Base-theme proof invalid", async () => {
+  const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
+  controller.verifiedBaseTheme = "Classic 2026";
+  controller.requireLabVisual = async () => {};
+  controller.openThemeControls = async () => ({ value: "Classic 2026", expanded: "false", x: 1, y: 1 });
+  controller.settle = async () => ({ settled: true, observations: 3 });
+  controller.selectVisual = async () => true;
+  Object.defineProperty(controller, "session", { value: {
+    async click() {},
+    async read(name: string) {
+      if (name === "baseThemeOptions") return [{ label: "Classic 2018", x: 2, y: 2 }];
+      if (name === "baseThemeValue") return { value: "Classic 2026" };
+      throw new Error(`unexpected lab read: ${name}`);
+    },
+  }, writable: true });
+
+  await assert.rejects(() => controller.setBaseTheme("Classic 2018"), /did not change/);
+  assert.equal(controller.verifiedBaseTheme, null);
+  assert.throws(() => controller.requireVerifiedThemeForSize(), /missing or was invalidated/);
+});
+
 test("the cartesian renderer classifier positively distinguishes clustered Bar and Column", () => {
   assert.deepEqual(
     classifyCartesianRenderer({
@@ -247,6 +312,51 @@ test("cartesian renderer classification fails closed on absent, mixed or incoher
   }
 });
 
+test("the native Line classifier requires the observed hierarchy and three four-vertex paths", () => {
+  assert.deepEqual(
+    classifyLineRenderer({
+      barMarkCount: 0,
+      columnMarkCount: 0,
+      lineVisualCount: 1,
+      lineSvgCount: 1,
+      lineAxisGroupCount: 1,
+      linePathCount: 3,
+      paintedLinePathCount: 3,
+      lineVertexCounts: [4, 4, 4],
+    }),
+    {
+      renderer: "line",
+      orientation: "vertical",
+      markType: "line",
+      grouping: null,
+      categoryAxisSide: "bottom",
+      valueAxisSide: "left",
+      marksRendered: 12,
+      categoriesRendered: 4,
+      seriesCount: 3,
+      linePathCount: 3,
+      lineVerticesPerPath: 4,
+    },
+  );
+});
+
+test("the Line classifier refuses absent, mixed, wrong-series, or wrong-vertex evidence", () => {
+  const observed = {
+    barMarkCount: 0, columnMarkCount: 0, lineVisualCount: 1, lineSvgCount: 1,
+    lineAxisGroupCount: 1, linePathCount: 3, paintedLinePathCount: 3, lineVertexCounts: [4, 4, 4],
+  };
+  for (const invalid of [
+    { ...observed, lineVisualCount: 0 },
+    { ...observed, barMarkCount: 1 },
+    { ...observed, columnMarkCount: 1 },
+    { ...observed, paintedLinePathCount: 2 },
+    { ...observed, linePathCount: 2, lineVertexCounts: [4, 4] },
+    { ...observed, lineVertexCounts: [4, 3, 4] },
+  ]) {
+    assert.equal(classifyLineRenderer(invalid), null);
+  }
+});
+
 test("physical axis bands preserve the established Bar mapping and reverse for Column", () => {
   const chart = { x: 8, y: 60, width: 580, height: 526, right: 588, bottom: 586 };
   const plot = { x: 92, y: 68, width: 480, height: 444, right: 572, bottom: 512 };
@@ -261,6 +371,10 @@ test("physical axis bands preserve the established Bar mapping and reverse for C
     category: bottom,
     value: left,
   });
+  assert.deepEqual(cartesianAxisBandBounds(LINE_LAB, chart, plot), {
+    category: bottom,
+    value: left,
+  });
 });
 
 test("the synthetic lab environment is recognised", () => {
@@ -269,6 +383,11 @@ test("the synthetic lab environment is recognised", () => {
 
 test("the synthetic Clustered Column environment is recognised with physical axes preserved", () => {
   assert.deepEqual(identifyLabEnvironment(COLUMN_LAB), { ok: true, reasons: [] });
+});
+
+test("the synthetic Line environment is recognised only with an explicit Line expectation", () => {
+  assert.equal(identifyLabEnvironment(LINE_LAB).ok, false);
+  assert.deepEqual(identifyLabEnvironment(LINE_LAB, { renderer: "line" }), { ok: true, reasons: [] });
 });
 
 test("LabController defaults to the established clustered identity", async () => {
@@ -297,6 +416,22 @@ test("LabController accepts explicit clustered or stacked fixture expectations",
   await assert.doesNotReject(stacked.open());
 });
 
+test("LabController accepts an explicit Line expectation and carries it into pre-mutation revalidation", async () => {
+  const { controller, session } = controllerForIdentity({
+    expectedRenderer: "line",
+    labVisuals: [LINE_LAB],
+    labState: LINE_LAB,
+  });
+  await assert.doesNotReject(controller.open());
+  await assert.doesNotReject(controller.requireLabVisual());
+
+  session.read = async (name) => {
+    if (name === "labVisuals") return [{ ...LINE_LAB, lineVertexCounts: [4, 3, 4] }];
+    throw new Error(`unexpected lab read: ${name}`);
+  };
+  await assert.rejects(controller.requireLabVisual(), /painted four-vertex series/);
+});
+
 test("LabController rejects unsupported or mismatched fixture groupings", async () => {
   for (const expectedGrouping of ["auto", "either", "bar", "", null]) {
     assert.throws(
@@ -317,6 +452,21 @@ test("LabController rejects unsupported or mismatched fixture groupings", async 
   });
   await assert.rejects(stackedRequestForClustered.open(), /grouping "clustered" is not stacked/);
   await assert.rejects(clusteredRequestForStacked.open(), /grouping "stacked" is not clustered/);
+});
+
+test("LabController rejects unsupported renderer expectations and Bar/Column fixtures requested as Line", async () => {
+  for (const expectedRenderer of ["auto", "either", "column", "", null]) {
+    assert.throws(
+      () => new LabController({ expectedRenderer: expectedRenderer as never }),
+      /expectedRenderer must be one of/,
+    );
+  }
+  const { controller } = controllerForIdentity({
+    expectedRenderer: "line",
+    labVisuals: [COLUMN_LAB],
+    labState: COLUMN_LAB,
+  });
+  await assert.rejects(controller.open(), /renderer "barOrColumn" is not line/);
 });
 
 test("LabController carries expected grouping into pre-mutation revalidation", async () => {

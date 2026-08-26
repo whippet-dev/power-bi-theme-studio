@@ -38,6 +38,7 @@ import {
   SUPPORTED_BASE_THEMES,
   cartesianAxisBandBounds,
   classifyCartesianRenderer,
+  classifyLineRenderer,
   identifyLabEnvironment,
   requireImplemented,
   selectLabVisual,
@@ -50,6 +51,7 @@ import {
 
 const HOST = "127.0.0.1";
 const SUPPORTED_CARTESIAN_GROUPINGS = Object.freeze(["clustered", "stacked"]);
+const SUPPORTED_CARTESIAN_RENDERERS = Object.freeze(["barOrColumn", "line"]);
 
 // ---------------------------------------------------------------------------
 // CDP plumbing
@@ -195,18 +197,57 @@ const VISUAL =
 const CARTESIAN_RENDER_CONTEXT = `
     const barMarks = [...el.querySelectorAll('svg rect.bar')];
     const columnMarks = [...el.querySelectorAll('svg rect.column')];
-    const candidateMarks = barMarks.length ? barMarks : columnMarks;
-    const candidateFills = [...new Set(candidateMarks.map((mark) => getComputedStyle(mark).fill))];
+    const lineVisuals = [...el.querySelectorAll('.visual-lineChart')];
+    const lineSvgs = [...el.querySelectorAll('svg.lineChartSVG')];
+    // Desktop puts lineChartSVG *inside* its axisGraphicsContext rather than
+    // beneath it. Count only the parent groups that own a Line drawing surface.
+    const lineAxisGroups = lineSvgs
+      .map((svg) => svg.parentElement)
+      .filter((parent) => parent?.matches('g.axisGraphicsContext.lineChart'));
+    const linePaths = [...el.querySelectorAll('svg.lineChartSVG path.line')];
+    const paintedLinePaths = linePaths.filter((path) => {
+      const style = getComputedStyle(path);
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && style.stroke !== 'none' && Number(style.opacity) > 0;
+    });
+    const lineVertexCounts = linePaths.map((path) => {
+      const commands = (path.getAttribute('d') || '').match(/[A-Za-z]/g) || [];
+      return commands.length === 4 && commands[0].toUpperCase() === 'M'
+        && commands.slice(1).every((command) => command.toUpperCase() === 'L')
+        ? 4 : null;
+    });
+    const interactivityLineCount = el.querySelectorAll('svg.lineChartSVG path.interactivity-line.sub-selectable').length;
+    const barOrColumnMarks = barMarks.length ? barMarks : columnMarks;
+    const candidateFills = [...new Set(barOrColumnMarks.map((mark) => getComputedStyle(mark).fill))];
     const candidateCoordinate = columnMarks.length ? 'x' : 'y';
-    const categoryPositionCount = new Set(candidateMarks.map((mark) => Number(mark.getAttribute(candidateCoordinate)))).size;
-    const renderer = (${classifyCartesianRenderer.toString()})({
+    const categoryPositionCount = new Set(barOrColumnMarks.map((mark) => Number(mark.getAttribute(candidateCoordinate)))).size;
+    const barOrColumnRenderer = (${classifyCartesianRenderer.toString()})({
       barMarkCount: barMarks.length,
       columnMarkCount: columnMarks.length,
       seriesCount: candidateFills.length,
       categoryPositionCount,
+      lineEvidencePresent: lineVisuals.length > 0 || lineSvgs.length > 0 || linePaths.length > 0,
     });
-    const marks = renderer ? (renderer.markType === 'bar' ? barMarks : columnMarks) : [];
-    const fills = renderer ? candidateFills : [];
+    const lineRenderer = (${classifyLineRenderer.toString()})({
+      barMarkCount: barMarks.length,
+      columnMarkCount: columnMarks.length,
+      lineVisualCount: lineVisuals.length,
+      lineSvgCount: lineSvgs.length,
+      lineAxisGroupCount: lineAxisGroups.length,
+      linePathCount: linePaths.length,
+      paintedLinePathCount: paintedLinePaths.length,
+      lineVertexCounts,
+    });
+    const renderer = barOrColumnRenderer || lineRenderer;
+    const marks = renderer
+      ? renderer.markType === 'bar' ? barMarks : renderer.markType === 'column' ? columnMarks : linePaths
+      : [];
+    const fills = renderer
+      ? renderer.markType === 'line'
+        ? [...new Set(linePaths.map((path) => getComputedStyle(path).stroke))]
+        : candidateFills
+      : [];
+    const rendererName = renderer ? (renderer.renderer || 'barOrColumn') : null;
   `;
 
 const CARTESIAN_AXIS_BANDS = `(${cartesianAxisBandBounds.toString()})(renderer, chartBounds, plotBounds)`;
@@ -266,14 +307,21 @@ const PAYLOADS = {
       return n.children.length === 0 ? (n.textContent || '').trim() : '';
     };
 
-    const plot = el.querySelector('svg.mainGraphicsContext');
+    const plot = renderer && renderer.markType === 'line'
+      ? el.querySelector('svg.lineChartSVG')
+      : el.querySelector('svg.mainGraphicsContext');
     const chart = el.querySelector('svg.cartesianChart');
 
     // Which physical edge owns an axis comes from the positively identified
     // renderer. Bar categories are left and values bottom; Column reverses
     // those roles without changing their semantic names downstream.
-    const markLeft = marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
-    const markBottom = marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
+    const plotRect = plot ? plot.getBoundingClientRect() : null;
+    const markLeft = renderer && renderer.markType === 'line' && plotRect
+      ? plotRect.left
+      : marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
+    const markBottom = renderer && renderer.markType === 'line' && plotRect
+      ? plotRect.bottom
+      : marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
     const texts = [...el.querySelectorAll('svg text')].map((t) => ({
       text: own(t), r: t.getBoundingClientRect(), face: getComputedStyle(t).fontFamily,
       px: parseFloat(getComputedStyle(t).fontSize),
@@ -297,14 +345,16 @@ const PAYLOADS = {
     const categoryCoordinate = renderer && renderer.orientation === 'vertical' ? 'x' : 'y';
     const categoryExtent = renderer && renderer.orientation === 'vertical' ? 'width' : 'height';
     const byFill = new Map();
-    for (const mark of marks) {
-      const f = getComputedStyle(mark).fill;
-      const list = byFill.get(f) ?? [];
-      list.push(Number(mark.getAttribute(categoryCoordinate)));
-      byFill.set(f, list);
+    if (renderer && renderer.markType !== 'line') {
+      for (const mark of marks) {
+        const f = getComputedStyle(mark).fill;
+        const list = byFill.get(f) ?? [];
+        list.push(Number(mark.getAttribute(categoryCoordinate)));
+        byFill.set(f, list);
+      }
     }
     const series = [...byFill.values()].map((positions) => positions.sort((a, b) => a - b));
-    const band = marks.length ? Number(marks[0].getAttribute(categoryExtent)) : null;
+    const band = renderer && renderer.markType !== 'line' && marks.length ? Number(marks[0].getAttribute(categoryExtent)) : null;
     const seriesStep = series.length >= 2 ? series[1][0] - series[0][0] : null;
     const categoryStep = series[0] && series[0].length >= 2 ? series[0][1] - series[0][0] : null;
 
@@ -379,6 +429,7 @@ const PAYLOADS = {
 
     return {
       visualType: 'cartesian',
+      renderer: rendererName,
       orientation: renderer ? renderer.orientation : null,
       markType: renderer ? renderer.markType : null,
       grouping: renderer ? renderer.grouping : null,
@@ -420,12 +471,23 @@ const PAYLOADS = {
           }
         : null,
       categories: catLabels.map((t) => t.text),
-      seriesCount: fills.length,
+      seriesCount: renderer && renderer.markType === 'line' ? renderer.seriesCount : fills.length,
       seriesNames: legendItems.map(own),
-      marksRendered: marks.length,
+      // A Line's rendered data marks are its vertices, not its three SVG
+      // carrier paths. Keep the established Bar/Column count unchanged.
+      marksRendered: renderer && renderer.markType === 'line' ? renderer.marksRendered : marks.length,
       // Retained for existing reports/tests; means cartesian marks, not only Bar.
-      barsRendered: marks.length,
+      barsRendered: renderer && renderer.markType === 'line' ? renderer.marksRendered : marks.length,
       categoriesRendered: renderer ? renderer.categoriesRendered : 0,
+      barMarkCount: barMarks.length,
+      columnMarkCount: columnMarks.length,
+      lineVisualCount: lineVisuals.length,
+      lineSvgCount: lineSvgs.length,
+      lineAxisGroupCount: lineAxisGroups.length,
+      linePathCount: linePaths.length,
+      paintedLinePathCount: paintedLinePaths.length,
+      lineVertexCounts,
+      interactivityLineCount,
       plotWidth: plot ? Number(plot.getAttribute('width')) : null,
       plotHeight: plot ? Number(plot.getAttribute('height')) : null,
       scrollableWidth: scrollable ? Number(scrollable.getAttribute('width')) : null,
@@ -463,7 +525,9 @@ const PAYLOADS = {
     if (!el) return {};
     const r = el.getBoundingClientRect();
     ${CARTESIAN_RENDER_CONTEXT}
-    const plot = el.querySelector('svg.mainGraphicsContext');
+    const plot = renderer && renderer.markType === 'line'
+      ? el.querySelector('svg.lineChartSVG')
+      : el.querySelector('svg.mainGraphicsContext');
     const mark = marks[0];
     const text = el.querySelector('svg text');
     return {
@@ -475,8 +539,11 @@ const PAYLOADS = {
       grouping: renderer ? renderer.grouping : null,
       bars: marks.length,
       marks: marks.length,
+      series: renderer && renderer.markType === 'line' ? renderer.seriesCount : fills.length,
+      linePaths: renderer && renderer.markType === 'line' ? linePaths.length : 0,
+      lineVertices: renderer && renderer.markType === 'line' ? lineVertexCounts.join(',') : '',
       texts: el.querySelectorAll('svg text').length,
-      fill: mark ? getComputedStyle(mark).fill : '',
+      fill: mark ? (renderer && renderer.markType === 'line' ? getComputedStyle(mark).stroke : getComputedStyle(mark).fill) : '',
       fontPx: text ? getComputedStyle(text).fontSize : '',
     };
   })()`,
@@ -505,8 +572,16 @@ const PAYLOADS = {
         const d = [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
         return d || (n.children.length === 0 ? (n.textContent || '').trim() : '');
       };
-      const markLeft = marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
-      const markBottom = marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
+      const plot = renderer && renderer.markType === 'line'
+        ? el.querySelector('svg.lineChartSVG')
+        : el.querySelector('svg.mainGraphicsContext');
+      const plotRect = plot ? plot.getBoundingClientRect() : null;
+      const markLeft = renderer && renderer.markType === 'line' && plotRect
+        ? plotRect.left
+        : marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
+      const markBottom = renderer && renderer.markType === 'line' && plotRect
+        ? plotRect.bottom
+        : marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
       const labelTexts = [...el.querySelectorAll('svg text')]
         .filter((text) => !/wf_standard-font/.test(getComputedStyle(text).fontFamily));
       const leftLabels = labelTexts
@@ -519,6 +594,7 @@ const PAYLOADS = {
         .filter((node) => !node.children.length && own(node));
       return {
         visualType: 'cartesian',
+        renderer: rendererName,
         orientation: renderer ? renderer.orientation : null,
         markType: renderer ? renderer.markType : null,
         grouping: renderer ? renderer.grouping : null,
@@ -526,11 +602,20 @@ const PAYLOADS = {
         valueAxisSide: renderer ? renderer.valueAxisSide : null,
         sentinel: hint.slice(0, 120),
         categories: cats,
-        seriesCount: fills.length,
+        seriesCount: renderer && renderer.markType === 'line' ? renderer.seriesCount : fills.length,
         seriesNames: legendItems.map(own),
         legendVisible: legendItems.length > 0,
-        marksRendered: marks.length,
+        marksRendered: renderer && renderer.markType === 'line' ? renderer.marksRendered : marks.length,
         categoriesRendered: renderer ? renderer.categoriesRendered : 0,
+        barMarkCount: barMarks.length,
+        columnMarkCount: columnMarks.length,
+        lineVisualCount: lineVisuals.length,
+        lineSvgCount: lineSvgs.length,
+        lineAxisGroupCount: lineAxisGroups.length,
+        linePathCount: linePaths.length,
+        paintedLinePathCount: paintedLinePaths.length,
+        lineVertexCounts,
+        interactivityLineCount,
       };
     });
   })()`.replace('CARTESIAN_PLACEHOLDER', CARTESIAN_VISUALS),
@@ -1385,7 +1470,18 @@ const PAYLOADS = {
 // ---------------------------------------------------------------------------
 
 export class LabController {
-  constructor({ port = 9222, verbose = true, expectedGrouping = "clustered", requireVerifiedBaseTheme = false } = {}) {
+  constructor({
+    port = 9222,
+    verbose = true,
+    expectedRenderer = "barOrColumn",
+    expectedGrouping = "clustered",
+    requireVerifiedBaseTheme = false,
+  } = {}) {
+    if (!SUPPORTED_CARTESIAN_RENDERERS.includes(expectedRenderer)) {
+      throw new TypeError(
+        `expectedRenderer must be one of ${SUPPORTED_CARTESIAN_RENDERERS.join(", ")}, not ${JSON.stringify(expectedRenderer)}`,
+      );
+    }
     if (!SUPPORTED_CARTESIAN_GROUPINGS.includes(expectedGrouping)) {
       throw new TypeError(
         `expectedGrouping must be one of ${SUPPORTED_CARTESIAN_GROUPINGS.join(", ")}, not ${JSON.stringify(expectedGrouping)}`,
@@ -1393,10 +1489,12 @@ export class LabController {
     }
     this.session = new LabSession(port);
     this.verbose = verbose;
-    // The grouping is a caller-declared part of fixture identity. There is
-    // deliberately no auto/either mode: accepting either would let a sweep
-    // continue after the visual type changed beneath it.
-    this.expectedLab = Object.freeze({ grouping: expectedGrouping });
+    // Grouping is only meaningful for Bar/Column. Line is a separate,
+    // caller-declared renderer expectation; there is deliberately no
+    // auto/either mode that could let a visual type change beneath a sweep.
+    this.expectedLab = Object.freeze(
+      expectedRenderer === "line" ? { renderer: "line" } : { grouping: expectedGrouping },
+    );
     this.requireVerifiedBaseTheme = requireVerifiedBaseTheme;
     this.verifiedBaseTheme = null;
     this.initialState = null;
@@ -1617,6 +1715,11 @@ export class LabController {
     if (verified !== theme) {
       throw new Error(`base theme did not change: asked for ${theme}, control reports ${verified}`);
     }
+    // This fixed semantic read-back is a new proof. Keep the preflight
+    // invalidation above: only a successful, verified mutation may replace
+    // it, so a later size action never inherits a requested-but-unproven
+    // theme label.
+    this.verifiedBaseTheme = verified;
     this.mutated.baseTheme = theme;
     this.log(`base theme now ${verified}`);
     return { theme: verified, changed: true, settled: outcome.settled };
