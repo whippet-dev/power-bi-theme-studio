@@ -24,6 +24,7 @@ import {
   validateAction,
   verifyRestoration,
 } from "../tools/pbi-render-probe/labActions.mjs";
+import { LabController } from "../tools/pbi-render-probe/lab-controller.mjs";
 
 /**
  * The lab controller drives a live Power BI holding someone's report, so the
@@ -103,6 +104,45 @@ const COLUMN_LAB = {
   valueAxisSide: "left",
 };
 
+const STACKED_COLUMN_LAB = {
+  ...COLUMN_LAB,
+  grouping: "stacked",
+};
+
+type FakeLabSession = {
+  open: () => Promise<void>;
+  close: () => void;
+  read: (name: string) => Promise<unknown>;
+};
+
+function controllerForIdentity({
+  expectedGrouping,
+  labVisuals,
+  labState,
+}: {
+  expectedGrouping?: string;
+  labVisuals: unknown;
+  labState: unknown;
+}) {
+  const controller = new LabController({ expectedGrouping, verbose: false });
+  const session: FakeLabSession = {
+    async open() {},
+    close() {},
+    async read(name) {
+      if (name === "labVisuals") return labVisuals;
+      if (name === "labState") return labState;
+      throw new Error(`unexpected lab read: ${name}`);
+    },
+  };
+  // The concrete CDP session is intentionally private implementation detail.
+  // Replace it only in this pure controller-boundary test.
+  Object.defineProperty(controller, "session", { value: session, writable: true });
+  // Base-theme reading navigates the live UI. Its value is immaterial to the
+  // grouping boundary, so keep this controller test pure and fixed-payload.
+  controller.readBaseTheme = async () => "Classic 2026";
+  return { controller, session };
+}
+
 test("the cartesian renderer classifier positively distinguishes clustered Bar and Column", () => {
   assert.deepEqual(
     classifyCartesianRenderer({
@@ -174,6 +214,72 @@ test("the synthetic lab environment is recognised", () => {
 
 test("the synthetic Clustered Column environment is recognised with physical axes preserved", () => {
   assert.deepEqual(identifyLabEnvironment(COLUMN_LAB), { ok: true, reasons: [] });
+});
+
+test("LabController defaults to the established clustered identity", async () => {
+  const { controller } = controllerForIdentity({
+    labVisuals: [LAB],
+    labState: LAB,
+  });
+  const state = await controller.open();
+  assert.equal(state.grouping, "clustered");
+  await assert.doesNotReject(controller.requireLabVisual());
+});
+
+test("LabController accepts explicit clustered or stacked fixture expectations", async () => {
+  const { controller: clustered } = controllerForIdentity({
+    expectedGrouping: "clustered",
+    labVisuals: [COLUMN_LAB],
+    labState: COLUMN_LAB,
+  });
+  const { controller: stacked } = controllerForIdentity({
+    expectedGrouping: "stacked",
+    labVisuals: [STACKED_COLUMN_LAB],
+    labState: STACKED_COLUMN_LAB,
+  });
+
+  await assert.doesNotReject(clustered.open());
+  await assert.doesNotReject(stacked.open());
+});
+
+test("LabController rejects unsupported or mismatched fixture groupings", async () => {
+  for (const expectedGrouping of ["auto", "either", "bar", "", null]) {
+    assert.throws(
+      () => new LabController({ expectedGrouping: expectedGrouping as never }),
+      /expectedGrouping must be one of/,
+    );
+  }
+
+  const { controller: stackedRequestForClustered } = controllerForIdentity({
+    expectedGrouping: "stacked",
+    labVisuals: [COLUMN_LAB],
+    labState: COLUMN_LAB,
+  });
+  const { controller: clusteredRequestForStacked } = controllerForIdentity({
+    expectedGrouping: "clustered",
+    labVisuals: [STACKED_COLUMN_LAB],
+    labState: STACKED_COLUMN_LAB,
+  });
+  await assert.rejects(stackedRequestForClustered.open(), /grouping "clustered" is not stacked/);
+  await assert.rejects(clusteredRequestForStacked.open(), /grouping "stacked" is not clustered/);
+});
+
+test("LabController carries expected grouping into pre-mutation revalidation", async () => {
+  const { controller, session } = controllerForIdentity({
+    expectedGrouping: "stacked",
+    labVisuals: [STACKED_COLUMN_LAB],
+    labState: STACKED_COLUMN_LAB,
+  });
+  await controller.open();
+
+  // This is the read that every mutating controller method makes immediately
+  // before it drives a Desktop control. A visual changing to clustered after
+  // open must be a refusal, not a fallback to the default expectation.
+  session.read = async (name) => {
+    if (name === "labVisuals") return [COLUMN_LAB];
+    throw new Error(`unexpected lab read: ${name}`);
+  };
+  await assert.rejects(controller.requireLabVisual(), /grouping "clustered" is not stacked/);
 });
 
 test("orientation is required and cannot disagree with marks or physical axes", () => {

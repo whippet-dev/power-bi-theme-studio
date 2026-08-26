@@ -49,6 +49,7 @@ import {
 } from "./labActions.mjs";
 
 const HOST = "127.0.0.1";
+const SUPPORTED_CARTESIAN_GROUPINGS = Object.freeze(["clustered", "stacked"]);
 
 // ---------------------------------------------------------------------------
 // CDP plumbing
@@ -1383,9 +1384,18 @@ const PAYLOADS = {
 // ---------------------------------------------------------------------------
 
 export class LabController {
-  constructor({ port = 9222, verbose = true } = {}) {
+  constructor({ port = 9222, verbose = true, expectedGrouping = "clustered" } = {}) {
+    if (!SUPPORTED_CARTESIAN_GROUPINGS.includes(expectedGrouping)) {
+      throw new TypeError(
+        `expectedGrouping must be one of ${SUPPORTED_CARTESIAN_GROUPINGS.join(", ")}, not ${JSON.stringify(expectedGrouping)}`,
+      );
+    }
     this.session = new LabSession(port);
     this.verbose = verbose;
+    // The grouping is a caller-declared part of fixture identity. There is
+    // deliberately no auto/either mode: accepting either would let a sweep
+    // continue after the visual type changed beneath it.
+    this.expectedLab = Object.freeze({ grouping: expectedGrouping });
     this.initialState = null;
     this.mutated = {};
     this.sizeFieldMap = null;
@@ -1400,7 +1410,7 @@ export class LabController {
    */
   async requireLabVisual() {
     const candidates = await this.session.read("labVisuals");
-    const chosen = selectLabVisual(candidates);
+    const chosen = selectLabVisual(candidates, this.expectedLab);
     if (!chosen.ok) {
       throw new Error(
         `REFUSING TO MUTATE — the lab visual is no longer uniquely identifiable (${chosen.reasons.join("; ")})`,
@@ -1419,14 +1429,14 @@ export class LabController {
     // reference visual cannot be mutated by mistake and an ambiguous page is
     // an error rather than a guess.
     const candidates = await this.session.read("labVisuals");
-    const chosen = selectLabVisual(candidates);
+    const chosen = selectLabVisual(candidates, this.expectedLab);
     if (!chosen.ok) {
       this.session.close();
       throw new Error(`REFUSING TO MUTATE — ${chosen.reasons.join("; ")}`);
     }
 
     const state = await this.session.read("labState");
-    const check = identifyLabEnvironment(state);
+    const check = identifyLabEnvironment(state, this.expectedLab);
     if (!check.ok) {
       this.session.close();
       throw new Error(
