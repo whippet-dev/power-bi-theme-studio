@@ -868,10 +868,10 @@ export function VisualGallery({
   );
 
 
-  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} />;
+  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} titleChrome={chromeStyles.column.title} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.column.spacing.customizeSpacing ? chromeStyles.column.spacing.spaceBelowTitle : 0} />;
 
 
-  const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} />;
+  const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} titleChrome={chromeStyles.stackedColumn.title} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceBelowTitle : 0} />;
 
 
   const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} />;
@@ -1842,9 +1842,9 @@ export function VisualGallery({
   }> = [
     { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
     { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent, titleInsideVisual: true },
-    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent },
+    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent, titleInsideVisual: true },
     { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent, titleInsideVisual: true },
-    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent },
+    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent, titleInsideVisual: true },
     {
       id: "line",
       label: "Line chart",

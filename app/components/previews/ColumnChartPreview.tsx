@@ -19,12 +19,14 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { PresentationScale } from "./PresentationScale";
+import { headingAria } from "../../lib/headingAria";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
-type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[] };
+type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; titleFallback?: string; spaceBelowTitle?: number };
 
-export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
+export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
   // Same series, same colours and the same band model as the clustered
   // bar chart. This chart is its transpose, so it must not compute its
   // own version of either.
@@ -39,13 +41,16 @@ export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
   );
   const columnLegendAtBottom = legendIsAfterPlot(columnChartStyle.legend.position);
   const columnLegendVertical = legendIsVertical(columnChartStyle.legend.position);
+  const legendBand = legendBandExtent(columnChartStyle.legend, cartesianFixture.series.map((s) => s.label));
+  const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
+  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
 
   // One layout for this visual instance. Everything geometric below reads
   // from it — gutters, gridlines, columns, labels, reference line — so the
   // chart cannot end up with two disagreeing coordinate systems the way
   // the CSS-derived version did (RENDERER_AUDIT §2.4, §3).
   const layout = computePreviewCartesianLayout({
-    box: COLUMN_CHART_BOX,
+    box: authoredInner,
     orientation: "vertical",
     categoryAxis: columnChartStyle.categoryAxis,
     valueAxis: columnChartStyle.valueAxis,
@@ -73,14 +78,15 @@ export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
   const zeroPct = valueFraction(layout, 0) * 100;
 
   return (
-    <span
+    <PresentationScale width={COLUMN_CHART_BOX.width}><span
       className={`chart-preview${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100 }}
+      style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }}
     >
-      {!columnLegendAtBottom && columnLegendNode}
+      {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
+      {!columnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{columnLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          <span className="column-preview__plot" style={{ height: COLUMN_CHART_BOX.height }}>
+          <span className="column-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
             <ValueAxisGutter
               axis={columnChartStyle.valueAxis}
               layout={layout}
@@ -195,7 +201,7 @@ export function ColumnChartPreview({ columnChartStyle, palette }: Props) {
           </span>
         </span>
       </span>
-      {columnLegendAtBottom && columnLegendNode}
-    </span>
+      {columnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{columnLegendNode}</span>}
+    </span></PresentationScale>
   );
 }

@@ -103,7 +103,9 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
  * Width is nominal: only in-plot fractions are taken from it, so the chart
  * stays fluid. Height is real and is applied to the rendered box.
  */
-export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 128 };
+// PROVEN-EXPERIMENT: Classic 2026 Clustered and Stacked Column retain the
+// full native title/legend treatment at this shared authored size.
+export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 300 };
 
 /**
  * The bar chart's **authored** size — the dimensions ChartLayout and the

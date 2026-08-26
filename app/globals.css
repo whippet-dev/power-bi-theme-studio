@@ -1481,7 +1481,7 @@ button { color: inherit; }
   flex-direction: column;
 }
 
-/* The column chart's natural chart box. Its `height: 128px` and the flex
+/* The column chart's authored inner chart box. Its dimensions are supplied
    stack that derived the plot from it are gone: ChartLayout now computes
    the plot and both gutters, and the renderer applies them inline. The
    height comes from COLUMN_CHART_BOX (previews/cartesianLayout.ts) so

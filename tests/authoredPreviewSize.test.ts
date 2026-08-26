@@ -148,8 +148,8 @@ test("a bigger authored box gives its extra space to the plot, not to the gutter
   assert.ok(after < before, `gutter share should fall: ${before} -> ${after}`);
 });
 
-test("the vertical cartesian families are untouched by this pilot", () => {
-  assert.deepEqual(COLUMN_CHART_BOX, { x: 0, y: 0, width: 372, height: 128 });
+test("the Column family shares the proven 450 x 300 authored box", () => {
+  assert.deepEqual(COLUMN_CHART_BOX, { x: 0, y: 0, width: 450, height: 300 });
   assert.deepEqual(LINE_CHART_BOX, { x: 0, y: 0, width: 372, height: 150 });
 });
 

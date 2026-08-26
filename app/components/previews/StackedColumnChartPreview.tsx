@@ -20,12 +20,14 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { PresentationScale } from "./PresentationScale";
+import { headingAria } from "../../lib/headingAria";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
-type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[] };
+type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; titleFallback?: string; spaceBelowTitle?: number };
 
-export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: Props) {
+export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
   // The transpose of the stacked bar chart, from the same fixture series
   // and the same palette slots, so a swatch means the same thing in both.
   const stackedColumnLegendNode = (
@@ -39,12 +41,15 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
   );
   const stackedColumnLegendAtBottom = legendIsAfterPlot(stackedColumnChartStyle.legend.position);
   const stackedColumnLegendVertical = legendIsVertical(stackedColumnChartStyle.legend.position);
+  const legendBand = legendBandExtent(stackedColumnChartStyle.legend, cartesianFixture.series.map((s) => s.label));
+  const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
+  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
 
   // Same engine, same box and the same shared furniture as the clustered
   // column chart — the two share the CSS and must share the coordinate
   // system too, or they drift apart.
   const layout = computePreviewCartesianLayout({
-    box: COLUMN_CHART_BOX,
+    box: authoredInner,
     orientation: "vertical",
     categoryAxis: stackedColumnChartStyle.categoryAxis,
     valueAxis: stackedColumnChartStyle.valueAxis,
@@ -59,14 +64,15 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
   const categoryGutter = layout.categoryAxis?.height ?? 0;
 
   return (
-    <span
+    <PresentationScale width={COLUMN_CHART_BOX.width}><span
       className={`chart-preview${stackedColumnLegendVertical ? " chart-preview--legend-side" : ""}${stackedColumnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100 }}
+      style={{ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }}
     >
-      {!stackedColumnLegendAtBottom && stackedColumnLegendNode}
+      {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
+      {!stackedColumnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{stackedColumnLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          <span className="column-preview__plot" style={{ height: COLUMN_CHART_BOX.height }}>
+          <span className="column-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
             <ValueAxisGutter
               axis={stackedColumnChartStyle.valueAxis}
               layout={layout}
@@ -184,7 +190,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette }: 
           </span>
         </span>
       </span>
-      {stackedColumnLegendAtBottom && stackedColumnLegendNode}
-    </span>
+      {stackedColumnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{stackedColumnLegendNode}</span>}
+    </span></PresentationScale>
   );
 }
