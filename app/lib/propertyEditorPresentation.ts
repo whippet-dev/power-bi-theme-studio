@@ -1,0 +1,216 @@
+import type { PropertyDefinition, PropertyValueType } from "./properties";
+
+export type PropertyEntry = [string, PropertyDefinition<PropertyValueType>];
+
+export type PropertySection = {
+  name?: string;
+  entries: PropertyEntry[];
+};
+
+export type EditorGroupMeta = {
+  id: string;
+  title: string;
+  count: number;
+  section?: string;
+};
+
+type EditorVisualKind =
+  | "card"
+  | "bar"
+  | "column"
+  | "stackedBar"
+  | "stackedColumn"
+  | "line"
+  | "table"
+  | "matrix"
+  | "pie"
+  | "slicer"
+  | "shape"
+  | "actionButton"
+  | "bookmarkNavigator"
+  | "pageNavigator"
+  | "textbox"
+  | "image";
+
+const MASTER_PROPERTY_NAMES = new Set(["show", "enabled", "visible"]);
+
+/**
+ * Genuine group activation fields use these exact schema names. A section
+ * can also have a compound schema name (gridlineShow, shadeShow, showMarker)
+ * while Power BI still labels its activation control exactly "Show"; that
+ * exact label is intentionally accepted. Longer labels such as "Show
+ * gradient legend" and unrelated booleans stay in their original order.
+ *
+ * The id sets are the narrow override point for a future schema exception;
+ * keeping them explicit prevents the general rule from becoming fuzzy.
+ */
+const MASTER_PROPERTY_ID_OVERRIDES = new Set<string>();
+const NON_MASTER_PROPERTY_ID_OVERRIDES = new Set<string>();
+
+export function isMasterActivationProperty(definition: PropertyDefinition): boolean {
+  if (NON_MASTER_PROPERTY_ID_OVERRIDES.has(definition.id)) return false;
+  if (MASTER_PROPERTY_ID_OVERRIDES.has(definition.id)) return true;
+  if (definition.valueType !== "boolean") return false;
+
+  const propertyName = definition.path.at(-1);
+  const label = definition.label.trim().toLowerCase();
+  return (
+    (typeof propertyName === "string" && MASTER_PROPERTY_NAMES.has(propertyName.toLowerCase())) ||
+    MASTER_PROPERTY_NAMES.has(label)
+  );
+}
+
+export function isFontFamilyProperty(definition: PropertyDefinition): boolean {
+  if (definition.valueType !== "text") return false;
+  const propertyName = definition.path.at(-1);
+  return typeof propertyName === "string" && /(?:fontfamily|fontface)$/i.test(propertyName);
+}
+
+/**
+ * Common Power BI and browser-safe choices plus every literal font value
+ * shipped by the three bundled base themes. Values are offered verbatim:
+ * choosing one writes that exact literal, while the editor remains free to
+ * retain or accept any value not present here.
+ */
+export const KNOWN_FONT_FAMILIES = [
+  "Segoe UI",
+  "Segoe UI Light",
+  "Segoe UI Semilight",
+  "Segoe UI Semibold",
+  "Segoe UI Bold",
+  "Arial",
+  "Calibri",
+  "Cambria",
+  "Georgia",
+  "Tahoma",
+  "Trebuchet MS",
+  "Verdana",
+  "Times New Roman",
+  "Courier New",
+  "DIN",
+  "DIN Light",
+  "Heading",
+  "Body",
+  "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif",
+  "'Segoe UI Semibold', wf_segoe-ui_semibold, helvetica, arial, sans-serif",
+  "'''Segoe UI Semibold'', wf_segoe-ui_semibold, helvetica, arial, sans-serif'",
+] as const;
+
+export function fontFamilyOptions(currentValue: string): string[] {
+  return currentValue && !KNOWN_FONT_FAMILIES.includes(currentValue as (typeof KNOWN_FONT_FAMILIES)[number])
+    ? [currentValue, ...KNOWN_FONT_FAMILIES]
+    : [...KNOWN_FONT_FAMILIES];
+}
+
+function stableActivationFirst(entries: PropertyEntry[]): PropertyEntry[] {
+  return entries
+    .map((entry, index) => ({ entry, index, master: isMasterActivationProperty(entry[1]) }))
+    .sort((left, right) => Number(right.master) - Number(left.master) || left.index - right.index)
+    .map(({ entry }) => entry);
+}
+
+function sectionRank(name: string): number {
+  if (/^(general|content|value|values|series|type|behaviou?r|options?)$/i.test(name)) return 10;
+  if (/(position|layout|alignment|scale|range|size|spacing)/i.test(name)) return 20;
+  if (/(title|label|text|font)/i.test(name)) return 30;
+  if (/(appearance|colo(?:u)?r|fill|background|border|outline|grid|line|marker|shade|style)/i.test(name)) return 40;
+  return 50;
+}
+
+/**
+ * Builds a sorted presentation copy. The registry object and its definition
+ * objects are never changed: ordinary properties retain their insertion
+ * order, master toggles move only within their own cluster, and section ties
+ * retain their original order.
+ */
+export function propertySections(group: Record<string, PropertyDefinition<PropertyValueType>>): PropertySection[] {
+  const entries = Object.entries(group) as PropertyEntry[];
+  const general = stableActivationFirst(entries.filter(([, definition]) => !definition.section));
+  const sectionNames: string[] = [];
+
+  for (const [, definition] of entries) {
+    if (definition.section && !sectionNames.includes(definition.section)) sectionNames.push(definition.section);
+  }
+
+  const orderedNames = sectionNames
+    .map((name, index) => ({ name, index, rank: sectionRank(name) }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ name }) => name);
+
+  return [
+    ...(general.length ? [{ entries: general }] : []),
+    ...orderedNames.map((name) => ({
+      name,
+      entries: stableActivationFirst(entries.filter(([, definition]) => definition.section === name)),
+    })),
+  ];
+}
+
+export function inactivePropertyGroup(
+  group: Record<string, PropertyDefinition<PropertyValueType>>,
+  values: Record<string, string | number | boolean>,
+): boolean {
+  const master = Object.entries(group).find(
+    ([, definition]) => !definition.section && isMasterActivationProperty(definition),
+  );
+  return Boolean(master && values[master[0]] === false);
+}
+
+const CORE_GROUP_ORDER: Partial<Record<EditorVisualKind, readonly string[]>> = {
+  bar: ["dataPoint", "legend", "valueAxis", "categoryAxis", "labels", "plotArea"],
+  column: ["dataPoint", "legend", "categoryAxis", "valueAxis", "labels", "plotArea"],
+  stackedBar: ["dataPoint", "legend", "valueAxis", "categoryAxis", "labels", "totals", "ribbonBands", "plotArea"],
+  stackedColumn: ["dataPoint", "legend", "categoryAxis", "valueAxis", "labels", "totals", "ribbonBands", "plotArea"],
+  line: [
+    "dataPoint",
+    "lineStyles",
+    "markers",
+    "legend",
+    "categoryAxis",
+    "valueAxis",
+    "y2Axis",
+    "labels",
+    "seriesLabels",
+    "plotArea",
+  ],
+  table: ["columnHeaders", "values", "total", "grid", "columnFormatting", "sparklines"],
+  slicer: ["header", "items", "selection", "searchBox", "general"],
+  card: ["typography", "labels", "categoryLabels", "wordWrap", "general"],
+};
+
+const SPECIALIST_GROUPS = new Set([
+  "error",
+  "trend",
+  "forecast",
+  "anomalyDetection",
+  "referenceLine",
+  "xAxisReferenceLine",
+  "y1AxisReferenceLine",
+  "zoom",
+  "smallMultiplesLayout",
+  "subheader",
+  "layout",
+]);
+
+function groupKey(id: string): string {
+  return id.includes(":") ? id.slice(id.indexOf(":") + 1) : id;
+}
+
+/** Applies small visual-specific priorities to a copy of the group list. */
+export function orderVisualGroups(visual: EditorVisualKind, groups: EditorGroupMeta[]): EditorGroupMeta[] {
+  const preferred = CORE_GROUP_ORDER[visual] ?? [];
+  const coreRank = new Map(preferred.map((key, index) => [key, index]));
+
+  return groups
+    .map((group, index) => {
+      const key = groupKey(group.id);
+      const chrome = group.id.startsWith("chrome:");
+      const specialist = SPECIALIST_GROUPS.has(key);
+      const tier = chrome ? 1 : specialist ? 2 : 0;
+      const rank = tier === 0 ? (coreRank.get(key) ?? preferred.length + index) : index;
+      const section = tier === 0 ? "Visual formatting" : tier === 1 ? "Visual container" : "Analytics & advanced";
+      return { group: { ...group, section }, index, tier, rank };
+    })
+    .sort((left, right) => left.tier - right.tier || left.rank - right.rank || left.index - right.index)
+    .map(({ group }) => group);
+}

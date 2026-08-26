@@ -2385,6 +2385,15 @@ button { color: inherit; }
   font-size: 11px;
 }
 
+.font-family-control {
+  background-image: linear-gradient(45deg, transparent 50%, #8a8490 50%),
+    linear-gradient(135deg, #8a8490 50%, transparent 50%);
+  background-position: calc(100% - 12px) 12px, calc(100% - 8px) 12px;
+  background-repeat: no-repeat;
+  background-size: 4px 4px, 4px 4px;
+  padding-right: 24px;
+}
+
 /* Compact by default: a property is just a label + control + ⓘ on one
    line. All explanation (plain-English description, practical guidance,
    and the underlying schema path) lives behind the small ⓘ toggle so a
@@ -2398,6 +2407,16 @@ button { color: inherit; }
 .registry-property:last-child { border-bottom: 0; }
 
 .registry-property .property-row { border-bottom: 0; }
+
+.registry-property--inactive {
+  opacity: 0.64;
+  transition: opacity 120ms ease;
+}
+
+.registry-property--inactive:hover,
+.registry-property--inactive:focus-within {
+  opacity: 1;
+}
 
 .info-toggle {
   position: relative;
@@ -2550,6 +2569,20 @@ button { color: inherit; }
   flex-direction: column;
 }
 
+.property-group-list__entry:first-child .property-group-list__section {
+  margin-top: 0;
+}
+
+.property-group-list__section {
+  margin-top: 14px;
+  padding: 7px 6px 5px;
+  color: #8a8490;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .property-group-list__item {
   display: flex;
   align-items: center;
@@ -2566,7 +2599,8 @@ button { color: inherit; }
   cursor: pointer;
 }
 
-.property-group-list__item:first-child {
+.property-group-list__entry:first-child .property-group-list__item,
+.property-group-list__section + .property-group-list__item {
   border-top: 0;
 }
 
@@ -2656,6 +2690,17 @@ button { color: inherit; }
   flex-shrink: 0;
   border-radius: 2px;
   background: var(--brand);
+}
+
+.property-group__inactive-note {
+  margin: 2px 4px 10px;
+  padding: 8px 10px;
+  border-left: 2px solid #b9a9c8;
+  border-radius: 0 5px 5px 0;
+  background: #f7f4f9;
+  color: #6d627b;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 

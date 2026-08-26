@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { ACTION_BUTTON_PROPERTIES, propertyThemePath as actionButtonPropertyThemePath } from "../lib/actionButtonProperties";
 import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
@@ -32,6 +32,15 @@ import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
 import { forState, groupSupportsStates, INTERACTION_STATES, stateEntryIndex, type InteractionState } from "../lib/properties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
+import {
+  fontFamilyOptions,
+  inactivePropertyGroup,
+  isFontFamilyProperty,
+  isMasterActivationProperty,
+  orderVisualGroups,
+  propertySections,
+  type EditorGroupMeta,
+} from "../lib/propertyEditorPresentation";
 import { propertyThemePath as shapePropertyThemePath, SHAPE_PROPERTIES } from "../lib/shapeProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
@@ -386,6 +395,28 @@ function TextControl({ value, onChange, label }: { value: string; onChange: (val
   );
 }
 
+export function FontFamilyControl({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  const listId = useId();
+  return (
+    <>
+      <input
+        className="text-control font-family-control"
+        type="text"
+        list={listId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={label}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {fontFamilyOptions(value).map((font) => (
+          <option key={font} value={font} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
 function SelectControl({
   value,
   options,
@@ -434,11 +465,12 @@ function SelectControl({
  * resolution fall through to the shared/theme default again instead of
  * requiring the value to be hand-matched back.
  */
-function PropertyRow({
+export function PropertyRow({
   definition,
   pathPrefix,
   value,
   hasOverride,
+  inactive,
   onChange,
   onReset,
 }: {
@@ -446,11 +478,12 @@ function PropertyRow({
   pathPrefix: string;
   value: PropertyValue;
   hasOverride: boolean;
+  inactive?: boolean;
   onChange: (value: PropertyValue) => void;
   onReset: () => void;
 }) {
   return (
-    <div className="registry-property">
+    <div className={`registry-property${inactive ? " registry-property--inactive" : ""}`}>
       <div className="property-row">
         <span className="property-row__copy">
           <span className="property-row__label" title={definition.label}>
@@ -473,7 +506,10 @@ function PropertyRow({
           {definition.valueType === "boolean" && (
             <BooleanControl label={definition.label} value={value as boolean} onChange={(next) => onChange(next)} />
           )}
-          {definition.valueType === "text" && (
+          {definition.valueType === "text" && isFontFamilyProperty(definition) && (
+            <FontFamilyControl label={definition.label} value={value as string} onChange={(next) => onChange(next)} />
+          )}
+          {definition.valueType === "text" && !isFontFamilyProperty(definition) && (
             <TextControl label={definition.label} value={value as string} onChange={(next) => onChange(next)} />
           )}
           {definition.valueType === "enum" && definition.options && (
@@ -618,12 +654,16 @@ function RegistryGroupBody({
   onChange: (path: ThemePath, value: PropertyValue) => void;
   onReset: (path: ThemePath) => void;
 }) {
-  const entries = Object.entries(group);
-  const general = entries.filter(([, definition]) => !definition.section);
-  const sectionNames: string[] = [];
-  for (const [, definition] of entries) {
-    if (definition.section && !sectionNames.includes(definition.section)) sectionNames.push(definition.section);
-  }
+  const sections = propertySections(group);
+
+  const resolvedValues = Object.fromEntries(
+    Object.entries(group).map(([key, definition]) => {
+      const readPath = (readThemePath ?? getThemePath)(definition);
+      const stateValue = readThemeValueAtPath(theme, readPath) as PropertyValue | undefined;
+      return [key, stateValue ?? groupValues[key]];
+    }),
+  ) as Record<string, PropertyValue>;
+  const inactive = inactivePropertyGroup(group, resolvedValues);
 
   const renderRow = ([key, definition]: [string, PropertyDefinition<PropertyValueType>]) => {
     const writePath = getThemePath(definition);
@@ -638,6 +678,7 @@ function RegistryGroupBody({
         pathPrefix={pathPrefix}
         value={stateValue ?? groupValues[key]}
         hasOverride={hasThemeValueAtPath(theme, writePath)}
+        inactive={inactive && !isMasterActivationProperty(definition)}
         onChange={(next) => {
           // A new state entry needs its $id, or Power BI can't tell which
           // state it describes and treats it as another default.
@@ -650,19 +691,29 @@ function RegistryGroupBody({
   };
 
   return (
-    <div className="property-group__body">
-      {general.map(renderRow)}
-      {sectionNames.map((sectionName) => (
-        <div className="property-subsection" key={sectionName}>
-          <div className="property-subsection__title">{sectionName}</div>
-          {entries.filter(([, definition]) => definition.section === sectionName).map(renderRow)}
-        </div>
-      ))}
+    <div className={`property-group__body${inactive ? " property-group__body--inactive" : ""}`}>
+      {inactive && (
+        <p className="property-group__inactive-note" role="status">
+          Not currently shown. Formatting applies when enabled.
+        </p>
+      )}
+      {sections.map((section, index) =>
+        section.name ? (
+          <div className="property-subsection" key={section.name}>
+            <div className="property-subsection__title">{section.name}</div>
+            {section.entries.map(renderRow)}
+          </div>
+        ) : (
+          <div className="property-section-general" key={`general-${index}`}>
+            {section.entries.map(renderRow)}
+          </div>
+        ),
+      )}
     </div>
   );
 }
 
-type GroupMeta = { id: string; title: string; count: number };
+type GroupMeta = EditorGroupMeta;
 
 /**
  * The group-picker list: one row per format-pane-style card (e.g. "Column
@@ -673,20 +724,25 @@ type GroupMeta = { id: string; title: string; count: number };
 function GroupList({ groups, onOpen }: { groups: GroupMeta[]; onOpen: (id: string) => void }) {
   return (
     <div className="property-group-list">
-      {groups.map((group) => (
-        <button
-          key={group.id}
-          type="button"
-          className="property-group-list__item"
-          onClick={() => onOpen(group.id)}
-        >
-          <span>{group.title}</span>
-          <span className="property-group-list__meta">
-            <span className="property-group__count">{group.count}</span>
-            <span className="property-group-list__chevron" aria-hidden="true">›</span>
-          </span>
-        </button>
-      ))}
+      {groups.map((group, index) => {
+        const showSection = Boolean(group.section && group.section !== groups[index - 1]?.section);
+        return (
+          <div className="property-group-list__entry" key={group.id}>
+            {showSection && <div className="property-group-list__section">{group.section}</div>}
+            <button
+              type="button"
+              className="property-group-list__item"
+              onClick={() => onOpen(group.id)}
+            >
+              <span>{group.title}</span>
+              <span className="property-group-list__meta">
+                <span className="property-group__count">{group.count}</span>
+                <span className="property-group-list__chevron" aria-hidden="true">›</span>
+              </span>
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -790,7 +846,7 @@ export function PropertyEditor({
     })),
   ];
 
-  const visualGroups: GroupMeta[] = [
+  const unorderedVisualGroups: GroupMeta[] = [
     ...chromeGroupKeys.map((key) => ({
       id: `${CHROME_ID_PREFIX}${key}`,
       title: CHROME_GROUP_LABELS[key],
@@ -910,6 +966,8 @@ export function PropertyEditor({
         }))
       : []),
   ];
+
+  const visualGroups = orderVisualGroups(selected, unorderedVisualGroups);
 
   const globalOptionsGroupKeys = Object.keys(GLOBAL_OPTIONS_PROPERTIES) as Array<keyof typeof GLOBAL_OPTIONS_PROPERTIES>;
   const globalGroups: GroupMeta[] = globalOptionsGroupKeys.map((key) => ({
