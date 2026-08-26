@@ -99,11 +99,15 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
  *
  * PROVEN-EXPERIMENT: native Power BI Desktop under Classic 2026 retained
  * the full useful title, legend, axes, all four categories and all three
- * series for both Clustered and Stacked Column at 450 x 300. At 450 x 250,
- * both entered the compact responsive treatment (smaller legend/axis-title
- * typography and fewer value ticks). The treatment persisted through
- * 275px and was gone by 300px, making 450 x 300 the smallest measured stable,
- * non-compacted comparison size for the shared Column family.
+ * series for both Clustered and Stacked Column at 450 x 300. At that size,
+ * both used the full treatment: 13.333px legend text and 16px axis titles.
+ * At 450 x 250, both used compact typography (12px legend text and 12px
+ * axis titles). Clustered Column also reduced its value ticks from three to
+ * two there; Stacked Column retained three. Clustered's compact treatment
+ * was measured through 275px and was gone by 300px. No Stacked midpoint was
+ * measured, so its exact threshold between 250px and 300px remains
+ * unresolved. Therefore 450 x 300 is the smallest TESTED size where both
+ * use the full, non-compact treatment.
  *
  * This replaces the old CSS-owned 372 x 128 inner plot constraint. That
  * smaller rectangle was neither the complete visual nor a proven authored
