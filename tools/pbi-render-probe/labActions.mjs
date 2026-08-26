@@ -184,6 +184,96 @@ export const FIXTURE_CATEGORY_SETS = Object.freeze({
   LONG: Object.freeze(["London", "Loughborough", "Scotland", "Wales"]),
 });
 
+/**
+ * Classifies the two native cartesian renderers the synthetic lab supports.
+ *
+ * This is intentionally positive evidence, not a fallback: Column is only
+ * recognised when rendered `rect.column` marks exist and rendered `rect.bar`
+ * marks do not. The reverse is true for Bar. Mixed or absent mark sets fail
+ * closed. The category-position count distinguishes the clustered fixture
+ * from a stacked rendering that happens to use the same mark class.
+ */
+export function classifyCartesianRenderer({
+  barMarkCount,
+  columnMarkCount,
+  seriesCount,
+  categoryPositionCount,
+}) {
+  const bar = Number.isInteger(barMarkCount) && barMarkCount > 0;
+  const column = Number.isInteger(columnMarkCount) && columnMarkCount > 0;
+  if (bar === column) return null;
+
+  const marksRendered = bar ? barMarkCount : columnMarkCount;
+  if (!Number.isInteger(seriesCount) || seriesCount < 1) return null;
+  if (!Number.isInteger(categoryPositionCount) || categoryPositionCount < 1) return null;
+  if (marksRendered % seriesCount !== 0) return null;
+
+  const categoriesRendered = marksRendered / seriesCount;
+  const grouping = categoryPositionCount === marksRendered
+    ? "clustered"
+    : categoryPositionCount === categoriesRendered
+      ? "stacked"
+      : null;
+  if (!grouping) return null;
+
+  return bar
+    ? {
+        orientation: "horizontal",
+        markType: "bar",
+        grouping,
+        categoryAxisSide: "left",
+        valueAxisSide: "bottom",
+        marksRendered,
+        categoriesRendered,
+      }
+    : {
+        orientation: "vertical",
+        markType: "column",
+        grouping,
+        categoryAxisSide: "bottom",
+        valueAxisSide: "left",
+        marksRendered,
+        categoriesRendered,
+      };
+}
+
+/**
+ * Maps semantic category/value axes to their physical chart strips.
+ *
+ * Keeping this pure makes the established Bar interpretation and the new
+ * Column interpretation testable without Desktop. Bounds are relative to the
+ * complete visual and are derived only from live chart/plot rectangles.
+ */
+export function cartesianAxisBandBounds(renderer, chartBounds, plotBounds) {
+  if (!renderer || !chartBounds || !plotBounds) return null;
+  const strip = (side) => {
+    if (side === "left") {
+      return {
+        x: chartBounds.x,
+        y: plotBounds.y,
+        width: plotBounds.x - chartBounds.x,
+        height: plotBounds.height,
+        right: plotBounds.x,
+        bottom: plotBounds.bottom,
+      };
+    }
+    if (side === "bottom") {
+      return {
+        x: plotBounds.x,
+        y: plotBounds.bottom,
+        width: plotBounds.width,
+        height: chartBounds.bottom - plotBounds.bottom,
+        right: plotBounds.right,
+        bottom: chartBounds.bottom,
+      };
+    }
+    return null;
+  };
+  const category = strip(renderer.categoryAxisSide);
+  const value = strip(renderer.valueAxisSide);
+  return category && value ? { category, value } : null;
+}
+
 /** Which known variant a rendered category set belongs to, or null. */
 export function fixtureVariantOf(categories) {
   if (!Array.isArray(categories) || !categories.length) return null;
@@ -203,6 +293,7 @@ export function identifyLabEnvironment(state, expected = {}) {
     series: ["Online", "Phone", "Post"],
     seriesCount: 3,
     visualType: "cartesian",
+    grouping: "clustered",
     ...expected,
   };
 
@@ -211,6 +302,27 @@ export function identifyLabEnvironment(state, expected = {}) {
   }
   if (state.visualType !== want.visualType) {
     reasons.push(`visual type ${JSON.stringify(state.visualType)} is not ${want.visualType}`);
+  }
+  const orientationModels = {
+    horizontal: { markType: "bar", categoryAxisSide: "left", valueAxisSide: "bottom" },
+    vertical: { markType: "column", categoryAxisSide: "bottom", valueAxisSide: "left" },
+  };
+  const model = orientationModels[state.orientation];
+  if (!model) {
+    reasons.push(`cartesian orientation ${JSON.stringify(state.orientation)} is not positively identified`);
+  } else {
+    if (state.markType !== model.markType) {
+      reasons.push(`${state.orientation} cartesian uses ${JSON.stringify(state.markType)} marks, not ${model.markType}`);
+    }
+    if (state.categoryAxisSide !== model.categoryAxisSide || state.valueAxisSide !== model.valueAxisSide) {
+      reasons.push(
+        `${state.orientation} axis sides are ${JSON.stringify(state.categoryAxisSide)}/${JSON.stringify(state.valueAxisSide)}, ` +
+          `not ${model.categoryAxisSide}/${model.valueAxisSide}`,
+      );
+    }
+  }
+  if (state.grouping !== want.grouping) {
+    reasons.push(`cartesian grouping ${JSON.stringify(state.grouping)} is not ${want.grouping}`);
   }
   if (!Array.isArray(state.categories)) reasons.push("no categories read from the visual");
   else if (state.categories.length === 0) reasons.push("no categories rendered");
@@ -230,6 +342,22 @@ export function identifyLabEnvironment(state, expected = {}) {
   }
   if (state.seriesCount !== want.seriesCount) {
     reasons.push(`series count ${state.seriesCount} is not ${want.seriesCount}`);
+  }
+  if (!Number.isInteger(state.marksRendered) || state.marksRendered < want.seriesCount) {
+    reasons.push(`mark count ${state.marksRendered} is not a positive ${want.seriesCount}-series render`);
+  } else if (!Number.isInteger(state.categoriesRendered)
+      || state.marksRendered !== state.categoriesRendered * state.seriesCount) {
+    reasons.push(
+      `mark count ${state.marksRendered} does not equal categories ${state.categoriesRendered} × series ${state.seriesCount}`,
+    );
+  }
+  if (state.legendVisible && Array.isArray(state.seriesNames)) {
+    const missingLegendSeries = want.series.filter(
+      (name) => !state.seriesNames.some((label) => String(label).includes(name)),
+    );
+    if (missingLegendSeries.length) {
+      reasons.push(`visible legend does not name ${missingLegendSeries.join(", ")}`);
+    }
   }
 
   // The sentinel. Categories and a series count are not enough on their own:

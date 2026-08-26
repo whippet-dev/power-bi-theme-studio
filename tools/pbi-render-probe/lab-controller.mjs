@@ -36,6 +36,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   SUPPORTED_BASE_THEMES,
+  cartesianAxisBandBounds,
+  classifyCartesianRenderer,
   identifyLabEnvironment,
   requireImplemented,
   selectLabVisual,
@@ -181,6 +183,33 @@ const VISUAL =
   "  return named.length === 1 ? named[0] : null; })()";
 
 /**
+ * Fixed browser-side cartesian classification shared by identity,
+ * measurement and settle readers.
+ *
+ * The pure classifier is stringified from `labActions.mjs`, so the safety
+ * decision tested in Node is exactly the decision executed in Desktop. It is
+ * still a fixed payload: no expression or selector comes from a caller.
+ */
+const CARTESIAN_RENDER_CONTEXT = `
+    const barMarks = [...el.querySelectorAll('svg rect.bar')];
+    const columnMarks = [...el.querySelectorAll('svg rect.column')];
+    const candidateMarks = barMarks.length ? barMarks : columnMarks;
+    const candidateFills = [...new Set(candidateMarks.map((mark) => getComputedStyle(mark).fill))];
+    const candidateCoordinate = columnMarks.length ? 'x' : 'y';
+    const categoryPositionCount = new Set(candidateMarks.map((mark) => Number(mark.getAttribute(candidateCoordinate)))).size;
+    const renderer = (${classifyCartesianRenderer.toString()})({
+      barMarkCount: barMarks.length,
+      columnMarkCount: columnMarks.length,
+      seriesCount: candidateFills.length,
+      categoryPositionCount,
+    });
+    const marks = renderer ? (renderer.markType === 'bar' ? barMarks : columnMarks) : [];
+    const fills = renderer ? candidateFills : [];
+  `;
+
+const CARTESIAN_AXIS_BANDS = `(${cartesianAxisBandBounds.toString()})(renderer, chartBounds, plotBounds)`;
+
+/**
  * A Format-pane slider card, located through the label that owns it.
  *
  * Position alone is not enough: 'Space between categories' and 'Space
@@ -225,6 +254,7 @@ const PAYLOADS = {
     const el = ${VISUAL};
     if (!el) return { visualType: null };
     const r = el.getBoundingClientRect();
+    ${CARTESIAN_RENDER_CONTEXT}
     // Direct text nodes only, because Power BI nests an accessibility
     // <title> inside each <text> and textContent would double the label.
     // Leaf elements have no such child, so they can fall back safely.
@@ -234,39 +264,107 @@ const PAYLOADS = {
       return n.children.length === 0 ? (n.textContent || '').trim() : '';
     };
 
-    const bars = [...el.querySelectorAll('svg rect.bar')];
-    const fills = [...new Set(bars.map((b) => getComputedStyle(b).fill))];
     const plot = el.querySelector('svg.mainGraphicsContext');
+    const chart = el.querySelector('svg.cartesianChart');
 
-    // Category labels are the Segoe-faced texts left of the bars.
-    const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
-    const barBottom = bars.length ? Math.max(...bars.map((b) => b.getBoundingClientRect().bottom)) : null;
+    // Which physical edge owns an axis comes from the positively identified
+    // renderer. Bar categories are left and values bottom; Column reverses
+    // those roles without changing their semantic names downstream.
+    const markLeft = marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
+    const markBottom = marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
     const texts = [...el.querySelectorAll('svg text')].map((t) => ({
       text: own(t), r: t.getBoundingClientRect(), face: getComputedStyle(t).fontFamily,
       px: parseFloat(getComputedStyle(t).fontSize),
     })).filter((t) => t.text);
     const isTitleFace = (f) => /wf_standard-font/.test(f);
-    const catLabels = texts.filter((t) => barLeft !== null && t.r.right <= barLeft + 2 && !isTitleFace(t.face));
-    const valLabels = texts.filter((t) => barBottom !== null && t.r.top >= barBottom - 6 && !isTitleFace(t.face));
-    const catTitle = texts.find((t) => barLeft !== null && t.r.right <= barLeft + 2 && isTitleFace(t.face));
-    const valTitle = texts.find((t) => barBottom !== null && t.r.top >= barBottom - 6 && isTitleFace(t.face));
+    const leftLabels = texts.filter((t) => markLeft !== null && t.r.right <= markLeft + 2 && !isTitleFace(t.face));
+    const bottomLabels = texts.filter((t) => markBottom !== null && t.r.top >= markBottom - 6 && !isTitleFace(t.face));
+    const leftTitle = texts.find((t) => markLeft !== null && t.r.right <= markLeft + 2 && isTitleFace(t.face));
+    const bottomTitle = texts.find((t) => markBottom !== null && t.r.top >= markBottom - 6 && isTitleFace(t.face));
+    const catLabels = renderer && renderer.categoryAxisSide === 'left' ? leftLabels : bottomLabels;
+    const valLabels = renderer && renderer.valueAxisSide === 'left' ? leftLabels : bottomLabels;
+    const catTitle = renderer && renderer.categoryAxisSide === 'left' ? leftTitle : bottomTitle;
+    const valTitle = renderer && renderer.valueAxisSide === 'left' ? leftTitle : bottomTitle;
 
     const legendItems = [...el.querySelectorAll('[class*="legend"] div, [class*="legend"] span, [class*="legend"] text')]
       .filter((n) => !n.children.length && own(n));
     const scrollable = el.querySelector('svg.svgScrollable');
 
-    // Band geometry, from the bars themselves.
+    // Band geometry in the category direction, from the positively
+    // identified marks themselves: y/height for Bar, x/width for Column.
+    const categoryCoordinate = renderer && renderer.orientation === 'vertical' ? 'x' : 'y';
+    const categoryExtent = renderer && renderer.orientation === 'vertical' ? 'width' : 'height';
     const byFill = new Map();
-    for (const b of bars) {
-      const f = getComputedStyle(b).fill;
+    for (const mark of marks) {
+      const f = getComputedStyle(mark).fill;
       const list = byFill.get(f) ?? [];
-      list.push(Number(b.getAttribute('y')));
+      list.push(Number(mark.getAttribute(categoryCoordinate)));
       byFill.set(f, list);
     }
-    const series = [...byFill.values()].map((ys) => ys.sort((a, b) => a - b));
-    const band = bars.length ? Number(bars[0].getAttribute('height')) : null;
+    const series = [...byFill.values()].map((positions) => positions.sort((a, b) => a - b));
+    const band = marks.length ? Number(marks[0].getAttribute(categoryExtent)) : null;
     const seriesStep = series.length >= 2 ? series[1][0] - series[0][0] : null;
     const categoryStep = series[0] && series[0].length >= 2 ? series[0][1] - series[0][0] : null;
+
+    const relativeRect = (node) => {
+      if (!node) return null;
+      const box = node.getBoundingClientRect();
+      return {
+        x: num(box.left - r.left), y: num(box.top - r.top),
+        width: num(box.width), height: num(box.height),
+        right: num(box.right - r.left), bottom: num(box.bottom - r.top),
+      };
+    };
+    const unionBounds = (nodes) => {
+      const boxes = nodes.map((node) => node && node.r ? node.r : node && node.getBoundingClientRect ? node.getBoundingClientRect() : null)
+        .filter(Boolean);
+      if (!boxes.length) return null;
+      const left = Math.min(...boxes.map((box) => box.left));
+      const top = Math.min(...boxes.map((box) => box.top));
+      const right = Math.max(...boxes.map((box) => box.right));
+      const bottom = Math.max(...boxes.map((box) => box.bottom));
+      return {
+        x: num(left - r.left), y: num(top - r.top),
+        width: num(right - left), height: num(bottom - top),
+        right: num(right - r.left), bottom: num(bottom - r.top),
+      };
+    };
+    const chartBounds = relativeRect(chart);
+    const plotBounds = relativeRect(plot);
+    const axisBounds = ${CARTESIAN_AXIS_BANDS};
+    const axisBand = (semantic, content) => renderer && axisBounds
+      ? {
+          side: semantic === 'category' ? renderer.categoryAxisSide : renderer.valueAxisSide,
+          bounds: axisBounds[semantic],
+          contentBounds: unionBounds(content),
+        }
+      : null;
+
+    const legendContainers = [...el.querySelectorAll('[class*="legend"]')]
+      .filter((node) => {
+        const box = node.getBoundingClientRect();
+        return chart && box.width > 1 && box.height > 1 && box.bottom <= chart.getBoundingClientRect().top + 2;
+      });
+    const legendContainer = legendContainers.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return br.width * br.height - ar.width * ar.height;
+    })[0] ?? null;
+    const legendBounds = relativeRect(legendContainer) ?? unionBounds(legendItems);
+    const titleCandidates = [...el.querySelectorAll('div,span,h1,h2,h3,p')]
+      .filter((node) => !node.querySelector('svg') && !node.closest('[class*="legend"]'))
+      .filter((node) => {
+        const text = own(node);
+        const box = node.getBoundingClientRect();
+        return text.includes('Online') && text.includes('Phone') && text.includes('Post')
+          && chart && box.width > 1 && box.height > 1 && box.bottom <= chart.getBoundingClientRect().top + 2;
+      })
+      .sort((a, b) => a.getBoundingClientRect().height - b.getBoundingClientRect().height);
+    const titleNode = titleCandidates[0] ?? null;
+    const titleTextBounds = relativeRect(titleNode);
+    const titleBandBottom = titleNode
+      ? (legendBounds ? legendBounds.y : chartBounds ? chartBounds.y : titleTextBounds.bottom)
+      : 0;
 
     // The lab sentinel: the visual's accessible description, which names
     // every measure and the category field. Present at every size, unlike
@@ -279,13 +377,53 @@ const PAYLOADS = {
 
     return {
       visualType: 'cartesian',
+      orientation: renderer ? renderer.orientation : null,
+      markType: renderer ? renderer.markType : null,
+      grouping: renderer ? renderer.grouping : null,
+      categoryAxisSide: renderer ? renderer.categoryAxisSide : null,
+      valueAxisSide: renderer ? renderer.valueAxisSide : null,
       sentinel,
       width: Math.round(r.width),
       height: Math.round(r.height),
+      visualBounds: { x: 0, y: 0, width: num(r.width), height: num(r.height), right: num(r.width), bottom: num(r.height) },
+      chartBounds,
+      plotBounds,
+      titleBand: titleNode
+        ? {
+            visible: true,
+            bounds: { x: 0, y: 0, width: num(r.width), height: num(titleBandBottom), right: num(r.width), bottom: num(titleBandBottom) },
+            textBounds: titleTextBounds,
+            fontPx: num(parseFloat(getComputedStyle(titleNode).fontSize)),
+          }
+        : { visible: false, bounds: null, textBounds: null, fontPx: null },
+      legendBand: legendBounds
+        ? { visible: true, bounds: legendBounds }
+        : { visible: false, bounds: null },
+      categoryAxisBand: axisBand('category', [...catLabels, catTitle]),
+      valueAxisBand: axisBand('value', [...valLabels, valTitle]),
+      outerInsets: chartBounds
+        ? {
+            left: chartBounds.x,
+            top: chartBounds.y,
+            right: num(r.width - chartBounds.right),
+            bottom: num(r.height - chartBounds.bottom),
+          }
+        : null,
+      plotInsetsWithinChart: chartBounds && plotBounds
+        ? {
+            left: num(plotBounds.x - chartBounds.x),
+            top: num(plotBounds.y - chartBounds.y),
+            right: num(chartBounds.right - plotBounds.right),
+            bottom: num(chartBounds.bottom - plotBounds.bottom),
+          }
+        : null,
       categories: catLabels.map((t) => t.text),
       seriesCount: fills.length,
-      barsRendered: bars.length,
-      categoriesRendered: series[0] ? series[0].length : 0,
+      seriesNames: legendItems.map(own),
+      marksRendered: marks.length,
+      // Retained for existing reports/tests; means cartesian marks, not only Bar.
+      barsRendered: marks.length,
+      categoriesRendered: renderer ? renderer.categoriesRendered : 0,
       plotWidth: plot ? Number(plot.getAttribute('width')) : null,
       plotHeight: plot ? Number(plot.getAttribute('height')) : null,
       scrollableWidth: scrollable ? Number(scrollable.getAttribute('width')) : null,
@@ -322,16 +460,21 @@ const PAYLOADS = {
     const el = ${VISUAL};
     if (!el) return {};
     const r = el.getBoundingClientRect();
+    ${CARTESIAN_RENDER_CONTEXT}
     const plot = el.querySelector('svg.mainGraphicsContext');
-    const bar = el.querySelector('svg rect.bar');
+    const mark = marks[0];
     const text = el.querySelector('svg text');
     return {
       w: +r.width.toFixed(2), h: +r.height.toFixed(2),
       plotW: plot ? Number(plot.getAttribute('width')) : 0,
       plotH: plot ? Number(plot.getAttribute('height')) : 0,
-      bars: el.querySelectorAll('svg rect.bar').length,
+      orientation: renderer ? renderer.orientation : null,
+      markType: renderer ? renderer.markType : null,
+      grouping: renderer ? renderer.grouping : null,
+      bars: marks.length,
+      marks: marks.length,
       texts: el.querySelectorAll('svg text').length,
-      fill: bar ? getComputedStyle(bar).fill : '',
+      fill: mark ? getComputedStyle(mark).fill : '',
       fontPx: text ? getComputedStyle(text).fontSize : '',
     };
   })()`,
@@ -355,21 +498,37 @@ const PAYLOADS = {
       const hint = [...el.querySelectorAll('[class*="visualsEnterHint"]')]
         .map((n) => (n.textContent || '').trim())
         .find((txt) => txt.length > 10 && !/^Press /.test(txt)) || '';
-      const bars = [...el.querySelectorAll('svg rect.bar')];
+      ${CARTESIAN_RENDER_CONTEXT}
       const own = (n) => {
         const d = [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').trim();
         return d || (n.children.length === 0 ? (n.textContent || '').trim() : '');
       };
-      const barLeft = bars.length ? Math.min(...bars.map((b) => b.getBoundingClientRect().left)) : null;
-      const cats = [...el.querySelectorAll('svg text')]
-        .filter((x) => barLeft !== null && x.getBoundingClientRect().right <= barLeft + 2
-          && !/wf_standard-font/.test(getComputedStyle(x).fontFamily))
+      const markLeft = marks.length ? Math.min(...marks.map((mark) => mark.getBoundingClientRect().left)) : null;
+      const markBottom = marks.length ? Math.max(...marks.map((mark) => mark.getBoundingClientRect().bottom)) : null;
+      const labelTexts = [...el.querySelectorAll('svg text')]
+        .filter((text) => !/wf_standard-font/.test(getComputedStyle(text).fontFamily));
+      const leftLabels = labelTexts
+        .filter((text) => markLeft !== null && text.getBoundingClientRect().right <= markLeft + 2);
+      const bottomLabels = labelTexts
+        .filter((text) => markBottom !== null && text.getBoundingClientRect().top >= markBottom - 6);
+      const cats = (renderer && renderer.categoryAxisSide === 'left' ? leftLabels : bottomLabels)
         .map(own).filter(Boolean);
+      const legendItems = [...el.querySelectorAll('[class*="legend"] div, [class*="legend"] span, [class*="legend"] text')]
+        .filter((node) => !node.children.length && own(node));
       return {
         visualType: 'cartesian',
+        orientation: renderer ? renderer.orientation : null,
+        markType: renderer ? renderer.markType : null,
+        grouping: renderer ? renderer.grouping : null,
+        categoryAxisSide: renderer ? renderer.categoryAxisSide : null,
+        valueAxisSide: renderer ? renderer.valueAxisSide : null,
         sentinel: hint.slice(0, 120),
         categories: cats,
-        seriesCount: [...new Set(bars.map((b) => getComputedStyle(b).fill))].length,
+        seriesCount: fills.length,
+        seriesNames: legendItems.map(own),
+        legendVisible: legendItems.length > 0,
+        marksRendered: marks.length,
+        categoriesRendered: renderer ? renderer.categoriesRendered : 0,
       };
     });
   })()`.replace('CARTESIAN_PLACEHOLDER', CARTESIAN_VISUALS),
@@ -1240,11 +1399,11 @@ export class LabController {
    * rests on never mutating something unidentified.
    */
   async requireLabVisual() {
-    const counts = await this.session.read("labVisualCount");
-    if (!counts || counts.matching !== 1) {
-      const found = counts ? `${counts.matching} of ${counts.cartesian} cartesian visuals match` : "the page could not be read";
+    const candidates = await this.session.read("labVisuals");
+    const chosen = selectLabVisual(candidates);
+    if (!chosen.ok) {
       throw new Error(
-        `REFUSING TO MUTATE — the lab visual is no longer uniquely identifiable (${found})`,
+        `REFUSING TO MUTATE — the lab visual is no longer uniquely identifiable (${chosen.reasons.join("; ")})`,
       );
     }
   }
@@ -1280,7 +1439,7 @@ export class LabController {
     state.baseTheme = await this.readBaseTheme();
     this.initialState = state;
     this.log(
-      `lab identified: ${state.width}x${state.height}, ${state.barsRendered} bars, ` +
+      `lab identified: ${state.width}x${state.height}, ${state.marksRendered} ${state.markType} marks, ` +
         `base theme ${state.baseTheme ?? "(unreadable)"}`,
     );
     return state;

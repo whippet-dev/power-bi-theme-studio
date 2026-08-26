@@ -7,7 +7,9 @@ import {
   requireImplemented,
   SUPPORTED_BASE_THEMES,
   SUPPORTED_LABEL_FONTS,
+  cartesianAxisBandBounds,
   checkVariantTheme,
+  classifyCartesianRenderer,
   expandMatrix,
   selectLabVisual,
   detectBreakpoints,
@@ -77,15 +79,126 @@ test("visual sizes outside a safe range are rejected", () => {
 
 const LAB = {
   visualType: "cartesian",
+  orientation: "horizontal",
+  markType: "bar",
+  grouping: "clustered",
+  categoryAxisSide: "left",
+  valueAxisSide: "bottom",
   categories: ["London", "North West", "Scotland", "Wales"],
   seriesCount: 3,
+  seriesNames: ["Sum of Online", "Sum of Phone", "Sum of Post"],
+  legendVisible: true,
+  marksRendered: 12,
+  categoriesRendered: 4,
   // The auto-generated visual title, which names every measure. Unlike the
   // legend it survives the small sizes where Power BI sheds furniture.
   sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
 };
 
+const COLUMN_LAB = {
+  ...LAB,
+  orientation: "vertical",
+  markType: "column",
+  categoryAxisSide: "bottom",
+  valueAxisSide: "left",
+};
+
+test("the cartesian renderer classifier positively distinguishes clustered Bar and Column", () => {
+  assert.deepEqual(
+    classifyCartesianRenderer({
+      barMarkCount: 12,
+      columnMarkCount: 0,
+      seriesCount: 3,
+      categoryPositionCount: 12,
+    }),
+    {
+      orientation: "horizontal",
+      markType: "bar",
+      grouping: "clustered",
+      categoryAxisSide: "left",
+      valueAxisSide: "bottom",
+      marksRendered: 12,
+      categoriesRendered: 4,
+    },
+  );
+  assert.deepEqual(
+    classifyCartesianRenderer({
+      barMarkCount: 0,
+      columnMarkCount: 12,
+      seriesCount: 3,
+      categoryPositionCount: 12,
+    }),
+    {
+      orientation: "vertical",
+      markType: "column",
+      grouping: "clustered",
+      categoryAxisSide: "bottom",
+      valueAxisSide: "left",
+      marksRendered: 12,
+      categoriesRendered: 4,
+    },
+  );
+});
+
+test("cartesian renderer classification fails closed on absent, mixed or incoherent marks", () => {
+  for (const input of [
+    { barMarkCount: 0, columnMarkCount: 0, seriesCount: 3, categoryPositionCount: 0 },
+    { barMarkCount: 12, columnMarkCount: 12, seriesCount: 3, categoryPositionCount: 12 },
+    { barMarkCount: 0, columnMarkCount: 11, seriesCount: 3, categoryPositionCount: 11 },
+    { barMarkCount: 0, columnMarkCount: 12, seriesCount: 0, categoryPositionCount: 12 },
+    { barMarkCount: 0, columnMarkCount: 12, seriesCount: 3, categoryPositionCount: 7 },
+  ]) {
+    assert.equal(classifyCartesianRenderer(input), null);
+  }
+});
+
+test("physical axis bands preserve the established Bar mapping and reverse for Column", () => {
+  const chart = { x: 8, y: 60, width: 580, height: 526, right: 588, bottom: 586 };
+  const plot = { x: 92, y: 68, width: 480, height: 444, right: 572, bottom: 512 };
+  const left = { x: 8, y: 68, width: 84, height: 444, right: 92, bottom: 512 };
+  const bottom = { x: 92, y: 512, width: 480, height: 74, right: 572, bottom: 586 };
+
+  assert.deepEqual(cartesianAxisBandBounds(LAB, chart, plot), {
+    category: left,
+    value: bottom,
+  });
+  assert.deepEqual(cartesianAxisBandBounds(COLUMN_LAB, chart, plot), {
+    category: bottom,
+    value: left,
+  });
+});
+
 test("the synthetic lab environment is recognised", () => {
   assert.deepEqual(identifyLabEnvironment(LAB), { ok: true, reasons: [] });
+});
+
+test("the synthetic Clustered Column environment is recognised with physical axes preserved", () => {
+  assert.deepEqual(identifyLabEnvironment(COLUMN_LAB), { ok: true, reasons: [] });
+});
+
+test("orientation is required and cannot disagree with marks or physical axes", () => {
+  for (const state of [
+    { ...COLUMN_LAB, orientation: null },
+    { ...COLUMN_LAB, markType: "bar" },
+    { ...COLUMN_LAB, categoryAxisSide: "left" },
+    { ...COLUMN_LAB, valueAxisSide: "bottom" },
+    { ...COLUMN_LAB, grouping: "stacked" },
+    { ...COLUMN_LAB, marksRendered: 11 },
+  ]) {
+    assert.equal(identifyLabEnvironment(state).ok, false);
+  }
+});
+
+test("a visible legend must name every synthetic series", () => {
+  assert.equal(
+    identifyLabEnvironment({ ...COLUMN_LAB, seriesNames: ["Sum of Online", "Sum of Phone", "Sum of Revenue"] }).ok,
+    false,
+  );
+  assert.equal(
+    identifyLabEnvironment({ ...COLUMN_LAB, legendVisible: false, seriesNames: [] }).ok,
+    true,
+    "legend shedding is allowed because the sentinel remains mandatory",
+  );
 });
 
 test("a partially rendered lab visual is still the lab", () => {
@@ -144,9 +257,7 @@ test("a partially rendered lab still carries its sentinel", () => {
 // ---------------------------------------------------------------------------
 
 const OTHER_CARTESIAN = {
-  visualType: "cartesian",
-  categories: ["London", "North West", "Scotland", "Wales"],
-  seriesCount: 3,
+  ...LAB,
   sentinel: "Sum of Revenue, Sum of Cost and Sum of Margin by Category",
 };
 
@@ -643,9 +754,7 @@ test("each known fixture variant identifies, and nothing else does", () => {
   // has to recognise the edited fixture without degrading into "any four
   // categories".
   const base = {
-    visualType: "cartesian",
-    seriesCount: 3,
-    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+    ...LAB,
   };
   for (const [name, categories] of Object.entries(FIXTURE_CATEGORY_SETS)) {
     const result = identifyLabEnvironment({ ...base, categories: [...categories] });
@@ -656,9 +765,7 @@ test("each known fixture variant identifies, and nothing else does", () => {
 
 test("a category set that is not a known variant is refused", () => {
   const base = {
-    visualType: "cartesian",
-    seriesCount: 3,
-    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+    ...LAB,
   };
   for (const categories of [
     ["Paris", "Berlin", "Madrid", "Rome"],
@@ -678,9 +785,7 @@ test("a shed subset of one variant still identifies", () => {
   // Power BI drops categories when space is tight; that must not read as a
   // different fixture.
   const result = identifyLabEnvironment({
-    visualType: "cartesian",
-    seriesCount: 3,
-    sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+    ...LAB,
     categories: ["London", "Loughborough"],
   });
   assert.equal(result.ok, true, result.reasons.join("; "));
@@ -689,9 +794,7 @@ test("a shed subset of one variant still identifies", () => {
 test("an explicit expectation still overrides the variant list", () => {
   const result = identifyLabEnvironment(
     {
-      visualType: "cartesian",
-      seriesCount: 3,
-      sentinel: "Sum of Online, Sum of Phone and Sum of Post by Category",
+      ...LAB,
       categories: ["London", "NW", "Scotland", "Wales"],
     },
     { categories: ["London", "North West", "Scotland", "Wales"] },
