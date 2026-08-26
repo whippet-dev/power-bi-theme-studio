@@ -10,6 +10,7 @@ import type { CartesianLayoutInput } from "../app/components/previews/cartesianL
 import {
   authoredChromeExtent,
   authoredInnerBox,
+  authoredRootStyle,
   legendBandExtent,
   visualTitleBandExtent,
   visualTitleStyle,
@@ -101,6 +102,24 @@ test("a hidden legend costs nothing, and a side legend costs width not height", 
   const band = legendBandExtent(side as never, ["Online", "Phone", "Post"], measure);
   assert.ok(band.width > 0 && band.height === 0, "a side legend takes width");
   assert.equal(authoredInnerBox(BAR_CHART_BOX, band).height, BAR_CHART_BOX.height, "and leaves the height alone");
+});
+
+test("a side legend and title carry their separate authored-axis budgets into rendering", () => {
+  const title = visualTitleBandExtent(titleOf() as never, "", 0, measure);
+  const legend = legendBandExtent(
+    { show: true, position: "LeftCenter", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" } as never,
+    ["Online", "Phone", "Post"],
+    measure,
+  );
+  const inner = authoredInnerBox(BAR_CHART_BOX, authoredChromeExtent([title, legend]));
+  const style = authoredRootStyle({ width: BAR_CHART_BOX.width, height: BAR_CHART_BOX.height }, title, legend);
+
+  assert.equal(style.width, BAR_CHART_BOX.width, "the authored root never grows for chrome");
+  assert.equal(style.height, BAR_CHART_BOX.height);
+  assert.equal(style["--chart-title-band-height" as never], `${title.height}px`);
+  assert.equal(style["--chart-legend-band-width" as never], `${legend.width}px`);
+  assert.equal(inner.width + legend.width, BAR_CHART_BOX.width, "side legend width is paid once");
+  assert.equal(inner.height + title.height, BAR_CHART_BOX.height, "title height is paid once");
 });
 
 test("the layout is computed against the inner box, and accounts for all of it", () => {

@@ -7,6 +7,7 @@ import {
   labelIsInside,
   labelVisibleAt,
   legendIsAfterPlot,
+  legendIsCentered,
   legendIsVertical,
   mapLineStyle,
   ScaledGridlines,
@@ -26,6 +27,7 @@ import { clusteredSeriesBands } from "../../lib/seriesBands";
 import {
   authoredChromeExtent,
   authoredInnerBox,
+  authoredRootStyle,
   legendBandExtent,
   legendBandStyle,
   visualTitleBandExtent,
@@ -131,12 +133,12 @@ export function BarChartPreview({ barChartStyle, palette, titleChrome, titleFall
   return (
     <PresentationScale width={BAR_CHART_BOX.width}>
     <span
-      className={`chart-preview chart-preview--authored${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{
+      className={`chart-preview chart-preview--authored${legendVertical ? " chart-preview--legend-side" : ""}${legendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(barChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
+      style={authoredRootStyle({
         opacity: 1 - barChartStyle.plotArea.transparency / 100,
         width: BAR_CHART_BOX.width,
         height: BAR_CHART_BOX.height,
-      }}
+      }, titleBand, legendBand)}
     >
       {titleBand.height > 0 && (
         <span

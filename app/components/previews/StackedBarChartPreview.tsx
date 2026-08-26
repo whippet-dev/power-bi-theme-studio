@@ -4,6 +4,7 @@ import {
   dataLabelStyle,
   formatValue,
   legendIsAfterPlot,
+  legendIsCentered,
   legendIsVertical,
   mapLineStyle,
   ScaledGridlines,
@@ -22,6 +23,7 @@ import { stackSegments } from "../../lib/seriesBands";
 import {
   authoredChromeExtent,
   authoredInnerBox,
+  authoredRootStyle,
   legendBandExtent,
   legendBandStyle,
   visualTitleBandExtent,
@@ -86,12 +88,12 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
   return (
     <PresentationScale width={BAR_CHART_BOX.width}>
     <span
-      className={`chart-preview chart-preview--authored${stackedBarLegendVertical ? " chart-preview--legend-side" : ""}${stackedBarLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{
+      className={`chart-preview chart-preview--authored${stackedBarLegendVertical ? " chart-preview--legend-side" : ""}${stackedBarLegendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(stackedBarChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
+      style={authoredRootStyle({
         opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100,
         width: BAR_CHART_BOX.width,
         height: BAR_CHART_BOX.height,
-      }}
+      }, titleBand, legendBand)}
     >
       {titleBand.height > 0 && (
         <span

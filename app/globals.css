@@ -949,21 +949,43 @@ button { color: inherit; }
   border-radius: 2px;
 }
 
-/* Legend to the left/right puts the plot beside it instead of below.
-   Doubled class so this beats the base `.chart-preview` column rule,
-   which is defined later in this file. */
+/* A side legend is a WIDTH band inside the authored visual. It must not turn
+   the root into a row: the visual title still owns a HEIGHT band above the
+   whole chart. The plot has already paid this width through authoredInnerBox;
+   these rules only place the matching rendered band. */
 .chart-preview.chart-preview--legend-side {
-  flex-direction: row;
-  align-items: stretch;
+  display: block;
+  position: relative;
 }
 
-.chart-preview.chart-preview--legend-side.chart-preview--legend-after {
-  flex-direction: row-reverse;
+.chart-preview--legend-side .chart-preview__legend-band {
+  position: absolute;
+  top: var(--chart-title-band-height, 0px);
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.chart-preview--legend-side.chart-preview--legend-after .chart-preview__legend-band {
+  right: 0;
+  left: auto;
+}
+
+.chart-preview--legend-side.chart-preview--legend-center .chart-preview__legend-band {
+  align-items: center;
 }
 
 .chart-preview--legend-side .chart-preview__body {
-  flex: 1;
+  margin-top: 0;
+  margin-left: var(--chart-legend-band-width, 0px);
   min-width: 0;
+}
+
+.chart-preview--legend-side.chart-preview--legend-after .chart-preview__body {
+  margin-right: var(--chart-legend-band-width, 0px);
+  margin-left: 0;
 }
 
 .chart-gridline {
@@ -1541,6 +1563,23 @@ button { color: inherit; }
   right: auto;
   top: 4px;
   transform: translateX(-50%);
+}
+
+/* Terminal labels are centred on the plot endpoints by the scale. At the
+   authored visual's outside edge that puts half the glyph box out of bounds;
+   pin only those endpoints inward. The plot and scale stay unchanged. */
+.chart-axis-gutter--horizontal .chart-axis-gutter__ticks span:first-child {
+  transform: translateX(0);
+}
+
+.chart-axis-gutter--horizontal .chart-axis-gutter__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+/* With no neighbouring category-axis gutter, the lowest vertical value tick
+   cannot overhang into it. Keep that endpoint in its own strip. */
+.chart-axis-gutter--value.chart-axis-gutter--edge-contained:not(.chart-axis-gutter--horizontal) .chart-axis-gutter__ticks span:first-child {
+  transform: translateY(0);
 }
 
 .chart-axis-gutter--category {
@@ -2863,6 +2902,12 @@ button { color: inherit; }
 .chart-preview__legend-band {
   display: block;
   overflow: hidden;
+}
+
+/* legendExtent owns the authored budget, so old visual-spacing margins must
+   not add unbudgeted width or height outside an authored legend band. */
+.chart-preview--authored .chart-legend {
+  margin: 0;
 }
 
 /* The Power BI visual title, drawn INSIDE the authored visual because that

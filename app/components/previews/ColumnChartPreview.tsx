@@ -5,6 +5,7 @@ import {
   DataLabel,
   labelVisibleAt,
   legendIsAfterPlot,
+  legendIsCentered,
   legendIsVertical,
   mapLineStyle,
   ScaledGridlines,
@@ -19,7 +20,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
@@ -79,8 +80,8 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
 
   return (
     <PresentationScale width={COLUMN_CHART_BOX.width}><span
-      className={`chart-preview chart-preview--authored${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }}
+      className={`chart-preview chart-preview--authored${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(columnChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
+      style={authoredRootStyle({ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }, titleBand, legendBand)}
     >
       {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
       {!columnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{columnLegendNode}</span>}

@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatValue, labelIsInside, labelVisibleAt, legendIsAfterPlot, legendIsVertical, mapLineStyle } from "../app/components/ChartParts";
+import {
+  formatValue,
+  labelIsInside,
+  labelVisibleAt,
+  legendHorizontalAlignment,
+  legendIsAfterPlot,
+  legendIsCentered,
+  legendIsVertical,
+  mapLineStyle,
+} from "../app/components/ChartParts";
 
 test("formatValue abbreviates by display unit and honours precision", () => {
   assert.equal(formatValue(82_000, "1000", 0), "82K");
@@ -26,6 +35,20 @@ test("legend position maps to placement, covering all four sides", () => {
   assert.equal(legendIsAfterPlot("Right"), true);
   assert.equal(legendIsAfterPlot("Top"), false);
   assert.equal(legendIsAfterPlot("Left"), false);
+});
+
+test("legend alignment preserves every reviewed Power BI position", () => {
+  assert.equal(legendHorizontalAlignment("Top"), "flex-start");
+  assert.equal(legendHorizontalAlignment("TopCenter"), "center");
+  assert.equal(legendHorizontalAlignment("TopRight"), "flex-end");
+  assert.equal(legendHorizontalAlignment("Bottom"), "flex-start");
+  assert.equal(legendHorizontalAlignment("BottomCenter"), "center");
+  assert.equal(legendHorizontalAlignment("BottomRight"), "flex-end");
+
+  assert.equal(legendIsCentered("LeftCenter"), true, "side legends centre vertically only when requested");
+  assert.equal(legendIsCentered("RightCenter"), true);
+  assert.equal(legendIsCentered("Left"), false, "stacked top-left remains top-aligned");
+  assert.equal(legendIsCentered("Right"), false, "stacked top-right remains top-aligned");
 });
 
 test("label density thins labels out between none and all", () => {

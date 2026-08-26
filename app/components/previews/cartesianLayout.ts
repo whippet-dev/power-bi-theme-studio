@@ -10,6 +10,7 @@ import {
   type Rect,
   type TextMeasure,
 } from "../../lib/chartLayout";
+import type { CSSProperties } from "react";
 import { canvasTextMeasure } from "../../lib/canvasTextMeasure";
 import type { ResolvedChromeStyle } from "../../lib/chromeProperties";
 import { themeFontSizeToCssPx } from "../../lib/fontUnits";
@@ -373,6 +374,22 @@ export function legendBandStyle(band: { width: number; height: number }): { widt
   if (band.width > 0) return { width: band.width };
   if (band.height > 0) return { height: band.height };
   return {};
+}
+
+/**
+ * CSS needs the same title/legend bands that authoredInnerBox deducted: a
+ * title consumes height, while a side legend consumes width.
+ */
+export function authoredRootStyle(
+  base: CSSProperties,
+  titleBand: { height: number },
+  legendBand: { width: number },
+): CSSProperties {
+  return {
+    ...base,
+    "--chart-title-band-height": `${titleBand.height}px`,
+    "--chart-legend-band-width": `${legendBand.width}px`,
+  } as CSSProperties;
 }
 
 export function computePreviewCartesianLayout(input: CartesianLayoutInput): ChartLayout {

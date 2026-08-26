@@ -9,6 +9,7 @@ import {
   formatValue,
   labelVisibleAt,
   legendIsAfterPlot,
+  legendIsCentered,
   legendIsVertical,
   mapLineStyle,
   ScaledGridlines,
@@ -20,6 +21,7 @@ import {
 import {
   authoredChromeExtent,
   authoredInnerBox,
+  authoredRootStyle,
   categoryCentre,
   categoryPercent,
   clampedValueCoordinate,
@@ -569,8 +571,8 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
 
   return (
     <PresentationScale width={LINE_CHART_BOX.width}><span
-      className={`chart-preview chart-preview--authored${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100, width: LINE_CHART_BOX.width, height: LINE_CHART_BOX.height }}
+      className={`chart-preview chart-preview--authored${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(lineChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
+      style={authoredRootStyle({ opacity: 1 - lineChartStyle.plotArea.transparency / 100, width: LINE_CHART_BOX.width, height: LINE_CHART_BOX.height }, titleBand, legendBand)}
     >
       {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
       {!lineLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{lineLegendNode}</span>}

@@ -163,6 +163,19 @@ export function legendIsAfterPlot(position: string | number): boolean {
   return p.startsWith("Bottom") || p.startsWith("Right");
 }
 
+/** Whether a legend position centres its entries along the available band. */
+export function legendIsCentered(position: string | number): boolean {
+  return String(position).endsWith("Center");
+}
+
+/** The inline alignment a horizontal legend uses within its full-width band. */
+export function legendHorizontalAlignment(position: string | number): "flex-start" | "center" | "flex-end" {
+  const p = String(position);
+  if (p.endsWith("Center")) return "center";
+  if (p.endsWith("Right")) return "flex-end";
+  return "flex-start";
+}
+
 /**
  * A legend with one entry per series, honouring the title and all four
  * placements. Previously previews drew a single hardcoded swatch and only
@@ -177,9 +190,13 @@ export function ChartLegend({
 }): ReactNode {
   if (!legend.show) return null;
   const vertical = legendIsVertical(legend.position);
+  const horizontalAlignment = legendHorizontalAlignment(legend.position);
 
   return (
-    <span className={`chart-legend${vertical ? " chart-legend--vertical" : ""}`}>
+    <span
+      className={`chart-legend${vertical ? " chart-legend--vertical" : ""}`}
+      style={vertical ? undefined : { justifyContent: horizontalAlignment }}
+    >
       {legend.showTitle && (
         <span className="chart-legend__title" style={textStyle(legend)}>
           {String(legend.titleText) || "Series"}
@@ -649,10 +666,13 @@ export function ValueAxisGutter({
 }): ReactNode {
   if (!layout.valueAxis) return null;
   const vertical = layout.orientation === "vertical";
+  // When the other gutter is absent, the lowest/first tick no longer has a
+  // neighbouring band into which it can safely overhang.
+  const edgeContained = offset <= 0;
 
   return (
     <span
-      className={`chart-axis-gutter chart-axis-gutter--value${vertical ? "" : " chart-axis-gutter--horizontal"}`}
+      className={`chart-axis-gutter chart-axis-gutter--value${vertical ? "" : " chart-axis-gutter--horizontal"}${edgeContained ? " chart-axis-gutter--edge-contained" : ""}`}
       style={vertical ? { width: layout.valueAxis.width, bottom: offset } : { height: layout.valueAxis.height, left: offset }}
     >
       {axis.showAxisTitle && (
