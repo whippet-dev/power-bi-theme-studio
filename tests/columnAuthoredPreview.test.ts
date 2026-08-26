@@ -58,7 +58,7 @@ test("both Column renderers opt into the fixed authored visual boundary", () => 
 test("the Column authored root neutralises both legacy vertical margins", () => {
   assert.match(
     cssSource,
-    /\.chart-preview--authored \.chart-preview__body,\s*\.chart-preview--authored \.bar-preview__plot,\s*\.chart-preview--authored \.column-preview__plot\s*\{\s*margin-top: 0;/,
+    /\.chart-preview--authored \.chart-preview__body,\s*\.chart-preview--authored \.bar-preview__plot,\s*\.chart-preview--authored \.column-preview__plot,\s*\.chart-preview--authored \.line-preview__plot\s*\{\s*margin-top: 0;/,
   );
 });
 

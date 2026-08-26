@@ -874,7 +874,10 @@ export function VisualGallery({
   const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} titleChrome={chromeStyles.stackedColumn.title} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceBelowTitle : 0} />;
 
 
-  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} />;
+  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} titleChrome={chromeStyles.line.title} titleFallback="Applications over time" spaceBelowTitle={chromeStyles.line.spacing.customizeSpacing ? chromeStyles.line.spacing.spaceBelowTitle : 0} />;
+  // SmallMultiplesGrid repeats its content into every cell. Keep the current
+  // outer-shell title there instead of giving every mini Line its own title.
+  const lineSmallMultipleContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} />;
   // The line chart's small-multiples wrapper lives with the other four in
   // the descriptors below, so these three stay here rather than moving
   // into the component. Same values, read straight off the resolved style.
@@ -1850,12 +1853,13 @@ export function VisualGallery({
       label: "Line chart",
       defaultTitle: "Applications over time",
       chrome: chromeStyles.line,
+      titleInsideVisual: !lineUsesSmallMultiples,
       content: lineUsesSmallMultiples
         ? (
             <SmallMultiplesGrid
               layout={lineSmallMultiples}
               subheader={lineSubheader}
-              content={lineContent}
+              content={lineSmallMultipleContent}
               titles={["London", "North West", "Scotland", "Wales"]}
             />
           )

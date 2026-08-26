@@ -164,29 +164,19 @@ export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 300 };
 export const BAR_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 250 };
 
 /**
- * The line chart's natural chart box. Replaces `.line-preview__plot`'s
- * `height: 120px` plus an SVG that carried its own abstract 100x100
- * coordinate space — a space in which a point's y was `100 - value`, so a
- * value of 68 sat 68% up the plot while its own axis said 68000/70000 =
- * 97%. The engine now owns both axes and the SVG draws in the plot's
- * coordinates (RENDERER_AUDIT §4.5).
+ * The Line family's real authored visual box. Classic 2026 native measurement
+ * established a height-driven compact treatment: at 450 × 250 and 450 × 275,
+ * the legend and both axis titles are 12px; at 450 × 300 they return to the
+ * full 13.333px legend and 16px axis-title treatment. The same transition
+ * appeared at 600px wide, so 450 × 300 is the smallest TESTED full-treatment
+ * authored size, rather than a nominal ratio that cancels in fluid CSS.
  *
- * 150 was arrived at by growing the box to give a new gutter its space
- * back — the compensating move the model above rejects, applied once by
- * hand before there was a model to reject it. The number survives on its
- * own merits rather than on that reasoning: it leaves 106.4-108.2 units of
- * plot, a 26.6-27.1 unit tick interval against a 16.2-18.9 unit value-axis
- * line, and so clears `minimumPlotHeight` by the widest margin of the three.
- * The line chart also has the most in-plot furniture to keep clear of — markers,
- * series labels and their leaders — which is the reason to keep the extra
- * height now that plot preservation is no longer one.
- *
- * Width is nominal, as above: the rendered box is CSS-fluid (measured at
- * 370 natural units), and every consumer of it — slot centres, gridline
- * offsets, the SVG viewBox — takes a ratio of the plot, so the nominal
- * figure cancels out.
+ * This is the whole Power BI visual, including its title and legend. Those
+ * renderer-owned bands are deducted before ChartLayout receives its inner
+ * chart box. It deliberately does not fit Theme Studio to the native
+ * 396 × 185.667 plot rectangle: the layout engine owns the preview geometry.
  */
-export const LINE_CHART_BOX: Rect = { x: 0, y: 0, width: 372, height: 150 };
+export const LINE_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 300 };
 
 export type CartesianLayoutInput = {
   box: Rect;

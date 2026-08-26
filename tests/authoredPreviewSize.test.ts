@@ -148,9 +148,9 @@ test("a bigger authored box gives its extra space to the plot, not to the gutter
   assert.ok(after < before, `gutter share should fall: ${before} -> ${after}`);
 });
 
-test("the Column family shares the proven 450 x 300 authored box", () => {
+test("the Column and Line families use their proven 450 x 300 authored boxes", () => {
   assert.deepEqual(COLUMN_CHART_BOX, { x: 0, y: 0, width: 450, height: 300 });
-  assert.deepEqual(LINE_CHART_BOX, { x: 0, y: 0, width: 372, height: 150 });
+  assert.deepEqual(LINE_CHART_BOX, { x: 0, y: 0, width: 450, height: 300 });
 });
 
 test("the category scale still derives from ChartLayout at the authored size", () => {

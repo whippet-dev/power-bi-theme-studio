@@ -18,13 +18,22 @@ import {
 import {
   seriesPointPercents, areaPath, linePath, markerShape } from "../../lib/lineGeometry";
 import {
+  authoredChromeExtent,
+  authoredInnerBox,
   categoryCentre,
   categoryPercent,
   clampedValueCoordinate,
   computePreviewCartesianLayout,
+  legendBandExtent,
+  legendBandStyle,
   LINE_CHART_BOX,
   valueFraction,
+  visualTitleBandExtent,
+  visualTitleStyle,
+  type VisualTitleChrome,
 } from "./cartesianLayout";
+import { PresentationScale } from "./PresentationScale";
+import { headingAria } from "../../lib/headingAria";
 import {
   LINE_DATA_MAX,
   VALUE_SCALE,
@@ -62,9 +71,15 @@ type ConstantLineStyle = {
   dataLabelVerticalPosition: string | number;
 };
 
-type Props = { lineChartStyle: ResolvedLineChartStyle; palette: string[] };
+type Props = {
+  lineChartStyle: ResolvedLineChartStyle;
+  palette: string[];
+  titleChrome?: VisualTitleChrome;
+  titleFallback?: string;
+  spaceBelowTitle?: number;
+};
 
-export function LineChartPreview({ lineChartStyle, palette }: Props) {
+export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
   /**
    * The series every single-series overlay belongs to.
    *
@@ -88,13 +103,16 @@ export function LineChartPreview({ lineChartStyle, palette }: Props) {
   );
   const lineLegendAtBottom = legendIsAfterPlot(lineChartStyle.legend.position);
   const lineLegendVertical = legendIsVertical(lineChartStyle.legend.position);
+  const legendBand = legendBandExtent(lineChartStyle.legend, lineFixture.series.map((series) => series.label));
+  const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
+  const authoredInner = authoredInnerBox(LINE_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
   // One layout, and one set of point coordinates derived from it. Every
   // other position on this chart — path, markers, labels, bands, constant
   // lines — is computed from these, so nothing can end up on a second
   // scale. Before T10 a point's y was `100 - value`, which put a value of
   // 68 at 68% of the plot while its own axis said 68000/70000 = 97%.
   const layout = computePreviewCartesianLayout({
-    box: LINE_CHART_BOX,
+    box: authoredInner,
     orientation: "vertical",
     categoryAxis: lineChartStyle.categoryAxis,
     valueAxis: lineChartStyle.valueAxis,
@@ -550,15 +568,16 @@ export function LineChartPreview({ lineChartStyle, palette }: Props) {
   // repeated mini-charts, one per category.
 
   return (
-    <span
-      className={`chart-preview${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}`}
-      style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100 }}
+    <PresentationScale width={LINE_CHART_BOX.width}><span
+      className={`chart-preview chart-preview--authored${lineLegendVertical ? " chart-preview--legend-side" : ""}${lineLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      style={{ opacity: 1 - lineChartStyle.plotArea.transparency / 100, width: LINE_CHART_BOX.width, height: LINE_CHART_BOX.height }}
     >
-      {!lineLegendAtBottom && lineLegendNode}
+      {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
+      {!lineLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{lineLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
           {y2TitleNode}
-          <span className="line-preview__plot" style={{ height: LINE_CHART_BOX.height }}>
+          <span className="line-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
             <ValueAxisGutter
               axis={lineChartStyle.valueAxis}
               layout={layout}
@@ -707,7 +726,7 @@ export function LineChartPreview({ lineChartStyle, palette }: Props) {
           </span>
         </span>
       </span>
-      {lineLegendAtBottom && lineLegendNode}
-    </span>
+      {lineLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{lineLegendNode}</span>}
+    </span></PresentationScale>
   );
 }

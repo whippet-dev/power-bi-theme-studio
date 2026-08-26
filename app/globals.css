@@ -1743,11 +1743,9 @@ button { color: inherit; }
   pointer-events: none;
 }
 
-/* The line chart's natural chart box. Its `height: 120px` is gone: the
-   height now comes from LINE_CHART_BOX (previews/cartesianLayout.ts) so
-   there is one declared box rather than a CSS rule the geometry cannot
-   see. `margin-top` stays — it is the gap below the legend, not plot
-   geometry. */
+/* The chart engine owns the Line plot's dimensions. The legacy margin stays
+   for small multiples; normal authored previews neutralise it below because
+   title and legend are already deducted from the fixed visual budget. */
 .line-preview__plot {
   position: relative;
   margin-top: 22px;
@@ -2849,8 +2847,17 @@ button { color: inherit; }
 
 .chart-preview--authored .chart-preview__body,
 .chart-preview--authored .bar-preview__plot,
-.chart-preview--authored .column-preview__plot {
+.chart-preview--authored .column-preview__plot,
+.chart-preview--authored .line-preview__plot {
   margin-top: 0;
+}
+
+/* The Line preview's optional secondary ticks used to live just outside a
+   fluid chart. In the fixed authored visual that would create horizontal
+   scroll (or be clipped), so keep this decorative axis inside its plot. */
+.chart-preview--authored .chart-ticks--secondary {
+  right: 4px;
+  transform: none;
 }
 
 .chart-preview__legend-band {
