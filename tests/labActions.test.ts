@@ -143,6 +143,32 @@ function controllerForIdentity({
   return { controller, session };
 }
 
+test("a semantic Base-theme preflight is retained after the shell menu disappears", async () => {
+  const controller = new LabController({ expectedGrouping: "stacked", requireVerifiedBaseTheme: true, verbose: false });
+  let visible = true;
+  Object.defineProperty(controller, "session", { value: {
+    async open() {}, close() {},
+    async read(name: string) {
+      if (name === "baseThemeValue") return visible ? { value: "Classic 2026" } : null;
+      if (name === "labVisuals") return [STACKED_COLUMN_LAB];
+      if (name === "labState") return STACKED_COLUMN_LAB;
+      throw new Error(`unexpected lab read: ${name}`);
+    },
+  }, writable: true });
+  assert.equal(await controller.verifyBaseThemePrecondition(), "Classic 2026");
+  visible = false;
+  const state = await controller.open();
+  assert.equal(state.baseTheme, "Classic 2026");
+});
+
+test("unavailable or unsupported Base-theme preflight refuses", async () => {
+  for (const value of [null, "Custom", "Classic 2027"]) {
+    const controller = new LabController({ verbose: false });
+    Object.defineProperty(controller, "session", { value: { async open() {}, close() {}, async read() { return value === null ? null : { value }; } }, writable: true });
+    await assert.rejects(() => controller.verifyBaseThemePrecondition(), /unavailable or unsupported/);
+  }
+});
+
 test("the cartesian renderer classifier positively distinguishes clustered Bar and Column", () => {
   assert.deepEqual(
     classifyCartesianRenderer({

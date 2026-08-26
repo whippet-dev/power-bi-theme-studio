@@ -63,6 +63,7 @@ class LabSession {
   }
 
   async open() {
+    if (this.socket) return;
     const targets = await (await fetch(`http://${HOST}:${this.port}/json/list`)).json();
     const target = targets.find((t) => t.type === "page" && t.url.includes("reportView"));
     if (!target) throw new Error("no Power BI reportView target — is Desktop running with the debug port?");
@@ -1384,7 +1385,7 @@ const PAYLOADS = {
 // ---------------------------------------------------------------------------
 
 export class LabController {
-  constructor({ port = 9222, verbose = true, expectedGrouping = "clustered" } = {}) {
+  constructor({ port = 9222, verbose = true, expectedGrouping = "clustered", requireVerifiedBaseTheme = false } = {}) {
     if (!SUPPORTED_CARTESIAN_GROUPINGS.includes(expectedGrouping)) {
       throw new TypeError(
         `expectedGrouping must be one of ${SUPPORTED_CARTESIAN_GROUPINGS.join(", ")}, not ${JSON.stringify(expectedGrouping)}`,
@@ -1396,6 +1397,8 @@ export class LabController {
     // deliberately no auto/either mode: accepting either would let a sweep
     // continue after the visual type changed beneath it.
     this.expectedLab = Object.freeze({ grouping: expectedGrouping });
+    this.requireVerifiedBaseTheme = requireVerifiedBaseTheme;
+    this.verifiedBaseTheme = null;
     this.initialState = null;
     this.mutated = {};
     this.sizeFieldMap = null;
@@ -1425,6 +1428,11 @@ export class LabController {
   async open() {
     await this.session.open();
 
+    if (this.requireVerifiedBaseTheme && !this.verifiedBaseTheme) {
+      this.session.close();
+      throw new Error("REFUSING TO MUTATE — a supported Base-theme preflight is required before opening this controller");
+    }
+
     // Identity first, across every cartesian visual on the page, so a second
     // reference visual cannot be mutated by mistake and an ambiguous page is
     // an error rather than a guess.
@@ -1446,13 +1454,35 @@ export class LabController {
 
     // The base theme is part of every measurement's identity, so it is read
     // up front and restored at the end like any other mutated setting.
-    state.baseTheme = await this.readBaseTheme();
+    state.baseTheme = this.verifiedBaseTheme ?? await this.readBaseTheme();
     this.initialState = state;
     this.log(
       `lab identified: ${state.width}x${state.height}, ${state.marksRendered} ${state.markType} marks, ` +
         `base theme ${state.baseTheme ?? "(unreadable)"}`,
     );
     return state;
+  }
+
+  /**
+   * Reads the already-visible View → Themes value without navigating the UI.
+   * This is an experiment precondition, not a caller assertion: only an exact
+   * value from the fixed semantic reader is accepted.
+   */
+  async verifyBaseThemePrecondition() {
+    await this.session.open();
+    const control = await this.session.read("baseThemeValue");
+    const theme = control?.value;
+    if (!SUPPORTED_BASE_THEMES.includes(theme)) {
+      throw new Error(`REFUSING TO MUTATE — Base-theme preflight is unavailable or unsupported: ${JSON.stringify(theme ?? null)}`);
+    }
+    this.verifiedBaseTheme = theme;
+    return theme;
+  }
+
+  requireVerifiedThemeForSize() {
+    if (this.requireVerifiedBaseTheme && !this.verifiedBaseTheme) {
+      throw new Error("REFUSING TO MUTATE — Base-theme preflight is missing or was invalidated");
+    }
   }
 
   /**
@@ -1551,6 +1581,10 @@ export class LabController {
    * earlier dataset unusable.
    */
   async setBaseTheme(theme) {
+    // A theme-changing action makes any earlier preflight proof stale before
+    // it touches the UI. A later size action must receive a fresh semantic
+    // preflight rather than inheriting a now-false experiment label.
+    this.verifiedBaseTheme = null;
     await this.requireLabVisual();
     validateAction({ type: "setBaseTheme", theme });
 
@@ -1840,6 +1874,7 @@ export class LabController {
   }
 
   async setVisualSize(width, height) {
+    this.requireVerifiedThemeForSize();
     await this.requireLabVisual();
     validateAction({ type: "setVisualSize", width: Math.round(width), height: Math.round(height) });
     const map = await this.resolveSizeFields();
