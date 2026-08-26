@@ -1481,13 +1481,12 @@ button { color: inherit; }
   flex-direction: column;
 }
 
-/* The column chart's authored inner chart box. Its dimensions are supplied
-   stack that derived the plot from it are gone: ChartLayout now computes
-   the plot and both gutters, and the renderer applies them inline. The
-   height comes from COLUMN_CHART_BOX (previews/cartesianLayout.ts) so
-   there is one declared box rather than a CSS rule and a TS constant that
-   can disagree. `margin-top` stays — it is the gap below the legend, not
-   plot geometry. */
+/* The column chart's inner chart box. Its dimensions come from the authored
+   budget in COLUMN_CHART_BOX (previews/cartesianLayout.ts): ChartLayout
+   computes the plot and both gutters, and the renderer applies the result
+   inline. The legacy margin remains for non-authored uses only; authored
+   previews neutralise it below because title and legend already consume
+   their share of the fixed 450 x 300 visual. */
 .column-preview__plot {
   position: relative;
   margin-top: 22px;
@@ -2849,7 +2848,8 @@ button { color: inherit; }
 }
 
 .chart-preview--authored .chart-preview__body,
-.chart-preview--authored .bar-preview__plot {
+.chart-preview--authored .bar-preview__plot,
+.chart-preview--authored .column-preview__plot {
   margin-top: 0;
 }
 

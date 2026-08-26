@@ -79,7 +79,7 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
 
   return (
     <PresentationScale width={COLUMN_CHART_BOX.width}><span
-      className={`chart-preview${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
+      className={`chart-preview chart-preview--authored${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}`}
       style={{ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }}
     >
       {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}

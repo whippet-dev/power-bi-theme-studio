@@ -89,22 +89,27 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
 }
 
 /**
- * The column chart's natural chart box. Replaces `.column-preview__plot`'s
- * `height: 128px`, which CSS owned and the geometry could not see. Same
- * total footprint as before; the difference is that the engine now carves
- * the axis gutters *out* of it, where the old CSS let the category labels
- * eat into the plot the value axis was measured against.
+ * The shared Column-family AUTHORED size.
  *
- * Re-checked, not merely inherited: 128 clears `minimumPlotHeight` in every
- * measured condition, leaving 84.4-86.2 units of plot and so a 21.1-21.6
- * unit tick interval against a 16.2-18.9 unit value-axis line. The
- * fixed-box model asks nothing of it, so it stands.
+ * **450 x 300 is real in both dimensions**: Clustered Column and Stacked
+ * Column render their complete visual into this fixed rectangle before
+ * PresentationScale fits the finished result into a hero or thumbnail.
+ * Title and legend bands are deducted from this box, so they cannot grow
+ * the visual beyond its authored height.
  *
- * Width is nominal: only in-plot fractions are taken from it, so the chart
- * stays fluid. Height is real and is applied to the rendered box.
+ * PROVEN-EXPERIMENT: native Power BI Desktop under Classic 2026 retained
+ * the full useful title, legend, axes, all four categories and all three
+ * series for both Clustered and Stacked Column at 450 x 300. At 450 x 250,
+ * both entered the compact responsive treatment (smaller legend/axis-title
+ * typography and fewer value ticks). The treatment persisted through
+ * 275px and was gone by 300px, making 450 x 300 the smallest measured stable,
+ * non-compacted comparison size for the shared Column family.
+ *
+ * This replaces the old CSS-owned 372 x 128 inner plot constraint. That
+ * smaller rectangle was neither the complete visual nor a proven authored
+ * size, and its width was only nominal. Keeping one real box here makes the
+ * layout engine, rendered DOM and native comparison use the same geometry.
  */
-// PROVEN-EXPERIMENT: Classic 2026 Clustered and Stacked Column retain the
-// full native title/legend treatment at this shared authored size.
 export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 300 };
 
 /**
