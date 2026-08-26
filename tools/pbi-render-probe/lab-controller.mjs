@@ -1690,6 +1690,10 @@ export class LabController {
     const control = await this.openThemeControls();
     if (!control) throw new Error("the Base theme control could not be found");
     if (control.value === theme) {
+      // The semantic control is a fresh proof even though no UI mutation is
+      // needed. This follows the same proof rule as the verified read-back
+      // below, without preserving the stale value cleared at method entry.
+      this.verifiedBaseTheme = theme;
       this.log(`base theme already ${theme}`);
       await this.selectVisual();
       return { theme, changed: false, settled: true };

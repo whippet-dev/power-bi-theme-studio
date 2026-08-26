@@ -242,6 +242,19 @@ test("a successfully verified theme mutation refreshes the Base-theme proof", as
   assert.doesNotThrow(() => controller.requireVerifiedThemeForSize());
 });
 
+test("a semantic no-op Base-theme request refreshes the proof", async () => {
+  const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
+  controller.verifiedBaseTheme = "Classic 2018";
+  controller.requireLabVisual = async () => {};
+  controller.openThemeControls = async () => ({ value: "Classic 2026", expanded: "false", x: 1, y: 1 });
+  controller.selectVisual = async () => true;
+
+  const result = await controller.setBaseTheme("Classic 2026");
+  assert.deepEqual(result, { theme: "Classic 2026", changed: false, settled: true });
+  assert.equal(controller.verifiedBaseTheme, "Classic 2026");
+  assert.doesNotThrow(() => controller.requireVerifiedThemeForSize());
+});
+
 test("an unverified theme mutation leaves the Base-theme proof invalid", async () => {
   const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
   controller.verifiedBaseTheme = "Classic 2026";
