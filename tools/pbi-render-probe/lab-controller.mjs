@@ -2234,7 +2234,10 @@ export class LabController {
       if (action.type === "setThemeLabelFontFamily") await this.setThemeLabelFontFamily(action.family);
     }
     const current = await this.session.read("labState");
-    current.baseTheme = await this.readBaseTheme();
+    // A size-only run cannot change the report theme. Keep using the exact
+    // semantic preflight proof when it remains valid; the shell menu is not
+    // expected to still be visible during restoration.
+    current.baseTheme = this.verifiedBaseTheme ?? await this.readBaseTheme();
     if (this.mutated.categoryAxisTitleVisible !== undefined) {
       const geometry = await this.session.read("horizontalGeometry");
       current.categoryAxisTitleVisible = Boolean(geometry && geometry.categoryTitle);

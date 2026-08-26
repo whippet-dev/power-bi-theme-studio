@@ -169,6 +169,35 @@ test("unavailable or unsupported Base-theme preflight refuses", async () => {
   }
 });
 
+test("size restoration retains a valid semantic Base-theme preflight", async () => {
+  const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
+  controller.verifiedBaseTheme = "Classic 2026";
+  controller.initialState = { width: 600, height: 600, baseTheme: "Classic 2026" };
+  controller.mutated = { width: 450, height: 250 };
+  let restoredSize = false;
+  controller.setVisualSize = async (width, height) => {
+    restoredSize = true;
+    return { width, height, settled: true, observations: 0 };
+  };
+  controller.readBaseTheme = async () => { throw new Error("Base-theme UI must not be reopened during size-only restore"); };
+  Object.defineProperty(controller, "session", { value: { async read(name: string) {
+    if (name === "labState") return { width: 600, height: 600 };
+    throw new Error(`unexpected lab read: ${name}`);
+  } }, writable: true });
+  const result = await controller.restore();
+  assert.equal(restoredSize, true);
+  assert.deepEqual(result, { restored: true, problems: [] });
+});
+
+test("a theme mutation invalidates the preflight before a required size action", async () => {
+  const controller = new LabController({ requireVerifiedBaseTheme: true, verbose: false });
+  controller.verifiedBaseTheme = "Classic 2026";
+  Object.defineProperty(controller, "session", { value: { async read() { return []; } }, writable: true });
+  await assert.rejects(() => controller.setBaseTheme("Classic 2018"));
+  assert.equal(controller.verifiedBaseTheme, null);
+  assert.throws(() => controller.requireVerifiedThemeForSize(), /missing or was invalidated/);
+});
+
 test("the cartesian renderer classifier positively distinguishes clustered Bar and Column", () => {
   assert.deepEqual(
     classifyCartesianRenderer({
