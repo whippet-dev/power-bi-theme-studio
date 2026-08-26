@@ -625,7 +625,7 @@ function EffectDemo({
  * sub-heading. Properties without a section render first, unclustered,
  * alongside the group's master show/enabled toggle.
  */
-function RegistryGroupBody({
+export function RegistryGroupBody({
   theme,
   group,
   groupValues,
@@ -694,7 +694,8 @@ function RegistryGroupBody({
     <div className={`property-group__body${inactive ? " property-group__body--inactive" : ""}`}>
       {inactive && (
         <p className="property-group__inactive-note" role="status">
-          Not currently shown. Formatting applies when enabled.
+          <span className="property-group__inactive-badge">Off</span>
+          <span>Not currently shown. Formatting applies when enabled.</span>
         </p>
       )}
       {sections.map((section, index) =>

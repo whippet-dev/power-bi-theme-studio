@@ -205,10 +205,17 @@ export function orderVisualGroups(visual: EditorVisualKind, groups: EditorGroupM
     .map((group, index) => {
       const key = groupKey(group.id);
       const chrome = group.id.startsWith("chrome:");
+      const coreChrome = chrome && (key === "title" || key === "subTitle");
       const specialist = SPECIALIST_GROUPS.has(key);
-      const tier = chrome ? 1 : specialist ? 2 : 0;
-      const rank = tier === 0 ? (coreRank.get(key) ?? preferred.length + index) : index;
-      const section = tier === 0 ? "Visual formatting" : tier === 1 ? "Visual container" : "Analytics & advanced";
+      const tier = specialist ? 2 : chrome && !coreChrome ? 1 : 0;
+      const rank = coreChrome
+        ? key === "title"
+          ? 0
+          : 1
+        : tier === 0
+          ? 2 + (coreRank.get(key) ?? preferred.length + index)
+          : index;
+      const section = tier === 0 ? "Core formatting" : tier === 1 ? "Visual settings" : "Analytics & advanced";
       return { group: { ...group, section }, index, tier, rank };
     })
     .sort((left, right) => left.tier - right.tier || left.rank - right.rank || left.index - right.index)

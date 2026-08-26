@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FontFamilyControl, PropertyRow } from "../app/components/PropertyEditor";
+import { FontFamilyControl, PropertyRow, RegistryGroupBody } from "../app/components/PropertyEditor";
 import {
   fontFamilyOptions,
   inactivePropertyGroup,
@@ -63,9 +63,11 @@ test("ordinary properties stay stable while named sections follow human-facing c
   assert.deepEqual(sections[0].entries.map(([key]) => key), ["second", "first"]);
 });
 
-test("cartesian group ordering puts core controls before container chrome and specialist features", () => {
+test("cartesian group ordering prioritises Title and Subtitle, then core controls, visual settings, and specialist features", () => {
   const groups: EditorGroupMeta[] = [
     { id: "chrome:title", title: "Title", count: 1 },
+    { id: "chrome:subTitle", title: "Subtitle", count: 1 },
+    { id: "chrome:background", title: "Background", count: 1 },
     { id: "bar:categoryAxis", title: "Y axis", count: 1 },
     { id: "bar:error", title: "Error bars", count: 1 },
     { id: "bar:dataPoint", title: "Data colors", count: 1 },
@@ -75,16 +77,66 @@ test("cartesian group ordering puts core controls before container chrome and sp
   const source = structuredClone(groups);
   const ordered = orderVisualGroups("bar", groups);
 
-  assert.deepEqual(ordered.map(({ title }) => title), ["Data colors", "Legend", "X axis", "Y axis", "Title", "Error bars"]);
+  assert.deepEqual(ordered.map(({ title }) => title), [
+    "Title",
+    "Subtitle",
+    "Data colors",
+    "Legend",
+    "X axis",
+    "Y axis",
+    "Background",
+    "Error bars",
+  ]);
   assert.deepEqual(ordered.map(({ section }) => section), [
-    "Visual formatting",
-    "Visual formatting",
-    "Visual formatting",
-    "Visual formatting",
-    "Visual container",
+    "Core formatting",
+    "Core formatting",
+    "Core formatting",
+    "Core formatting",
+    "Core formatting",
+    "Core formatting",
+    "Visual settings",
     "Analytics & advanced",
   ]);
+  assert.equal(ordered.some(({ section }) => section === "Visual container"), false);
   assert.deepEqual(groups, source);
+});
+
+test("non-cartesian core ordering adapts to Card and Table without mutating either source list", () => {
+  const card: EditorGroupMeta[] = [
+    { id: "chrome:background", title: "Background", count: 1 },
+    { id: "card:categoryLabels", title: "Category label", count: 1 },
+    { id: "chrome:subTitle", title: "Subtitle", count: 1 },
+    { id: "card:labels", title: "Data label", count: 1 },
+    { id: "typography", title: "Typography", count: 1 },
+    { id: "chrome:title", title: "Title", count: 1 },
+  ];
+  const table: EditorGroupMeta[] = [
+    { id: "table:grid", title: "Grid", count: 1 },
+    { id: "chrome:title", title: "Title", count: 1 },
+    { id: "table:values", title: "Values", count: 1 },
+    { id: "chrome:subTitle", title: "Subtitle", count: 1 },
+    { id: "table:columnHeaders", title: "Column headers", count: 1 },
+  ];
+  const cardSource = structuredClone(card);
+  const tableSource = structuredClone(table);
+
+  assert.deepEqual(orderVisualGroups("card", card).map(({ title }) => title), [
+    "Title",
+    "Subtitle",
+    "Typography",
+    "Data label",
+    "Category label",
+    "Background",
+  ]);
+  assert.deepEqual(orderVisualGroups("table", table).map(({ title }) => title), [
+    "Title",
+    "Subtitle",
+    "Column headers",
+    "Values",
+    "Grid",
+  ]);
+  assert.deepEqual(card, cardSource);
+  assert.deepEqual(table, tableSource);
 });
 
 test("font-family detection covers visual fontFamily and global fontFace paths only", () => {
@@ -131,6 +183,22 @@ test("inactive group presentation leaves dependent controls enabled and editable
   );
   assert.match(markup, /registry-property--inactive/);
   assert.doesNotMatch(markup, /disabled/);
+
+  const groupMarkup = renderToStaticMarkup(
+    <RegistryGroupBody
+      theme={{ name: "Test" } as PowerBITheme}
+      group={group}
+      groupValues={{ family: "Arial", show: false }}
+      pathPrefix="visualStyles.lineChart.*"
+      getThemePath={(item) => ["visualStyles", "lineChart", "*", ...item.path]}
+      onChange={() => undefined}
+      onReset={() => undefined}
+    />,
+  );
+  assert.match(groupMarkup, /property-group__body--inactive/);
+  assert.match(groupMarkup, /property-group__inactive-badge">Off/);
+  assert.match(groupMarkup, /Not currently shown\. Formatting applies when enabled\./);
+  assert.doesNotMatch(groupMarkup, /disabled/);
 });
 
 test("visibility changes and reset preserve separately configured formatting values and literal paths", () => {
