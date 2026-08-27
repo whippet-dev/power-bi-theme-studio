@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  cloneStarterTheme,
+  cloneNewTheme,
   deleteThemeValue,
   parseThemeJson,
   resolveTheme,
@@ -62,9 +62,9 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
 };
 
 export function ThemeStudio() {
-  const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
+  const [theme, setTheme] = useState<PowerBITheme>(() => cloneNewTheme());
   const [selectedVisual, setSelectedVisual] = useState<VisualKind>(DEFAULT_HERO_VISUAL);
-  const [fileLabel, setFileLabel] = useState("Starter theme");
+  const [fileLabel, setFileLabel] = useState("New theme");
   const [message, setMessage] = useState<string | null>(null);
   // Both start visible; these are display-only preview toggles, not
   // theme state, so hiding them costs nothing to try and nothing is lost.
@@ -73,8 +73,7 @@ export function ThemeStudio() {
   // Which real Power BI base theme underlies every default this app shows
   // when the working theme itself is silent on a value — see baseThemes.ts.
   // Defaults to Classic 2026 (Power BI's own current default for new
-  // reports), independent of what the *starter theme* (this app's own
-  // from-scratch example) happens to set.
+  // reports), independently of the user-authored working theme.
   const [baseThemeId, setBaseThemeId] = useState<BaseThemeId>(DEFAULT_BASE_THEME_ID);
   const fileInput = useRef<HTMLInputElement>(null);
   // Resolution reads the user's theme and the base theme as separate
@@ -214,8 +213,8 @@ export function ThemeStudio() {
   };
 
   const resetTheme = () => {
-    setTheme(cloneStarterTheme());
-    setFileLabel("Starter theme");
+    setTheme(cloneNewTheme());
+    setFileLabel("New theme");
     setMessage(null);
   };
 
@@ -273,7 +272,7 @@ export function ThemeStudio() {
             ))}
           </select>
         </label>
-        <button className="text-button" type="button" onClick={resetTheme}>Reset starter</button>
+        <button className="text-button" type="button" onClick={resetTheme}>Reset theme</button>
       </div>
 
       {message && (

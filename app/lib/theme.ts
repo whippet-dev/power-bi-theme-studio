@@ -31,31 +31,17 @@ export type ResolvedTheme = {
   categoryLabelColor: string;
 };
 
-export const STARTER_THEME: PowerBITheme = {
-  name: "Sample theme",
-  dataColors: ["#005EA5", "#28A197", "#FFDD00", "#D4351C", "#912B88"],
-  background: "#FFFFFF",
-  foreground: "#0B0C0C",
-  tableAccent: "#005EA5",
-  textClasses: {
-    title: {
-      fontFace: "Segoe UI",
-      fontSize: 12,
-      color: "#0B0C0C",
-    },
-    callout: {
-      fontFace: "Segoe UI Semibold",
-      fontSize: 28,
-      color: "#0B0C0C",
-    },
-    label: {
-      fontFace: "Segoe UI",
-      fontSize: 10,
-      color: "#505A5F",
-    },
-  },
-  visualStyles: {},
-};
+/**
+ * A fresh working theme contains only user-authored content. The selected
+ * Power BI base theme supplies every default beneath it; this object is what
+ * gets edited, reset, imported over, and exported.
+ */
+export const NEW_THEME: PowerBITheme = { name: "New theme" };
+
+// Resolver fallbacks are deliberately separate from NEW_THEME. They are only
+// used for malformed or incomplete standalone data where no base layer is
+// available, and must never become implicit user overrides.
+const FALLBACK_PALETTE = ["#005EA5", "#28A197", "#FFDD00", "#D4351C", "#912B88"];
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -102,7 +88,6 @@ export function parseThemeJson(source: string): PowerBITheme {
 }
 
 export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
-  const starterPalette = STARTER_THEME.dataColors as string[];
   const incomingPalette = Array.isArray(theme.dataColors)
     ? theme.dataColors.filter(
         (color): color is string => typeof color === "string" && HEX_COLOR.test(color),
@@ -115,11 +100,11 @@ export function resolveTheme(theme: PowerBITheme): ResolvedTheme {
 
   return {
     name: typeof theme.name === "string" && theme.name.trim() ? theme.name : "Untitled theme",
-    palette: incomingPalette.length ? incomingPalette : starterPalette,
+    palette: incomingPalette.length ? incomingPalette : FALLBACK_PALETTE,
     background: readColor(theme.background, "#FFFFFF"),
     foreground: readColor(theme.foreground, "#0B0C0C"),
     muted: readColor(label.color, "#505A5F"),
-    tableAccent: readColor(theme.tableAccent, incomingPalette[0] ?? starterPalette[0]),
+    tableAccent: readColor(theme.tableAccent, incomingPalette[0] ?? FALLBACK_PALETTE[0]),
     fontFamily:
       typeof label.fontFace === "string" && label.fontFace.trim()
         ? label.fontFace
@@ -298,8 +283,8 @@ function deepMergeJson(base: JsonValue | undefined, override: JsonValue | undefi
   return override;
 }
 
-export function cloneStarterTheme(): PowerBITheme {
-  return JSON.parse(JSON.stringify(STARTER_THEME)) as PowerBITheme;
+export function cloneNewTheme(): PowerBITheme {
+  return { ...NEW_THEME };
 }
 
 export function themeFileName(name: string): string {

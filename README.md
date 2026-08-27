@@ -52,8 +52,8 @@ npm test
 
 ## What it does
 
-- Import a `.json` Power BI theme in the browser, or start from the bundled
-  sample theme
+- Import a `.json` Power BI theme in the browser, or start with a clean New
+  theme that inherits from the selected Power BI base theme
 - **16 visuals** — Card, Clustered bar, Clustered column, Stacked bar, Stacked
   column, Line, Table, Matrix, Pie, Slicer, Shape, Action button, Bookmark
   navigator, Page navigator, Textbox and Image — each with a real,
@@ -83,7 +83,7 @@ npm test
   has no UI for — on export
 - A clear error when an uploaded file is not valid JSON
 
-The included `public/fixtures/starter-theme.json` is a small development
+The included `public/fixtures/new-theme.json` is a minimal development
 fixture, not a replacement for a full theme.
 
 Not every property is reflected in the small mock previews — they all resolve,
@@ -145,7 +145,7 @@ app/
   main.tsx                     # browser entry point
 themes/base/                   # Classic 2018/2026 + Fluent 2, from PBI Desktop
 public/fixtures/
-  starter-theme.json           # development theme
+  new-theme.json               # minimal development theme
 tests/                         # 206 tests; discovered by glob
 ```
 
