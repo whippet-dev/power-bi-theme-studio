@@ -37,6 +37,8 @@ import {
   inactivePropertyGroup,
   isFontFamilyProperty,
   isMasterActivationProperty,
+  orderGlobalGroups,
+  orderThemeGroups,
   orderVisualGroups,
   propertySections,
   type EditorGroupMeta,
@@ -834,7 +836,7 @@ export function PropertyEditor({
 
   const chromeGroupKeys = Object.keys(CHROME_PROPERTIES) as Array<keyof typeof CHROME_PROPERTIES>;
 
-  const themeGroups: GroupMeta[] = [
+  const unorderedThemeGroups: GroupMeta[] = [
     { id: THEME_IDENTITY_ID, title: "Theme identity", count: 1 },
     { id: SHARED_COLOURS_ID, title: "Shared colours", count: 3 },
     { id: DATA_PALETTE_ID, title: "Data palette", count: Math.min(resolved.palette.length, 5) },
@@ -846,6 +848,7 @@ export function PropertyEditor({
       count: Object.keys(CHROME_PROPERTIES[key]).length,
     })),
   ];
+  const themeGroups = orderThemeGroups(unorderedThemeGroups);
 
   const unorderedVisualGroups: GroupMeta[] = [
     ...chromeGroupKeys.map((key) => ({
@@ -971,11 +974,13 @@ export function PropertyEditor({
   const visualGroups = orderVisualGroups(selected, unorderedVisualGroups);
 
   const globalOptionsGroupKeys = Object.keys(GLOBAL_OPTIONS_PROPERTIES) as Array<keyof typeof GLOBAL_OPTIONS_PROPERTIES>;
-  const globalGroups: GroupMeta[] = globalOptionsGroupKeys.map((key) => ({
-    id: `${GLOBAL_OPTIONS_ID_PREFIX}${key}`,
-    title: GLOBAL_OPTIONS_GROUP_LABELS[key],
-    count: Object.keys(GLOBAL_OPTIONS_PROPERTIES[key]).length,
-  }));
+  const globalGroups = orderGlobalGroups(
+    globalOptionsGroupKeys.map((key) => ({
+      id: `${GLOBAL_OPTIONS_ID_PREFIX}${key}`,
+      title: GLOBAL_OPTIONS_GROUP_LABELS[key],
+      count: Object.keys(GLOBAL_OPTIONS_PROPERTIES[key]).length,
+    })),
+  );
 
   const activeGroups = tab === "theme" ? themeGroups : tab === "global" ? globalGroups : visualGroups;
   const openGroup = openGroupId ? activeGroups.find((group) => group.id === openGroupId) : undefined;

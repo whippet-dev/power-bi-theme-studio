@@ -221,3 +221,61 @@ export function orderVisualGroups(visual: EditorVisualKind, groups: EditorGroupM
     .sort((left, right) => left.tier - right.tier || left.rank - right.rank || left.index - right.index)
     .map(({ group }) => group);
 }
+
+type GroupPlacement = { section: string; rank: number };
+
+function orderGroupsByPlacement(
+  groups: EditorGroupMeta[],
+  placementFor: (group: EditorGroupMeta) => GroupPlacement,
+): EditorGroupMeta[] {
+  return groups
+    .map((group, index) => {
+      const placement = placementFor(group);
+      return { group: { ...group, section: placement.section }, index, ...placement };
+    })
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ group }) => group);
+}
+
+const THEME_GROUP_PLACEMENT: Record<string, GroupPlacement> = {
+  identity: { section: "Theme basics", rank: 0 },
+  sharedColours: { section: "Colours", rank: 10 },
+  dataPalette: { section: "Colours", rank: 11 },
+  semanticColors: { section: "Colours", rank: 12 },
+  textClasses: { section: "Typography", rank: 20 },
+};
+
+/** Organises the Theme tab without changing its source group array. */
+export function orderThemeGroups(groups: EditorGroupMeta[]): EditorGroupMeta[] {
+  return orderGroupsByPlacement(groups, (group) => {
+    const explicit = THEME_GROUP_PLACEMENT[group.id];
+    if (explicit) return explicit;
+    if (group.id === "chrome:title") return { section: "Default visual settings", rank: 30 };
+    if (group.id === "chrome:subTitle") return { section: "Default visual settings", rank: 31 };
+    return group.id.startsWith("chrome:")
+      ? { section: "Default visual settings", rank: 32 }
+      : { section: "Theme basics", rank: 9 };
+  });
+}
+
+const GLOBAL_GROUP_PLACEMENT: Record<string, GroupPlacement> = {
+  "global:reportFilterPaneState": { section: "Report defaults", rank: 0 },
+  "global:reportPageAlignment": { section: "Report defaults", rank: 1 },
+  "global:pageSize": { section: "Page & canvas", rank: 10 },
+  "global:pageBackground": { section: "Page & canvas", rank: 11 },
+  "global:pageWallpaper": { section: "Page & canvas", rank: 12 },
+  "global:pageAlignment": { section: "Page & canvas", rank: 13 },
+  "global:pageInformation": { section: "Page & canvas", rank: 14 },
+  "global:pageFilterPane": { section: "Filters", rank: 20 },
+  "global:pageFilterCards": { section: "Filters", rank: 21 },
+  "global:pageRefresh": { section: "Features & behaviour", rank: 30 },
+  "global:personalizeVisual": { section: "Features & behaviour", rank: 31 },
+};
+
+/** Organises report/page settings by user task, again on a display copy. */
+export function orderGlobalGroups(groups: EditorGroupMeta[]): EditorGroupMeta[] {
+  return orderGroupsByPlacement(
+    groups,
+    (group) => GLOBAL_GROUP_PLACEMENT[group.id] ?? { section: "Features & behaviour", rank: 39 },
+  );
+}

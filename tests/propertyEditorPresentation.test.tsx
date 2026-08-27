@@ -7,6 +7,8 @@ import {
   inactivePropertyGroup,
   isFontFamilyProperty,
   isMasterActivationProperty,
+  orderGlobalGroups,
+  orderThemeGroups,
   orderVisualGroups,
   propertySections,
   type EditorGroupMeta,
@@ -137,6 +139,106 @@ test("non-cartesian core ordering adapts to Card and Table without mutating eith
   ]);
   assert.deepEqual(card, cardSource);
   assert.deepEqual(table, tableSource);
+});
+
+test("Theme groups follow basics, colours, typography, and default visual settings", () => {
+  const groups: EditorGroupMeta[] = [
+    { id: "chrome:background", title: "Background", count: 3 },
+    { id: "semanticColors", title: "Semantic colours", count: 20 },
+    { id: "identity", title: "Theme identity", count: 1 },
+    { id: "chrome:subTitle", title: "Subtitle", count: 11 },
+    { id: "dataPalette", title: "Data palette", count: 5 },
+    { id: "textClasses", title: "Text classes", count: 42 },
+    { id: "sharedColours", title: "Shared colours", count: 3 },
+    { id: "chrome:title", title: "Title", count: 12 },
+  ];
+  const source = structuredClone(groups);
+  const ordered = orderThemeGroups(groups);
+
+  assert.deepEqual(ordered.map(({ title }) => title), [
+    "Theme identity",
+    "Shared colours",
+    "Data palette",
+    "Semantic colours",
+    "Text classes",
+    "Title",
+    "Subtitle",
+    "Background",
+  ]);
+  assert.deepEqual(ordered.map(({ section }) => section), [
+    "Theme basics",
+    "Colours",
+    "Colours",
+    "Colours",
+    "Typography",
+    "Default visual settings",
+    "Default visual settings",
+    "Default visual settings",
+  ]);
+  assert.deepEqual(groups, source);
+});
+
+test("Theme default Title and Subtitle are explicitly prioritised within default visual settings", () => {
+  const groups: EditorGroupMeta[] = [
+    { id: "identity", title: "Theme identity", count: 1 },
+    { id: "textClasses", title: "Text classes", count: 1 },
+    { id: "chrome:background", title: "Background", count: 1 },
+    { id: "chrome:subTitle", title: "Subtitle", count: 1 },
+    { id: "chrome:title", title: "Title", count: 1 },
+  ];
+  assert.deepEqual(orderThemeGroups(groups).map(({ title }) => title), [
+    "Theme identity",
+    "Text classes",
+    "Title",
+    "Subtitle",
+    "Background",
+  ]);
+});
+
+test("Global groups follow report defaults, page and canvas, filters, then features", () => {
+  const groups: EditorGroupMeta[] = [
+    { id: "global:pageFilterCards", title: "Filter cards", count: 8 },
+    { id: "global:pageBackground", title: "Page background", count: 2 },
+    { id: "global:personalizeVisual", title: "Personalize visual", count: 2 },
+    { id: "global:reportPageAlignment", title: "Page alignment (report default)", count: 1 },
+    { id: "global:pageFilterPane", title: "Filter pane", count: 12 },
+    { id: "global:pageInformation", title: "Page information", count: 2 },
+    { id: "global:pageRefresh", title: "Page refresh", count: 3 },
+    { id: "global:pageAlignment", title: "Page alignment", count: 1 },
+    { id: "global:pageWallpaper", title: "Wallpaper", count: 2 },
+    { id: "global:reportFilterPaneState", title: "Filter pane (report default)", count: 2 },
+    { id: "global:pageSize", title: "Canvas settings", count: 3 },
+  ];
+  const source = structuredClone(groups);
+  const ordered = orderGlobalGroups(groups);
+
+  assert.deepEqual(ordered.map(({ title }) => title), [
+    "Filter pane (report default)",
+    "Page alignment (report default)",
+    "Canvas settings",
+    "Page background",
+    "Wallpaper",
+    "Page alignment",
+    "Page information",
+    "Filter pane",
+    "Filter cards",
+    "Page refresh",
+    "Personalize visual",
+  ]);
+  assert.deepEqual(ordered.map(({ section }) => section), [
+    "Report defaults",
+    "Report defaults",
+    "Page & canvas",
+    "Page & canvas",
+    "Page & canvas",
+    "Page & canvas",
+    "Page & canvas",
+    "Filters",
+    "Filters",
+    "Features & behaviour",
+    "Features & behaviour",
+  ]);
+  assert.deepEqual(groups, source);
 });
 
 test("font-family detection covers visual fontFamily and global fontFace paths only", () => {
