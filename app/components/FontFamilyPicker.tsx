@@ -19,9 +19,10 @@ export function FontFamilyPicker({ value, label, onChange }: FontFamilyPickerPro
   const [preservedValue, setPreservedValue] = useState(value);
   const [hasEditedQuery, setHasEditedQuery] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  // Preserve an imported unknown that existed when the list opened, not the
-  // transient partial string written while somebody searches for a choice.
-  const options = filterFontFamilyOptions(query, open && !hasEditedQuery ? preservedValue : "");
+  // Opening is a browse action: start with every friendly choice and keep an
+  // imported literal local to this picker. Filtering only begins after the
+  // user types, so a current DIN value never hides choices such as Arial.
+  const options = filterFontFamilyOptions(hasEditedQuery ? query : "", preservedValue);
   const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
 
   const openList = () => {
@@ -29,7 +30,7 @@ export function FontFamilyPicker({ value, label, onChange }: FontFamilyPickerPro
     setPreservedValue(value);
     setHasEditedQuery(false);
     setOpen(true);
-    setActiveIndex(-1);
+    setActiveIndex(filterFontFamilyOptions("", value).indexOf(value));
   };
 
   const select = (font: string) => {

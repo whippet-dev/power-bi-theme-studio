@@ -286,6 +286,15 @@ test("font search is case-insensitive, prefix-first, and never promotes raw stac
   assert.equal(filterFontFamilyOptions("wf_", raw)[0], raw, "the current raw literal can still be found and preserved");
 });
 
+test("opening a font picker browses every friendly choice while retaining the current literal", () => {
+  const openedWithDin = filterFontFamilyOptions("", "DIN");
+  const raw = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
+
+  assert.ok(openedWithDin.includes("Arial"));
+  assert.equal(openedWithDin[openedWithDin.indexOf("DIN")], "DIN");
+  assert.equal(filterFontFamilyOptions("", raw)[0], raw);
+});
+
 test("opening a font picker is presentation-only; literal writes and reset paths stay unchanged", () => {
   const familyDefinition = definition("family", "Font family", "text", "fontFamily");
   const path = ["visualStyles", "lineChart", "*", "legend", 0, "fontFamily"] as Array<string | number>;
