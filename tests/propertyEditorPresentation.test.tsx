@@ -4,9 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { FontFamilyControl, PropertyRow, RegistryGroupBody } from "../app/components/PropertyEditor";
 import {
   fontFamilyOptions,
+  filterFontFamilyOptions,
   inactivePropertyGroup,
   isFontFamilyProperty,
   isMasterActivationProperty,
+  KNOWN_FONT_FAMILIES,
   orderGlobalGroups,
   orderThemeGroups,
   orderVisualGroups,
@@ -241,27 +243,70 @@ test("Global groups follow report defaults, page and canvas, filters, then featu
   assert.deepEqual(groups, source);
 });
 
-test("font-family detection covers visual fontFamily and global fontFace paths only", () => {
+test("font-family detection covers every shared font-family naming shape", () => {
   const family = definition("family", "Font family", "text", "fontFamily");
   const face = definition("face", "Font family", "text", "fontFace");
   const titleFamily = definition("title-family", "Title font family", "text", "titleFontFamily");
+  const secondaryFamily = definition("secondary-family", "Secondary font family", "text", "secFontFamily");
+  const seriesFamily = definition("series-family", "Series font family", "text", "seriesFontFamily");
   const label = definition("label", "Label", "text", "label");
   assert.equal(isFontFamilyProperty(family), true);
   assert.equal(isFontFamilyProperty(face), true);
   assert.equal(isFontFamilyProperty(titleFamily), true);
+  assert.equal(isFontFamilyProperty(secondaryFamily), true);
+  assert.equal(isFontFamilyProperty(seriesFamily), true);
   assert.equal(isFontFamilyProperty(label), false);
 });
 
-test("font options offer shipped fonts and retain an arbitrary imported literal exactly", () => {
+test("font options are friendly, deduplicated, and retain an arbitrary imported literal exactly", () => {
   const custom = "Mortimer Sans Variable, sans-serif";
   assert.ok(fontFamilyOptions("Segoe UI").includes("DIN"));
-  assert.ok(fontFamilyOptions("Segoe UI").includes("'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif"));
+  assert.ok(KNOWN_FONT_FAMILIES.includes("Arial"));
+  assert.ok(KNOWN_FONT_FAMILIES.includes("DIN Light"));
+  assert.equal(KNOWN_FONT_FAMILIES.some((font) => /\bwf_|helvetica|,/.test(font)), false);
+  assert.equal(new Set(KNOWN_FONT_FAMILIES).size, KNOWN_FONT_FAMILIES.length);
   assert.equal(fontFamilyOptions(custom)[0], custom);
+  assert.equal(fontFamilyOptions("Segoe UI").includes(custom), false);
 
   const markup = renderToStaticMarkup(<FontFamilyControl value={custom} label="Font family" onChange={() => undefined} />);
-  assert.match(markup, /class="text-control font-family-control"/);
-  assert.match(markup, /list="[^"]+"/);
+  assert.match(markup, /class="text-control font-picker__input"/);
+  assert.match(markup, /role="combobox"/);
+  assert.doesNotMatch(markup, /datalist|list="/);
   assert.ok(markup.includes(custom));
+});
+
+test("font search is case-insensitive, prefix-first, and never promotes raw stacks for another property", () => {
+  const raw = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
+  const seg = filterFontFamilyOptions("seg", "Arial");
+
+  assert.deepEqual(seg.slice(0, 5), ["Segoe UI", "Segoe UI Light", "Segoe UI Semilight", "Segoe UI Semibold", "Segoe UI Bold"]);
+  assert.equal(seg.includes(raw), false);
+  assert.equal(filterFontFamilyOptions("DIn", "Arial").includes("DIN"), true);
+  assert.equal(fontFamilyOptions(raw)[0], raw, "an imported stack stays visible at the property that owns it");
+  assert.equal(filterFontFamilyOptions("wf_", raw)[0], raw, "the current raw literal can still be found and preserved");
+});
+
+test("opening a font picker is presentation-only; literal writes and reset paths stay unchanged", () => {
+  const familyDefinition = definition("family", "Font family", "text", "fontFamily");
+  const path = ["visualStyles", "lineChart", "*", "legend", 0, "fontFamily"] as Array<string | number>;
+  const imported = "Some Corporate Font";
+  const before = updateThemeValue({ name: "Test" } as PowerBITheme, path, imported);
+  const markup = renderToStaticMarkup(
+    <PropertyRow
+      definition={familyDefinition}
+      pathPrefix="visualStyles.lineChart.*"
+      value={imported}
+      hasOverride
+      onChange={() => undefined}
+      onReset={() => undefined}
+    />,
+  );
+
+  assert.equal(readThemeValueAtPath(before, path), imported);
+  assert.match(markup, /role="combobox"/);
+  assert.match(markup, /Reset Font family to the theme default/);
+  const reset = deleteThemeValue(before, path);
+  assert.equal(readThemeValueAtPath(reset, path), undefined);
 });
 
 test("inactive group presentation leaves dependent controls enabled and editable", () => {

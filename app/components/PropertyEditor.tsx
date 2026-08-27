@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ACTION_BUTTON_PROPERTIES, propertyThemePath as actionButtonPropertyThemePath } from "../lib/actionButtonProperties";
 import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
@@ -33,7 +33,6 @@ import { forState, groupSupportsStates, INTERACTION_STATES, stateEntryIndex, typ
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
 import {
-  fontFamilyOptions,
   inactivePropertyGroup,
   isFontFamilyProperty,
   isMasterActivationProperty,
@@ -43,6 +42,7 @@ import {
   propertySections,
   type EditorGroupMeta,
 } from "../lib/propertyEditorPresentation";
+import { FontFamilyPicker } from "./FontFamilyPicker";
 import { propertyThemePath as shapePropertyThemePath, SHAPE_PROPERTIES } from "../lib/shapeProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import { propertyThemePath as slicerPropertyThemePath, SLICER_PROPERTIES } from "../lib/slicerProperties";
@@ -379,25 +379,7 @@ function TextControl({ value, onChange, label }: { value: string; onChange: (val
 }
 
 export function FontFamilyControl({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
-  const listId = useId();
-  return (
-    <>
-      <input
-        className="text-control font-family-control"
-        type="text"
-        list={listId}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-label={label}
-        autoComplete="off"
-      />
-      <datalist id={listId}>
-        {fontFamilyOptions(value).map((font) => (
-          <option key={font} value={font} />
-        ))}
-      </datalist>
-    </>
-  );
+  return <FontFamilyPicker value={value} onChange={onChange} label={label} />;
 }
 
 function SelectControl({

@@ -67,10 +67,10 @@ export function isFontFamilyProperty(definition: PropertyDefinition): boolean {
 }
 
 /**
- * Common Power BI and browser-safe choices plus every literal font value
- * shipped by the three bundled base themes. Values are offered verbatim:
- * choosing one writes that exact literal, while the editor remains free to
- * retain or accept any value not present here.
+ * Friendly, literal Power BI font choices. These are editor suggestions, not
+ * renderer fallbacks: the renderer owns CSS-stack expansion separately. In
+ * particular, the raw wf_/helvetica stacks found in some base-theme resources
+ * must never become ordinary author-facing options.
  */
 export const KNOWN_FONT_FAMILIES = [
   "Segoe UI",
@@ -89,17 +89,31 @@ export const KNOWN_FONT_FAMILIES = [
   "Courier New",
   "DIN",
   "DIN Light",
-  "Heading",
-  "Body",
-  "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif",
-  "'Segoe UI Semibold', wf_segoe-ui_semibold, helvetica, arial, sans-serif",
-  "'''Segoe UI Semibold'', wf_segoe-ui_semibold, helvetica, arial, sans-serif'",
 ] as const;
 
+/**
+ * Friendly choices, plus the literal currently stored in an imported theme
+ * when it is not one of those choices. The latter is deliberately local to
+ * that editor instance: an imported raw stack stays visible and preservable,
+ * but is never offered to another property as a normal suggestion.
+ */
 export function fontFamilyOptions(currentValue: string): string[] {
   return currentValue && !KNOWN_FONT_FAMILIES.includes(currentValue as (typeof KNOWN_FONT_FAMILIES)[number])
     ? [currentValue, ...KNOWN_FONT_FAMILIES]
     : [...KNOWN_FONT_FAMILIES];
+}
+
+/** Case-insensitive substring search with stable prefix-first ranking. */
+export function filterFontFamilyOptions(query: string, currentValue: string): string[] {
+  const needle = query.trim().toLocaleLowerCase();
+  const candidates = fontFamilyOptions(currentValue);
+  if (!needle) return candidates;
+
+  return candidates
+    .map((font, index) => ({ font, index, lower: font.toLocaleLowerCase() }))
+    .filter(({ lower }) => lower.includes(needle))
+    .sort((left, right) => Number(!left.lower.startsWith(needle)) - Number(!right.lower.startsWith(needle)) || left.index - right.index)
+    .map(({ font }) => font);
 }
 
 function stableActivationFirst(entries: PropertyEntry[]): PropertyEntry[] {
