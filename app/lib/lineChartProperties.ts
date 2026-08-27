@@ -5,6 +5,7 @@ import {
   enumProp,
   numberProp,
   propertyThemePath,
+  resolvePropertyEntry,
   resolvePropertyValue,
   textProp,
   isGroupSetBy,
@@ -568,6 +569,8 @@ export type ResolvedLineChartStyle = {
     markerShape: string | number;
     markerSize: number;
     showMarker: boolean;
+    /** Whether Show itself was supplied by a theme layer. */
+    showMarkerIsSet: boolean;
     showMarkerByDefault: boolean;
     strokeAutoScale: boolean;
     strokeColor: string;
@@ -1095,6 +1098,7 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       markerShape: resolvePropertyValue(theme, p.lineStyles.markerShape, "circle"),
       markerSize: resolvePropertyValue(theme, p.lineStyles.markerSize, 6),
       showMarker: resolvePropertyValue(theme, p.lineStyles.showMarker, false),
+      showMarkerIsSet: resolvePropertyEntry(theme, p.lineStyles.showMarker, false).isSet,
       showMarkerByDefault: resolvePropertyValue(theme, p.lineStyles.showMarkerByDefault, false),
       strokeAutoScale: resolvePropertyValue(theme, p.lineStyles.strokeAutoScale, false),
       // The stroke colour is an override; unset, a series uses its data

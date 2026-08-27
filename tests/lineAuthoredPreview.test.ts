@@ -66,6 +66,8 @@ test("authored Line neutralises its old plot margin", () => {
     cssSource,
     /\.chart-preview--authored \.chart-preview__body,[\s\S]*?\.chart-preview--authored \.line-preview__plot\s*\{\s*margin-top: 0;/,
   );
-  assert.match(cssSource, /\.chart-preview--authored \.chart-ticks--secondary\s*\{\s*right: 4px;\s*transform: none;/,
-    "the secondary Line axis must stay inside the fixed authored root");
+  assert.match(cssSource, /\.chart-axis-gutter--secondary\s*\{[\s\S]*?right: 0;[\s\S]*?left: auto;/,
+    "the secondary Line axis must be a contained right-side gutter");
+  assert.match(lineSource, /right: secondaryGutter/,
+    "the canonical plot must pay for the secondary gutter");
 });

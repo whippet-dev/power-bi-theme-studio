@@ -704,6 +704,7 @@ export function CategoryAxisGutter({
   layout,
   categories,
   offset,
+  farOffset = 0,
   titleFallback = "",
 }: {
   axis: AxisStyle;
@@ -711,6 +712,8 @@ export function CategoryAxisGutter({
   categories: readonly string[];
   /** The value axis's gutter, which this one starts after. */
   offset: number;
+  /** Optional value gutter on the far side of a vertical plot. */
+  farOffset?: number;
   titleFallback?: string;
 }): ReactNode {
   if (!layout.categoryAxis) return null;
@@ -726,7 +729,7 @@ export function CategoryAxisGutter({
       // becoming the horizontal branch's first consumer.
       style={
         vertical
-          ? { height: layout.categoryAxis.height, left: offset }
+          ? { height: layout.categoryAxis.height, left: offset, right: farOffset }
           : { width: layout.categoryAxis.width, bottom: offset }
       }
     >

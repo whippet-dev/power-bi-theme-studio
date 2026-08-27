@@ -162,9 +162,13 @@ export type ChartLayout = {
   /** The gutter, null when the axis is hidden — hidden means zero space. */
   categoryAxis: Rect | null;
   valueAxis: Rect | null;
+  /** Optional opposite-side value gutter used by dual-axis cartesian visuals. */
+  secondaryValueAxis?: Rect | null;
   /** THE plot rectangle. Computed once, consumed by everything. */
   plot: Rect;
   scale: ChartScale;
+  /** A distinct value scale sharing the primary category geometry. */
+  secondaryScale?: ChartScale | null;
 };
 
 export type ChartLayoutInput = {
@@ -172,6 +176,8 @@ export type ChartLayoutInput = {
   orientation: CartesianOrientation;
   categoryAxis: AxisLayoutStyle;
   valueAxis: AxisLayoutStyle;
+  /** Optional value axis on the far side of the plot. */
+  secondaryValueAxis?: AxisLayoutStyle;
   legend?: LegendLayoutStyle;
   /** Category labels, in plot order. Their extent sizes the category gutter. */
   categories: readonly string[];
@@ -179,6 +185,7 @@ export type ChartLayoutInput = {
   seriesLabels?: readonly string[];
   /** The value the axis spans to when it does not pin its own range. */
   dataMax: number;
+  secondaryDataMax?: number;
   /** Power BI's "space between categories", 0-100, as a share of the slot. */
   innerPadding?: number;
   /** Gridline/tick intervals. `ticks` has this many + 1 entries. */
@@ -191,6 +198,7 @@ export type ChartLayoutInput = {
    * truth for what a tick says.
    */
   formatTick?: (value: number) => string;
+  formatSecondaryTick?: (value: number) => string;
   measureText?: TextMeasure;
   /** Space between a gutter's text and the plot edge. */
   labelGap?: number;
@@ -521,13 +529,16 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     orientation,
     categoryAxis,
     valueAxis,
+    secondaryValueAxis,
     legend,
     categories,
     seriesLabels = [],
     dataMax,
+    secondaryDataMax = dataMax,
     innerPadding = 0,
     tickCount = DEFAULT_TICK_COUNT,
     formatTick = (value: number) => String(value),
+    formatSecondaryTick = formatTick,
     measureText = estimateText,
     labelGap = DEFAULT_LABEL_GAP,
     titleText = null,
@@ -615,6 +626,25 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
       : takeBottom(text.height + labelGap + axisTitleExtent(valueAxis));
   }
 
+  let secondaryValueAxisRect: Rect | null = null;
+  const secondaryTicks = secondaryValueAxis
+    ? axisTickValues(secondaryValueAxis, secondaryDataMax, tickCount)
+    : [];
+  if (secondaryValueAxis?.show) {
+    const text = widestText(
+      secondaryTicks.map(formatSecondaryTick),
+      secondaryValueAxis.fontSize,
+      secondaryValueAxis.fontFamily,
+      measureText,
+    );
+    // Line is currently the only dual-axis consumer and is vertical. The
+    // transpose is kept coherent for any future cartesian consumer: the
+    // secondary value gutter always occupies the edge opposite the primary.
+    secondaryValueAxisRect = vertical
+      ? takeRight(text.width + labelGap + axisTitleExtent(secondaryValueAxis))
+      : takeTop(text.height + labelGap + axisTitleExtent(secondaryValueAxis));
+  }
+
   /**
    * A horizontal category axis, sized the way Power BI sizes it.
    *
@@ -664,6 +694,17 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     const fraction = inverted ? 1 - raw : raw;
     // Screen y grows downward, so a vertical chart measures its fraction up
     // from the bottom. That is the whole of the transpose.
+    return vertical ? plot.y + plot.height - fraction * plot.height : plot.x + fraction * plot.width;
+  };
+
+  const secondaryRange = secondaryValueAxis
+    ? axisRange(secondaryValueAxis, secondaryDataMax)
+    : null;
+  const secondaryValue = (v: number): number => {
+    if (!secondaryRange) return value(v);
+    const secondarySpan = secondaryRange.end - secondaryRange.start;
+    const raw = secondarySpan === 0 ? 0 : (v - secondaryRange.start) / secondarySpan;
+    const fraction = secondaryValueAxis?.invertAxis ? 1 - raw : raw;
     return vertical ? plot.y + plot.height - fraction * plot.height : plot.x + fraction * plot.width;
   };
 
@@ -720,6 +761,11 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     };
   };
 
+  const primaryScale: ChartScale = { value, category, categoryWidth, ticks };
+  const secondaryScale: ChartScale | null = secondaryValueAxis
+    ? { value: secondaryValue, category, categoryWidth, ticks: secondaryTicks }
+    : null;
+
   return {
     orientation,
     outer,
@@ -728,7 +774,10 @@ export function computeChartLayout(input: ChartLayoutInput): ChartLayout {
     legend: legendRect,
     categoryAxis: categoryAxisRect,
     valueAxis: valueAxisRect,
+    ...(secondaryValueAxis
+      ? { secondaryValueAxis: secondaryValueAxisRect, secondaryScale }
+      : {}),
     plot,
-    scale: { value, category, categoryWidth, ticks },
+    scale: primaryScale,
   };
 }

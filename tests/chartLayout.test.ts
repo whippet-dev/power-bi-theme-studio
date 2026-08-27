@@ -915,3 +915,32 @@ test("every category gets an identical slot size, at every inner padding", () =>
     }
   }
 });
+
+test("a secondary value axis owns a far-side gutter and releases it when hidden", () => {
+  const shown = layout({
+    secondaryValueAxis: axis({ show: true, showAxisTitle: true, titleText: "Post" }),
+    secondaryDataMax: 26_000,
+  });
+  const hidden = layout({
+    secondaryValueAxis: axis({ show: false, showAxisTitle: true, titleText: "Post" }),
+    secondaryDataMax: 26_000,
+  });
+  assert.ok(shown.secondaryValueAxis && shown.secondaryValueAxis.width > 0);
+  assert.equal(shown.secondaryValueAxis.x, shown.plot.x + shown.plot.width);
+  assert.equal(hidden.secondaryValueAxis, null);
+  assert.ok(near(hidden.plot.width - shown.plot.width, shown.secondaryValueAxis.width));
+});
+
+test("secondary and primary value scales share the plot but map different domains", () => {
+  const l = layout({
+    dataMax: 70_000,
+    secondaryValueAxis: axis({ show: true }),
+    secondaryDataMax: 26_000,
+  });
+  assert.ok(l.secondaryScale);
+  assert.equal(l.scale.value(0), l.secondaryScale.value(0));
+  assert.equal(l.scale.value(70_000), l.plot.y);
+  assert.equal(l.secondaryScale.value(26_000), l.plot.y);
+  assert.notEqual(l.scale.value(21_000), l.secondaryScale.value(21_000));
+  assert.deepEqual(l.scale.category(2, 4), l.secondaryScale.category(2, 4));
+});

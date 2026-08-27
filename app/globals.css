@@ -1233,23 +1233,20 @@ button { color: inherit; }
   margin-top: 3px;
 }
 
-/* Secondary value axis, drawn to the right of the plot. */
-.chart-ticks--secondary {
-  position: absolute;
-  top: 0;
-  bottom: 0;
+/* The optional Line Y2 axis is a real right-side gutter. ChartLayout reserves
+   its width; CSS only mirrors the primary gutter's internal alignment. */
+.chart-axis-gutter--secondary {
   right: 0;
-  flex-direction: column-reverse;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin: 0;
-  transform: translateX(100%);
-  padding-left: 4px;
-  pointer-events: none;
+  left: auto;
 }
 
-.chart-preview__axis-title--secondary {
-  text-align: right;
+.chart-axis-gutter--secondary .chart-axis-gutter__ticks span {
+  right: auto;
+  left: 4px;
+}
+
+.chart-axis-gutter--secondary .chart-preview__axis-title--secondary {
+  transform: none;
 }
 
 /* Anchored to the series' own endpoint, so `left` and `transform` are
@@ -2967,14 +2964,6 @@ button { color: inherit; }
 .chart-preview--authored .column-preview__plot,
 .chart-preview--authored .line-preview__plot {
   margin-top: 0;
-}
-
-/* The Line preview's optional secondary ticks used to live just outside a
-   fluid chart. In the fixed authored visual that would create horizontal
-   scroll (or be clipped), so keep this decorative axis inside its plot. */
-.chart-preview--authored .chart-ticks--secondary {
-  right: 4px;
-  transform: none;
 }
 
 .chart-preview__legend-band {

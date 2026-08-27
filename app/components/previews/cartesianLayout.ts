@@ -184,8 +184,10 @@ export type CartesianLayoutInput = {
   orientation: CartesianOrientation;
   categoryAxis: AxisLayoutStyle & { labelDisplayUnits?: string | number; labelPrecision?: number };
   valueAxis: AxisLayoutStyle & { labelDisplayUnits?: string | number; labelPrecision?: number };
+  secondaryValueAxis?: AxisLayoutStyle & { labelDisplayUnits?: string | number; labelPrecision?: number };
   categories: readonly string[];
   dataMax: number;
+  secondaryDataMax?: number;
   innerPadding?: number;
   /** Used when the axis declares no title text, matching the renderer's own fallbacks. */
   valueAxisTitleFallback?: string;
@@ -398,8 +400,10 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     orientation,
     categoryAxis,
     valueAxis,
+    secondaryValueAxis,
     categories,
     dataMax,
+    secondaryDataMax,
     innerPadding = 0,
     measureText,
     valueAxisTitleFallback = "",
@@ -423,8 +427,12 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
       ...valueAxis,
       titleText: String(valueAxis.titleText) || valueAxisTitleFallback,
     }),
+    secondaryValueAxis: secondaryValueAxis
+      ? inCssPixels(secondaryValueAxis)
+      : undefined,
     categories,
     dataMax,
+    secondaryDataMax,
     innerPadding,
     // The browser draws the text, so the browser measures it. `estimateText`
     // assumes 0.55em per glyph and is out by up to 21.5% on the strings
@@ -433,6 +441,9 @@ export function computePreviewCartesianLayout(input: CartesianLayoutInput): Char
     // The gutter must be as wide as the label the renderer draws, so the
     // engine is handed the renderer's own formatter.
     formatTick: (value) => formatValue(value, valueAxis.labelDisplayUnits, valueAxis.labelPrecision),
+    formatSecondaryTick: secondaryValueAxis
+      ? (value) => formatValue(value, secondaryValueAxis.labelDisplayUnits, secondaryValueAxis.labelPrecision)
+      : undefined,
   });
 }
 

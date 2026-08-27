@@ -184,6 +184,79 @@ test("markers stay off when the theme does not ask for them", () => {
   assert.equal(markerStyles(renderLine()).length, 0);
 });
 
+test("an explicit marker Show false overrides an inherited show-by-default true", () => {
+  const custom = updateThemeValue(
+    EMPTY,
+    ["visualStyles", "lineChart", "*", "lineStyles", 0, "showMarker"],
+    false,
+  );
+  const inheritedDefault = updateThemeValue(
+    EMPTY,
+    ["visualStyles", "lineChart", "*", "lineStyles", 0, "showMarkerByDefault"],
+    true,
+  );
+  const source = themeLayers(custom, inheritedDefault);
+  const style = resolveLineChartStyle(source, resolveTheme(source.roots));
+  assert.equal(style.lineStyles.showMarkerByDefault, true, "fixture must exercise the inherited default");
+  assert.equal(style.lineStyles.showMarkerIsSet, true);
+  const html = renderToStaticMarkup(<LineChartPreview lineChartStyle={style} palette={PALETTE} />);
+  assert.equal(markerStyles(html).length, 0);
+});
+
+test("marker size, shape, fill and border reach every series marker", () => {
+  let custom = WITH_MARKERS;
+  for (const [path, value] of [
+    [["visualStyles", "lineChart", "*", "lineStyles", 0, "markerShape"], "diamond"],
+    [["visualStyles", "lineChart", "*", "lineStyles", 0, "markerSize"], 12],
+    [["visualStyles", "lineChart", "*", "markers", 0, "borderShow"], true],
+    [["visualStyles", "lineChart", "*", "markers", 0, "borderColor"], { solid: { color: "#123456" } }],
+    [["visualStyles", "lineChart", "*", "markers", 0, "borderColorMatchFill"], false],
+    [["visualStyles", "lineChart", "*", "markers", 0, "borderWidth"], 2],
+  ] as const) custom = updateThemeValue(custom, [...path], value);
+  const html = renderLine(custom);
+  assert.equal(markerStyles(html).length, 15);
+  assert.equal((html.match(/width:\s*10\.2px;height:\s*10\.2px/g) ?? []).length, 15);
+  assert.equal((html.match(/border:\s*2px solid rgba\(18, 52, 86, 1\)/g) ?? []).length, 15);
+  assert.equal((html.match(/rotate\(45deg\)/g) ?? []).length, 15);
+});
+
+test("series labels identify all three plotted series", () => {
+  const custom = updateThemeValue(
+    EMPTY,
+    ["visualStyles", "lineChart", "*", "seriesLabels", 0, "show"],
+    true,
+  );
+  const html = renderLine(custom);
+  for (const series of lineFixture.series) {
+    assert.ok(html.includes(`data-series-label="${series.label}"`), `missing ${series.label} label`);
+  }
+  assert.equal((html.match(/class="line-preview__series-label"/g) ?? []).length, 3);
+});
+
+test("Y2 reserves a right gutter and gives only the representative Post series a distinct scale", () => {
+  const y2Off = updateThemeValue(
+    EMPTY,
+    ["visualStyles", "lineChart", "*", "y2Axis", 0, "show"],
+    false,
+  );
+  const onHtml = renderLine();
+  const offHtml = renderLine(y2Off);
+  assert.ok(onHtml.includes('data-secondary-series="Post"'));
+  assert.ok(!offHtml.includes("data-secondary-series"));
+
+  const onPaths = pathAttrs(onHtml).map((tag) => (tag.match(/\bd="([^"]*)"/) ?? [])[1]);
+  const offPaths = pathAttrs(offHtml).map((tag) => (tag.match(/\bd="([^"]*)"/) ?? [])[1]);
+  assert.equal(onPaths.length, 3);
+  const yCoordinates = (path: string) =>
+    [...path.matchAll(/[ML]\s+[\d.]+\s+([\d.]+)/g)].map((match) => Number(match[1]));
+  assert.deepEqual(yCoordinates(onPaths[0]), yCoordinates(offPaths[0]), "Phone must stay on the primary scale");
+  assert.notDeepEqual(yCoordinates(onPaths[1]), yCoordinates(offPaths[1]), "Post must move to the secondary scale");
+  assert.deepEqual(yCoordinates(onPaths[2]), yCoordinates(offPaths[2]), "Online must stay on the primary scale");
+
+  assert.match(onHtml, /class="chart-plot" style="left:[^;]+;right:(?!0px)[^;]+;bottom:/);
+  assert.match(offHtml, /class="chart-plot" style="left:[^;]+;right:0;bottom:/);
+});
+
 // ---------------------------------------------------------------------------
 // Legends describe what is drawn
 // ---------------------------------------------------------------------------

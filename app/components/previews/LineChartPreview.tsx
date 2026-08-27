@@ -108,6 +108,27 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
   const legendBand = legendBandExtent(lineChartStyle.legend, lineFixture.series.map((series) => series.label));
   const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
   const authoredInner = authoredInnerBox(LINE_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
+  const y2 = lineChartStyle.y2Axis;
+  // Theme JSON formats axes; it does not assign measures to them. For this
+  // representative fixture the final series (Post) is the reviewed Y2
+  // convention whenever the secondary axis is shown. Nothing is persisted.
+  const secondarySeriesIndex = lineFixture.series.length - 1;
+  const secondarySeries = lineFixture.series[secondarySeriesIndex];
+  const secondaryDataMax = Math.max(...secondarySeries.values) * VALUE_SCALE;
+  const secondaryAxisStyle = {
+    show: y2.show,
+    fontSize: y2.secFontSize,
+    fontFamily: y2.secFontFamily,
+    showAxisTitle: y2.secShowAxisTitle,
+    titleText: String(y2.secTitleText) || secondarySeries.label,
+    titleFontSize: y2.secTitleFontSize,
+    titleFontFamily: y2.secTitleFontFamily,
+    start: y2.secStart,
+    end: y2.secEnd,
+    labelDisplayUnits: y2.secLabelDisplayUnits,
+    labelPrecision: y2.secLabelPrecision,
+    invertAxis: false,
+  };
   // One layout, and one set of point coordinates derived from it. Every
   // other position on this chart — path, markers, labels, bands, constant
   // lines — is computed from these, so nothing can end up on a second
@@ -118,8 +139,10 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     orientation: "vertical",
     categoryAxis: lineChartStyle.categoryAxis,
     valueAxis: lineChartStyle.valueAxis,
+    secondaryValueAxis: y2.show ? secondaryAxisStyle : undefined,
     categories: lineCategoryLabels,
     dataMax: LINE_DATA_MAX,
+    secondaryDataMax,
     innerPadding: 0,
     valueAxisTitleFallback: "Applications",
     categoryAxisTitleFallback: "Month",
@@ -150,10 +173,19 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     return slot.offset + slot.size / 2;
   };
   const valueFractionOf = (value: number) => valueFraction(layout, value * VALUE_SCALE);
+  const secondaryValueFractionOf = (value: number) => {
+    const scale = layout.secondaryScale;
+    if (!scale || plot.height <= 0) return valueFractionOf(value);
+    return (plot.y + plot.height - scale.value(value * VALUE_SCALE)) / plot.height;
+  };
 
   /** Every series' points as plot percentages, for the HTML overlays. */
-  const seriesPercents = lineFixture.series.map((series) =>
-    seriesPointPercents(series.values, categoryCentrePercent, valueFractionOf),
+  const seriesPercents = lineFixture.series.map((series, seriesIndex) =>
+    seriesPointPercents(
+      series.values,
+      categoryCentrePercent,
+      y2.show && seriesIndex === secondarySeriesIndex ? secondaryValueFractionOf : valueFractionOf,
+    ),
   );
   /** The primary series' points, which the single-series overlays use. */
   const pointPercent = (index: number) => seriesPercents[0][index];
@@ -226,9 +258,12 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
    * nothing about the value axis would be testable against them.
    */
   const seriesPaths = lineFixture.series.map((series, seriesIndex) => {
+    const valueScale = y2.show && seriesIndex === secondarySeriesIndex && layout.secondaryScale
+      ? layout.secondaryScale
+      : layout.scale;
     const coords = series.values.map((value, index) => ({
       x: categoryCentre(layout, index, pointCount) - plot.x,
-      y: layout.scale.value(value * VALUE_SCALE) - plot.y,
+      y: valueScale.value(value * VALUE_SCALE) - plot.y,
     }));
     return {
       series,
@@ -250,7 +285,12 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
   const lineIsArea = lineStyles.areaShow;
   const lineStrokeColor = lineStyles.strokeColor || lineChartStyle.dataPoint.fill;
   const lineMarkerColor = lineStyles.markerColor || lineChartStyle.dataPoint.fill;
-  const lineShowMarkers = lineStyles.showMarker || lineStyles.showMarkerByDefault;
+  // `showMarkerByDefault` is only the fallback for a series with no explicit
+  // Show value. OR-ing the two made an inherited default of true impossible
+  // to turn off with an explicit false.
+  const lineShowMarkers = lineStyles.showMarkerIsSet
+    ? lineStyles.showMarker
+    : lineStyles.showMarkerByDefault;
   const lineMarker = markerShape(String(lineStyles.markerShape), lineStyles.markerSize || 5);
 
   /**
@@ -332,9 +372,10 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     );
   };
 
-  // Secondary value axis, drawn on the right. Its fields all carry a
-  // `sec` prefix in the schema, so it can't reuse the AxisStyle helpers.
-  const y2 = lineChartStyle.y2Axis;
+  // Secondary value axis, drawn in the right gutter reserved by ChartLayout.
+  // Its schema fields carry a `sec` prefix, so the render style is adapted
+  // here without changing any theme property or stored value.
+  const secondaryGutter = layout.secondaryValueAxis?.width ?? 0;
   const y2TextStyle: CSSProperties = {
     color: y2.secLabelColor,
     fontFamily: y2.secFontFamily || undefined,
@@ -343,32 +384,39 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     fontStyle: y2.secItalic ? "italic" : "normal",
     textDecoration: y2.secUnderline ? "underline" : "none",
   };
-  const y2Node = y2.show && (
-    <span className="chart-ticks chart-ticks--secondary">
-      {Array.from({ length: 5 }, (_, i) => {
-        const start = Number(y2.secStart) || 0;
-        const end = Number(y2.secEnd) > start ? Number(y2.secEnd) : 40_000;
-        return (
-          <span key={i} style={y2TextStyle}>
-            {formatValue(start + ((end - start) * i) / 4, y2.secLabelDisplayUnits, y2.secLabelPrecision)}
-          </span>
-        );
-      })}
-    </span>
-  );
-  const y2TitleNode = y2.show && y2.secShowAxisTitle && (
+  const y2Node = y2.show && layout.secondaryValueAxis && layout.secondaryScale && (
     <span
-      className="chart-preview__axis-title chart-preview__axis-title--secondary"
-      style={{
-        color: y2.secTitleColor,
-        fontFamily: y2.secTitleFontFamily || undefined,
-        fontSize: themeFontSizeToCssPx(y2.secTitleFontSize),
-        fontWeight: y2.secTitleBold ? 700 : 400,
-        fontStyle: y2.secTitleItalic ? "italic" : "normal",
-        textDecoration: y2.secTitleUnderline ? "underline" : "none",
-      }}
+      className="chart-axis-gutter chart-axis-gutter--value chart-axis-gutter--secondary"
+      data-secondary-series={secondarySeries.label}
+      style={{ width: secondaryGutter, bottom: categoryGutter }}
     >
-      {String(y2.secTitleText) || "Secondary"}
+      <span className="chart-axis-gutter__ticks">
+        {layout.secondaryScale.ticks.map((tick, index) => {
+          const bottom = plot.height <= 0
+            ? 0
+            : ((plot.y + plot.height - layout.secondaryScale!.value(tick)) / plot.height) * 100;
+          return (
+            <span key={index} style={{ ...y2TextStyle, bottom: `${bottom}%` }}>
+              {formatValue(tick, y2.secLabelDisplayUnits, y2.secLabelPrecision)}
+            </span>
+          );
+        })}
+      </span>
+      {y2.secShowAxisTitle && (
+        <span
+          className="chart-preview__axis-title chart-preview__axis-title--rotated chart-preview__axis-title--secondary"
+          style={{
+            color: y2.secTitleColor,
+            fontFamily: y2.secTitleFontFamily || undefined,
+            fontSize: themeFontSizeToCssPx(y2.secTitleFontSize),
+            fontWeight: y2.secTitleBold ? 700 : 400,
+            fontStyle: y2.secTitleItalic ? "italic" : "normal",
+            textDecoration: y2.secTitleUnderline ? "underline" : "none",
+          }}
+        >
+          {String(y2.secTitleText) || secondarySeries.label}
+        </span>
+      )}
     </span>
   );
 
@@ -400,57 +448,55 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     const incumbent = pointPercent(chosen).left;
     return (seriesLabelOnLeft ? candidate < incumbent : candidate > incumbent) ? index : chosen;
   }, 0);
-  const seriesLabelPoint = pointPercent(seriesLabelIndex);
   /** Natural units, like every other pre-transform number here. */
   const seriesLabelOffset = Number(sl.maximumOffset) || 0;
-  const seriesLabelNode = sl.show && (
-    <span
-      className="line-preview__series-label"
-      style={{
-        left: `${seriesLabelPoint.left}%`,
-        top: `${seriesLabelPoint.top}%`,
-        // The box hangs off the anchor away from the plot, so its inner
-        // edge — and the leader line, the flex item nearest it — lands on
-        // the chosen point. `maximumOffset` (the gap between series and
-        // label) rides in the same transform rather than as a margin: a
-        // margin on the inner side is inert for a left-side label, which is
-        // positioned by `left` with its `right` auto, so the two sides
-        // would displace by different amounts.
-        transform: seriesLabelOnLeft
-          ? `translate(calc(-100% - ${seriesLabelOffset}px), -50%)`
-          : `translate(${seriesLabelOffset}px, -50%)`,
-        // The leader faces the series: rightward from a left-side label,
-        // leftward from a right-side one.
-        flexDirection: seriesLabelOnLeft ? "row-reverse" : "row",
-        color: hexWithAlpha(sl.seriesMatchColor ? lineChartStyle.dataPoint.fill : sl.seriesColor, sl.seriesTransparency),
-        fontFamily: sl.seriesFontFamily || undefined,
-        fontSize: themeFontSizeToCssPx(sl.textSize),
-        fontWeight: sl.bold ? 700 : 400,
-        fontStyle: sl.italic ? "italic" : "normal",
-        textDecoration: sl.underline ? "underline" : "none",
-        maxWidth: sl.seriesMaximumWidth || undefined,
-        whiteSpace: sl.seriesWordWrap ? "normal" : "nowrap",
-        backgroundColor: sl.enableBackground
-          ? hexWithAlpha(sl.backgroundMatchColor ? lineChartStyle.dataPoint.fill : sl.backgroundColor, sl.backgroundTransparency)
-          : undefined,
-        padding: sl.enableBackground ? "1px 4px" : undefined,
-        borderRadius: sl.enableBackground ? 3 : undefined,
-      }}
-    >
-      {sl.leaderLines && (
-        <span
-          className="line-preview__leader"
-          aria-hidden="true"
-          style={{
-            borderTopWidth: sl.leaderLineWidth,
-            borderTopStyle: mapLineStyle(sl.leaderLinePattern),
-            borderTopColor: hexWithAlpha(sl.leaderLineColor, sl.leaderLineTransparency),
-          }}
-        />
-      )}
-      {primarySeries.label}
-    </span>
-  );
+  const seriesLabelNodes = sl.show && lineFixture.series.map((series, seriesIndex) => {
+    const seriesLabelPoint = seriesPercents[seriesIndex][seriesLabelIndex];
+    const identityColor = seriesPaths[seriesIndex].color;
+    return (
+      <span
+        className="line-preview__series-label"
+        data-series-label={series.label}
+        key={series.key}
+        style={{
+          left: `${seriesLabelPoint.left}%`,
+          top: `${seriesLabelPoint.top}%`,
+          // Keep the chip on the plot-facing side of its endpoint. The old
+          // transform pushed right-side labels out of the authored visual.
+          transform: seriesLabelOnLeft
+            ? `translate(${seriesLabelOffset}px, -50%)`
+            : `translate(calc(-100% - ${seriesLabelOffset}px), -50%)`,
+          flexDirection: seriesLabelOnLeft ? "row" : "row-reverse",
+          color: hexWithAlpha(sl.seriesMatchColor ? identityColor : sl.seriesColor, sl.seriesTransparency),
+          fontFamily: sl.seriesFontFamily || undefined,
+          fontSize: themeFontSizeToCssPx(sl.textSize),
+          fontWeight: sl.bold ? 700 : 400,
+          fontStyle: sl.italic ? "italic" : "normal",
+          textDecoration: sl.underline ? "underline" : "none",
+          maxWidth: sl.seriesMaximumWidth || undefined,
+          whiteSpace: sl.seriesWordWrap ? "normal" : "nowrap",
+          backgroundColor: sl.enableBackground
+            ? hexWithAlpha(sl.backgroundMatchColor ? identityColor : sl.backgroundColor, sl.backgroundTransparency)
+            : undefined,
+          padding: sl.enableBackground ? "1px 4px" : undefined,
+          borderRadius: sl.enableBackground ? 3 : undefined,
+        }}
+      >
+        {sl.leaderLines && (
+          <span
+            className="line-preview__leader"
+            aria-hidden="true"
+            style={{
+              borderTopWidth: sl.leaderLineWidth,
+              borderTopStyle: mapLineStyle(sl.leaderLinePattern),
+              borderTopColor: hexWithAlpha(sl.leaderLineColor, sl.leaderLineTransparency),
+            }}
+          />
+        )}
+        {series.label}
+      </span>
+    );
+  });
 
   const zoomNodes = <ZoomSliders zoom={lineChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />;
 
@@ -578,7 +624,6 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
       {!lineLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{lineLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
-          {y2TitleNode}
           <span className="line-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
             <ValueAxisGutter
               axis={lineChartStyle.valueAxis}
@@ -586,11 +631,11 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
               offset={categoryGutter}
               titleFallback="Applications"
             />
-            <span className="chart-plot" style={{ left: valueGutter, bottom: categoryGutter }}>
+            {y2Node}
+            <span className="chart-plot" style={{ left: valueGutter, right: secondaryGutter, bottom: categoryGutter }}>
               <CategoryGridlines axis={lineChartStyle.categoryAxis} layout={layout} count={pointCount} />
               <ScaledGridlines axis={lineChartStyle.valueAxis} layout={layout} />
-              {y2Node}
-              {seriesLabelNode}
+              {seriesLabelNodes}
               {zoomNodes}
               {errorLabel}
               {lineConstantLines}
@@ -723,6 +768,7 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
               layout={layout}
               categories={lineCategoryLabels}
               offset={valueGutter}
+              farOffset={secondaryGutter}
               titleFallback="Month"
             />
           </span>
