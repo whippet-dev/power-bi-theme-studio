@@ -376,6 +376,7 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
   // Its schema fields carry a `sec` prefix, so the render style is adapted
   // here without changing any theme property or stored value.
   const secondaryGutter = layout.secondaryValueAxis?.width ?? 0;
+  const secondaryGutterLeft = layout.secondaryValueAxis?.x ?? authoredInner.width;
   const y2TextStyle: CSSProperties = {
     color: y2.secLabelColor,
     fontFamily: y2.secFontFamily || undefined,
@@ -388,7 +389,10 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
     <span
       className="chart-axis-gutter chart-axis-gutter--value chart-axis-gutter--secondary"
       data-secondary-series={secondarySeries.label}
-      style={{ width: secondaryGutter, bottom: categoryGutter }}
+      // Physical placement belongs to ChartLayout just as much as the width.
+      // Pinning both values inline prevents a shared left-axis rule from
+      // relocating this far-side gutter through the stylesheet cascade.
+      style={{ left: secondaryGutterLeft, right: "auto", width: secondaryGutter, bottom: categoryGutter }}
     >
       <span className="chart-axis-gutter__ticks">
         {layout.secondaryScale.ticks.map((tick, index) => {

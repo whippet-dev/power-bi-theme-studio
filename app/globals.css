@@ -1233,12 +1233,9 @@ button { color: inherit; }
   margin-top: 3px;
 }
 
-/* The optional Line Y2 axis is a real right-side gutter. ChartLayout reserves
-   its width; CSS only mirrors the primary gutter's internal alignment. */
-.chart-axis-gutter--secondary {
-  right: 0;
-  left: auto;
-}
+/* The optional Line Y2 axis is a real right-side gutter. ChartLayout owns its
+   inline position and width; CSS only mirrors the primary gutter's internal
+   alignment. */
 
 .chart-axis-gutter--secondary .chart-axis-gutter__ticks span {
   right: auto;

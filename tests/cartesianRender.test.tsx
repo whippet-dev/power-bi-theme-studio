@@ -257,6 +257,67 @@ test("Y2 reserves a right gutter and gives only the representative Post series a
   assert.match(offHtml, /class="chart-plot" style="left:[^;]+;right:0;bottom:/);
 });
 
+test("rendered Y2 gutters occupy opposite sides of the plot without overlap", () => {
+  const html = renderLine();
+  const authoredWidth = 450;
+  const tagFor = (className: string) => {
+    const tag = html.match(new RegExp(`<span class="[^"]*${className}[^"]*"[^>]*>`))?.[0];
+    assert.ok(tag, `missing ${className}`);
+    return tag;
+  };
+  const px = (tag: string, property: string) => {
+    const value = tag.match(new RegExp(`${property}:([\\d.]+)px`))?.[1];
+    assert.ok(value, `${property} is not pinned in ${tag}`);
+    return Number(value);
+  };
+
+  const primary = tagFor("chart-axis-gutter--value");
+  const secondary = tagFor("chart-axis-gutter--secondary");
+  const plot = tagFor("chart-plot");
+  const category = tagFor("chart-axis-gutter--category");
+
+  const primaryRight = px(primary, "width");
+  const plotLeft = px(plot, "left");
+  const plotRight = authoredWidth - px(plot, "right");
+  const secondaryLeft = px(secondary, "left");
+  const secondaryRight = secondaryLeft + px(secondary, "width");
+
+  assert.ok(primaryRight <= plotLeft, `primary ${primaryRight} overlaps plot starting at ${plotLeft}`);
+  assert.ok(secondaryLeft >= plotRight, `secondary ${secondaryLeft} overlaps plot ending at ${plotRight}`);
+  assert.ok(secondaryRight <= authoredWidth, `secondary ends outside authored root at ${secondaryRight}`);
+  assert.equal(px(category, "left"), plotLeft, "category gutter must start at the plot's left edge");
+  assert.equal(authoredWidth - px(category, "right"), plotRight,
+    "category gutter must end at the plot's right edge");
+  assert.match(secondary, /right:auto/, "the left-axis CSS rule must not over-constrain Y2");
+});
+
+test("Y2 range and typography settings reach the rendered right axis", () => {
+  let custom = EMPTY;
+  for (const [property, value] of [
+    ["secStart", 0],
+    ["secEnd", 1000],
+    ["secFontSize", 14],
+    ["secLabelColor", { solid: { color: "#B1005A" } }],
+    ["secLabelDisplayUnits", 1000],
+    ["secLabelPrecision", 1],
+    ["secShowAxisTitle", true],
+    ["secTitleText", "Post volume"],
+    ["secTitleFontSize", 16],
+    ["secTitleColor", { solid: { color: "#00703C" } }],
+  ] as const) {
+    custom = updateThemeValue(custom, ["visualStyles", "lineChart", "*", "y2Axis", 0, property], value);
+  }
+
+  const html = renderLine(custom);
+  const secondary = html.match(/<span class="chart-axis-gutter chart-axis-gutter--value chart-axis-gutter--secondary"[\s\S]*?<\/span><\/span>/)?.[0];
+  assert.ok(secondary, "missing rendered Y2 axis");
+  assert.match(secondary, /color:#B1005A;font-size:18\.666/);
+  assert.match(html, /color:#00703C;font-size:21\.333/);
+  assert.match(html, />Post volume</);
+  assert.match(secondary, />0\.3K</, "the pinned 0..1000 secondary range must drive its own formatted ticks");
+  assert.match(secondary, />1\.0K</);
+});
+
 // ---------------------------------------------------------------------------
 // Legends describe what is drawn
 // ---------------------------------------------------------------------------
