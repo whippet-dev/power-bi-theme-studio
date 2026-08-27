@@ -218,105 +218,96 @@ button { color: inherit; }
 
 .studio-layout {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) 328px;
+  grid-template-columns: 172px minmax(0, 1fr) 328px;
   min-height: calc(100vh - 116px);
 }
 
 .visual-rail {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   height: calc(100vh - 116px);
   position: sticky;
   top: 116px;
-  padding: 18px 10px;
+  padding: 14px 10px;
   border-right: 1px solid var(--line);
   background: var(--paper);
   overflow-y: auto;
 }
 
 .visual-rail__item {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  border-radius: 8px;
-}
-
-.visual-rail__item.is-selected { background: var(--brand-soft); }
-.visual-rail__item.is-hidden { opacity: 0.45; }
-
-.visual-rail__focus {
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
+  min-height: 54px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 10px 2px 8px;
-  border: 0;
+  gap: 9px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: var(--ink);
   cursor: pointer;
+  text-align: left;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.visual-rail__focus:disabled { cursor: not-allowed; }
+.visual-rail__item:hover {
+  border-color: #ded7e8;
+  background: #faf8fc;
+}
 
-.visual-rail__monogram {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.visual-rail__item.is-selected {
+  border-color: #c7b8e1;
+  background: var(--brand-soft);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.visual-rail__item:focus-visible {
+  outline: 3px solid rgba(86, 59, 143, 0.3);
+  outline-offset: 2px;
+}
+
+.visual-rail__icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 4px;
   border-radius: 999px;
   background: #f2eef6;
   color: #6d627b;
-  font-size: 11px;
-  font-weight: 750;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.is-selected .visual-rail__monogram {
+.is-selected .visual-rail__icon {
   background: var(--brand);
   color: white;
 }
 
+.visual-icon__muted { opacity: 0.55; }
+.visual-icon__fill {
+  fill: currentColor;
+  fill-opacity: 0.22;
+}
+
 .visual-rail__name {
-  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--muted);
-  font-size: 9px;
+  display: -webkit-box;
+  font-size: 10px;
   font-weight: 650;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .is-selected .visual-rail__name { color: var(--brand); }
-
-.visual-rail__toggle {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d6d1d9;
-  border-radius: 4px;
-  background: #fff;
-  color: var(--brand);
-  font-size: 9px;
-  font-weight: 750;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.visual-rail__toggle[aria-pressed="true"] {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-}
 
 .canvas-panel {
   padding: 34px clamp(24px, 4vw, 58px) 56px;
@@ -376,7 +367,7 @@ button { color: inherit; }
 
 /* Persistent, always-visible show/hide switches for the two canvas
    sections that aren't a "visual" of their own (filter pane, colour
-   reference) — sits next to the on-canvas count rather than buried in
+   reference) — sits next to the preview count rather than buried in
    a settings panel, so it's there whenever those sections are. */
 .canvas-panel__toggles {
   flex: 0 0 auto;
@@ -2847,7 +2838,16 @@ button { color: inherit; }
     border-bottom: 1px solid var(--line);
     overflow-x: auto;
   }
-  .visual-rail__item { flex-direction: column; }
+  .visual-rail__item {
+    flex: 0 0 122px;
+    min-height: 72px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
+  }
+  .visual-rail__item.is-selected { box-shadow: inset 0 3px 0 var(--brand); }
+  .visual-rail__name { min-height: 25px; }
 }
 
 @media (max-width: 680px) {

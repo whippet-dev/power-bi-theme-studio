@@ -56,7 +56,7 @@ import type { ResolvedTableStyle } from "../lib/tableProperties";
 import { propertyThemePath as textboxPropertyThemePath, TEXTBOX_PROPERTIES } from "../lib/textboxProperties";
 import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
 import { hasThemeValueAtPath, readThemeValueAtPath, type PowerBITheme, type ResolvedTheme } from "../lib/theme";
-import type { VisualKind } from "./VisualPreviews";
+import { VISUAL_LABEL, type VisualKind } from "./visualCatalog";
 
 type ThemePath = Array<string | number>;
 type PropertyValue = string | number | boolean;
@@ -88,25 +88,6 @@ type PropertyEditorProps = {
   selected: VisualKind;
   onChange: (path: ThemePath, value: PropertyValue) => void;
   onReset: (path: ThemePath) => void;
-};
-
-const visualNames: Record<VisualKind, string> = {
-  card: "Card",
-  bar: "Clustered bar chart",
-  column: "Clustered column chart",
-  stackedBar: "Stacked bar chart",
-  stackedColumn: "Stacked column chart",
-  line: "Line chart",
-  table: "Table",
-  matrix: "Matrix",
-  pie: "Pie chart",
-  slicer: "Slicer",
-  shape: "Shape",
-  actionButton: "Action button",
-  bookmarkNavigator: "Bookmark navigator",
-  pageNavigator: "Page navigator",
-  textbox: "Textbox",
-  image: "Image",
 };
 
 const TABLE_GROUP_LABELS: Record<keyof typeof TABLE_PROPERTIES, string> = {
@@ -1423,7 +1404,7 @@ export function PropertyEditor({
       <div className="properties-panel__header">
         <div>
           <span className="eyebrow">Properties</span>
-          <h2>{visualNames[selected]}</h2>
+          <h2>{VISUAL_LABEL[selected]}</h2>
         </div>
         <span className="selection-dot" title="Selected visual" />
       </div>
@@ -1436,7 +1417,7 @@ export function PropertyEditor({
           className={`properties-panel__tab${tab === "visual" ? " is-active" : ""}`}
           onClick={() => setTab("visual")}
         >
-          {visualNames[selected]}
+          {VISUAL_LABEL[selected]}
         </button>
         <button
           type="button"

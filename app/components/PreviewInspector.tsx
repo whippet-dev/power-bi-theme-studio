@@ -4,7 +4,7 @@ import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { InteractionState } from "../lib/properties";
 import { StateSelector } from "./PropertyEditor";
-import type { VisualKind } from "./VisualPreviews";
+import type { VisualKind } from "./visualCatalog";
 
 /**
  * Theme Studio's own supporting region for the selected visual.
@@ -46,6 +46,10 @@ const STATEFUL_VISUALS: ReadonlySet<VisualKind> = new Set<VisualKind>([
   "pageNavigator",
 ]);
 
+export function isStatefulPreviewVisual(selected: VisualKind): boolean {
+  return STATEFUL_VISUALS.has(selected);
+}
+
 /**
  * True when the selected visual has anything to inspect. Used by the caller
  * so an empty region is never rendered — the design's guardrail against a
@@ -53,7 +57,7 @@ const STATEFUL_VISUALS: ReadonlySet<VisualKind> = new Set<VisualKind>([
  * place, and a permanent empty card would be the first step the other way.
  */
 export function hasInspectorContent(selected: VisualKind, chrome: ResolvedChromeStyle): boolean {
-  return STATEFUL_VISUALS.has(selected) || chrome.visualTooltip.show;
+  return isStatefulPreviewVisual(selected) || chrome.visualTooltip.show;
 }
 
 export function PreviewInspector({
@@ -69,7 +73,7 @@ export function PreviewInspector({
   // interaction state and style resolution, which stay in ThemeStudio.
   const [showTooltipPreview, setShowTooltipPreview] = useState(false);
 
-  const isStateful = STATEFUL_VISUALS.has(selected);
+  const isStateful = isStatefulPreviewVisual(selected);
   const tooltip = chrome.visualTooltip;
   const tooltipIsReportPage = String(tooltip.type) === "Canvas";
 

@@ -35,9 +35,10 @@ import { resolveTextboxStyle } from "../lib/textboxProperties";
 import { resolveTextClasses, resolveThemeColors } from "../lib/themeGlobalsProperties";
 import { FilterPanePreview, PaletteLegend } from "./GlobalPreviews";
 import { PropertyEditor } from "./PropertyEditor";
-import { VisualGallery, type VisualKind } from "./VisualPreviews";
+import { VisualGallery } from "./VisualPreviews";
 import { PreviewInspector } from "./PreviewInspector";
-import { VISUAL_LABEL, VisualRail } from "./VisualRail";
+import { VisualRail } from "./VisualRail";
+import { ALL_VISUALS, DEFAULT_HERO_VISUAL, VISUAL_LABEL, type VisualKind } from "./visualCatalog";
 
 // Maps this app's UI visual identifiers to the schema's real visual-type
 // keys, so chrome (title/subtitle/background/border) resolves per visual.
@@ -60,39 +61,9 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   image: "image",
 };
 
-const ALL_VISUALS: VisualKind[] = [
-  "card",
-  "bar",
-  "column",
-  "stackedBar",
-  "stackedColumn",
-  "line",
-  "table",
-  "matrix",
-  "pie",
-  "slicer",
-  "shape",
-  "actionButton",
-  "bookmarkNavigator",
-  "pageNavigator",
-  "textbox",
-  "image",
-];
-
-/** The visual the studio opens on, and the only one on the canvas to start. */
-const INITIAL_VISUAL: VisualKind = "bar";
-
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneStarterTheme());
-  const [selectedVisual, setSelectedVisual] = useState<VisualKind>(INITIAL_VISUAL);
-  // Only the selected visual starts on the canvas. With all sixteen shown
-  // the page opens as a wall of thumbnails, which buries the one being
-  // edited and makes the effect of a change hard to see; the rail is
-  // there to add more when they're wanted.
-  const [visibility, setVisibility] = useState<Record<VisualKind, boolean>>(() => {
-    const none = Object.fromEntries(ALL_VISUALS.map((visual) => [visual, false])) as Record<VisualKind, boolean>;
-    return { ...none, [INITIAL_VISUAL]: true };
-  });
+  const [selectedVisual, setSelectedVisual] = useState<VisualKind>(DEFAULT_HERO_VISUAL);
   const [fileLabel, setFileLabel] = useState("Starter theme");
   const [message, setMessage] = useState<string | null>(null);
   // Both start visible; these are display-only preview toggles, not
@@ -230,25 +201,6 @@ export function ThemeStudio() {
     setMessage(null);
   };
 
-  const visibleVisuals = ALL_VISUALS.filter((kind) => visibility[kind]);
-
-  const handleToggleVisible = (kind: VisualKind) => {
-    setVisibility((current) => {
-      const makingVisible = !current[kind];
-      const visibleCount = ALL_VISUALS.filter((k) => current[k]).length;
-      if (!makingVisible && visibleCount <= 1) return current; // at least one visual must stay on the canvas
-
-      const next = { ...current, [kind]: makingVisible };
-      if (makingVisible) {
-        setSelectedVisual(kind);
-      } else if (selectedVisual === kind) {
-        const fallback = ALL_VISUALS.find((k) => k !== kind && next[k]);
-        if (fallback) setSelectedVisual(fallback);
-      }
-      return next;
-    });
-  };
-
   const handleExport = () => {
     const blob = new Blob([`${JSON.stringify(theme, null, 2)}\n`], {
       type: "application/json",
@@ -332,10 +284,8 @@ export function ThemeStudio() {
 
       <div className="studio-layout">
         <VisualRail
-          visibility={visibility}
           selected={selectedVisual}
           onSelect={setSelectedVisual}
-          onToggleVisible={handleToggleVisible}
         />
 
         <section className="canvas-panel" aria-labelledby="gallery-title">
@@ -355,7 +305,7 @@ export function ThemeStudio() {
                 Colour reference
               </label>
               <span className="preview-badge">
-                <span /> {visibleVisuals.length} on canvas
+                <span /> {ALL_VISUALS.length} previews
               </span>
             </div>
           </div>
@@ -383,23 +333,22 @@ export function ThemeStudio() {
               <VisualGallery
                 theme={resolved}
                 tableStyle={tableStyle}
-            barChartStyle={barChartStyle}
-            columnChartStyle={columnChartStyle}
-            stackedBarChartStyle={stackedBarChartStyle}
-            stackedColumnChartStyle={stackedColumnChartStyle}
-            lineChartStyle={lineChartStyle}
-            cardStyle={cardStyle}
-            slicerStyle={slicerStyle}
-            matrixStyle={matrixStyle}
-            pieChartStyle={pieChartStyle}
-            shapeStyle={shapeStyle}
-            actionButtonStyle={heroActionButtonStyle}
-            bookmarkNavigatorStyle={heroBookmarkNavigatorStyle}
-            pageNavigatorStyle={heroPageNavigatorStyle}
-            textboxStyle={textboxStyle}
-            imageStyle={imageStyle}
+                barChartStyle={barChartStyle}
+                columnChartStyle={columnChartStyle}
+                stackedBarChartStyle={stackedBarChartStyle}
+                stackedColumnChartStyle={stackedColumnChartStyle}
+                lineChartStyle={lineChartStyle}
+                cardStyle={cardStyle}
+                slicerStyle={slicerStyle}
+                matrixStyle={matrixStyle}
+                pieChartStyle={pieChartStyle}
+                shapeStyle={shapeStyle}
+                actionButtonStyle={heroActionButtonStyle}
+                bookmarkNavigatorStyle={heroBookmarkNavigatorStyle}
+                pageNavigatorStyle={heroPageNavigatorStyle}
+                textboxStyle={textboxStyle}
+                imageStyle={imageStyle}
                 chromeStyles={chromeStyles}
-                visibleVisuals={visibleVisuals}
                 selected={selectedVisual}
                 onSelect={setSelectedVisual}
               />

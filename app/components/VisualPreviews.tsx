@@ -29,24 +29,9 @@ import type { ResolvedStackedColumnChartStyle } from "../lib/stackedColumnChartP
 import type { ResolvedTableStyle } from "../lib/tableProperties";
 import type { ResolvedTextboxStyle } from "../lib/textboxProperties";
 import type { ResolvedTheme } from "../lib/theme";
+import { splitHeroVisuals, VISUAL_LABEL, type VisualKind } from "./visualCatalog";
 
-export type VisualKind =
-  | "card"
-  | "bar"
-  | "column"
-  | "stackedBar"
-  | "stackedColumn"
-  | "line"
-  | "table"
-  | "matrix"
-  | "pie"
-  | "slicer"
-  | "shape"
-  | "actionButton"
-  | "bookmarkNavigator"
-  | "pageNavigator"
-  | "textbox"
-  | "image";
+export type { VisualKind } from "./visualCatalog";
 
 /**
  * Whether the user has actually opened a chart's small-multiples grid and
@@ -83,7 +68,6 @@ type VisualGalleryProps = {
   textboxStyle: ResolvedTextboxStyle;
   imageStyle: ResolvedImageStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
-  visibleVisuals: VisualKind[];
   selected: VisualKind;
   onSelect: (visual: VisualKind) => void;
 };
@@ -188,7 +172,7 @@ function actionButtonGlyph(shapeType: string): string {
 
 function shapeTile(
   style: ResolvedShapeFamilyCore,
-  key: string,
+  fallbackText: string,
   extra?: ReactNode,
   /** Where `extra` (an action button's icon) sits relative to the text. */
   extraPlacement?: string,
@@ -209,7 +193,7 @@ function shapeTile(
   return (
     <span
       className="shape-tile"
-      key={key}
+      key={fallbackText}
       style={{
         // clip-path cuts off any CSS border, so a clipped shape draws its
         // outline as an inset ring instead — otherwise turning the outline
@@ -258,7 +242,7 @@ function shapeTile(
             transform: style.rotation.textAngle ? `rotate(${style.rotation.textAngle}deg)` : undefined,
           }}
         >
-          {String(style.text.text) || key}
+          {String(style.text.text) || fallbackText}
         </span>
       )}
     </span>
@@ -775,7 +759,6 @@ export function VisualGallery({
   textboxStyle,
   imageStyle,
   chromeStyles,
-  visibleVisuals,
   selected,
   onSelect,
 }: VisualGalleryProps) {
@@ -1681,12 +1664,12 @@ export function VisualGallery({
     </span>
   );
 
-  const shapeContent = shapeTile(shapeStyle, "shape");
+  const shapeContent = shapeTile(shapeStyle, VISUAL_LABEL.shape);
 
   const actionIcon = actionButtonStyle.icon;
   const actionButtonContent = shapeTile(
     actionButtonStyle,
-    "actionButton",
+    VISUAL_LABEL.actionButton,
     actionIcon.show && (
       <span
         className="shape-tile__icon"
@@ -1843,14 +1826,14 @@ export function VisualGallery({
     /** The visual draws its own Power BI title inside its authored bounds. */
     titleInsideVisual?: boolean;
   }> = [
-    { id: "card", label: "Card", defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
-    { id: "bar", label: "Clustered bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent, titleInsideVisual: true },
-    { id: "column", label: "Clustered column chart", defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent, titleInsideVisual: true },
-    { id: "stackedBar", label: "Stacked bar chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent, titleInsideVisual: true },
-    { id: "stackedColumn", label: "Stacked column chart", defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent, titleInsideVisual: true },
+    { id: "card", label: VISUAL_LABEL.card, defaultTitle: "Total support awarded", chrome: chromeStyles.card, content: cardContent },
+    { id: "bar", label: VISUAL_LABEL.bar, defaultTitle: "Applications by region", chrome: chromeStyles.bar, content: barFinalContent, titleInsideVisual: true },
+    { id: "column", label: VISUAL_LABEL.column, defaultTitle: "Applications by region", chrome: chromeStyles.column, content: columnFinalContent, titleInsideVisual: true },
+    { id: "stackedBar", label: VISUAL_LABEL.stackedBar, defaultTitle: "Applications by region", chrome: chromeStyles.stackedBar, content: stackedBarFinalContent, titleInsideVisual: true },
+    { id: "stackedColumn", label: VISUAL_LABEL.stackedColumn, defaultTitle: "Applications by region", chrome: chromeStyles.stackedColumn, content: stackedColumnFinalContent, titleInsideVisual: true },
     {
       id: "line",
-      label: "Line chart",
+      label: VISUAL_LABEL.line,
       defaultTitle: "Applications over time",
       chrome: chromeStyles.line,
       titleInsideVisual: !lineUsesSmallMultiples,
@@ -1865,33 +1848,31 @@ export function VisualGallery({
           )
         : lineContent,
     },
-    { id: "table", label: "Table", defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
-    { id: "matrix", label: "Matrix", defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
-    { id: "pie", label: "Pie chart", defaultTitle: "Applications by region", chrome: chromeStyles.pie, content: pieContent },
-    { id: "slicer", label: "Slicer", defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
-    { id: "shape", label: "Shape", defaultTitle: "Shape", chrome: chromeStyles.shape, content: shapeContent },
-    { id: "actionButton", label: "Action button", defaultTitle: "Action button", chrome: chromeStyles.actionButton, content: actionButtonContent },
+    { id: "table", label: VISUAL_LABEL.table, defaultTitle: "Regional performance", chrome: chromeStyles.table, content: tableContent },
+    { id: "matrix", label: VISUAL_LABEL.matrix, defaultTitle: "Regional performance by quarter", chrome: chromeStyles.matrix, content: matrixContent },
+    { id: "pie", label: VISUAL_LABEL.pie, defaultTitle: "Applications by region", chrome: chromeStyles.pie, content: pieContent },
+    { id: "slicer", label: VISUAL_LABEL.slicer, defaultTitle: "Application status", chrome: chromeStyles.slicer, content: slicerContent },
+    { id: "shape", label: VISUAL_LABEL.shape, defaultTitle: VISUAL_LABEL.shape, chrome: chromeStyles.shape, content: shapeContent },
+    { id: "actionButton", label: VISUAL_LABEL.actionButton, defaultTitle: VISUAL_LABEL.actionButton, chrome: chromeStyles.actionButton, content: actionButtonContent },
     {
       id: "bookmarkNavigator",
-      label: "Bookmark navigator",
-      defaultTitle: "Bookmark navigator",
+      label: VISUAL_LABEL.bookmarkNavigator,
+      defaultTitle: VISUAL_LABEL.bookmarkNavigator,
       chrome: chromeStyles.bookmarkNavigator,
       content: bookmarkNavigatorContent,
     },
     {
       id: "pageNavigator",
-      label: "Page navigator",
-      defaultTitle: "Page navigator",
+      label: VISUAL_LABEL.pageNavigator,
+      defaultTitle: VISUAL_LABEL.pageNavigator,
       chrome: chromeStyles.pageNavigator,
       content: pageNavigatorContent,
     },
-    { id: "textbox", label: "Textbox", defaultTitle: "Textbox", chrome: chromeStyles.textbox, content: textboxContent },
-    { id: "image", label: "Image", defaultTitle: "Image", chrome: chromeStyles.image, content: imageContent },
+    { id: "textbox", label: VISUAL_LABEL.textbox, defaultTitle: VISUAL_LABEL.textbox, chrome: chromeStyles.textbox, content: textboxContent },
+    { id: "image", label: VISUAL_LABEL.image, defaultTitle: VISUAL_LABEL.image, chrome: chromeStyles.image, content: imageContent },
   ];
 
-  const visible = descriptors.filter((d) => visibleVisuals.includes(d.id));
-  const hero = visible.find((d) => d.id === selected) ?? visible[0];
-  const thumbnails = visible.filter((d) => d.id !== hero?.id);
+  const { hero, thumbnails } = splitHeroVisuals(descriptors, selected);
 
   return (
     <div className="visual-canvas">
