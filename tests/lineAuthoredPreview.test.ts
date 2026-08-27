@@ -14,7 +14,13 @@ const gallerySource = readFileSync(new URL("../app/components/VisualPreviews.tsx
 const cssSource = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 
 const measure = (text: string, fontSize: number) => ({ width: text.length * fontSize * 0.5, height: fontSize * 1.35 });
-const title = { show: true, text: "Applications over time", fontSize: 12, fontFamily: "Segoe UI" };
+const title = {
+  show: true,
+  text: "Applications over time",
+  fontSize: 12,
+  fontFamily: "Segoe UI",
+  fontFamilyCss: "Segoe UI",
+};
 const legend = { show: true, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" };
 
 test("Line uses the measured 450 x 300 authored visual box", () => {
@@ -49,7 +55,10 @@ test("hiding Line title and legend returns all their authored space", () => {
   const hiddenLegend = legendBandExtent({ ...legend, show: false } as never, ["Online", "Phone", "Post"], measure);
   const hidden = authoredInnerBox(LINE_CHART_BOX, authoredChromeExtent([hiddenTitle, hiddenLegend]));
   assert.equal(hidden.height, 300);
-  assert.equal(hidden.height - shown.height, shownTitle.height + shownLegend.height);
+  assert.ok(
+    Math.abs(hidden.height - shown.height - (shownTitle.height + shownLegend.height)) < 1e-9,
+    "all title and legend height returns to the chart",
+  );
 });
 
 test("normal Line has one internal title owner and small multiples do not repeat it", () => {

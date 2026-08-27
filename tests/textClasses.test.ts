@@ -232,6 +232,7 @@ test("foregroundNeutralSecondary layers custom over base for light classes", () 
 // ---------------------------------------------------------------------------
 
 test("the semantic roles map to the classes Microsoft documents", () => {
+  assert.equal(TEXT_ROLE_CLASS.visualTitle, "largeTitle");
   assert.equal(TEXT_ROLE_CLASS.categoryAxisTitle, "title");
   assert.equal(TEXT_ROLE_CLASS.valueAxisTitle, "title");
   // Microsoft's published table associates category axis labels with
@@ -253,6 +254,15 @@ test("the semantic roles map to the classes Microsoft documents", () => {
   // A role is just a named class lookup, so the two must agree.
   const l = withClassic(PRIMARY_ONLY);
   assert.deepEqual(resolveTextRole(l, "valueAxisLabel"), resolveTextClass(l, "smallLightLabel"));
+});
+
+test("Classic 2026 visual titles resolve through largeTitle to the native DIN 14 role", () => {
+  const title = resolveTextRole(withClassic(EMPTY), "visualTitle");
+
+  assert.equal(title.fontFamily, "DIN");
+  assert.equal(title.cssFontFamily, "wf_standard-font, helvetica, arial, sans-serif");
+  assert.equal(title.fontSize, 14);
+  assert.equal(title.fontWeight, undefined);
 });
 
 // ---------------------------------------------------------------------------

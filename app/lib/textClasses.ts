@@ -4,15 +4,17 @@
  * A Power BI theme declares four *primary* text classes — `callout`,
  * `header`, `label`, `title` — and Power BI derives ten *secondary* classes
  * from them. Visuals then take their default typography from a named class:
- * an axis title from `title`, a category axis label from `lightLabel`, and
- * so on. A theme that declares only the four primaries is complete, because
- * everything else is derived.
+ * an axis title from `title`, a visual title from `largeTitle`, and so on.
+ * A theme that declares only the four primaries contains enough information
+ * to derive every text class. It does not, by itself, describe which class
+ * every visual property uses or replace Power BI's visual-capability defaults.
  *
  * `BASE_THEME_DIFFERENTIAL_AUDIT.md` found that Studio implemented none of
  * this: a typography property absent from `visualStyles` fell straight to a
  * literal `6` (66 properties across 9 registries) or `""` (72 properties).
- * Classic 2026 — a verbatim Power BI file — declares *no* font size anywhere
- * in `visualStyles` precisely because it expects this layer to supply them.
+ * Classic 2026 — a verbatim Power BI resource — omits many font sizes from
+ * `visualStyles`; the effective defaults require this layer plus the semantic
+ * role mapping below (and, for roles not yet modelled, visual defaults).
  *
  * The derivation below is not inferred from documentation. It is transcribed
  * from Power BI Desktop's own implementation: the function its assertion
@@ -137,6 +139,7 @@ export type ResolvedTextClass = {
  * Recorded, not modelled — see POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.15.
  */
 export const TEXT_ROLE_CLASS = {
+  visualTitle: "largeTitle",
   categoryAxisLabel: "smallLightLabel",
   categoryAxisTitle: "title",
   valueAxisLabel: "smallLightLabel",

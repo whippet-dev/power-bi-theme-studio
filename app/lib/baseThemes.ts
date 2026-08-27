@@ -4,19 +4,20 @@ import fluent2Json from "../../themes/base/fluent2.json";
 import type { PowerBITheme } from "./theme";
 
 /**
- * The base theme layer Power BI itself applies before any custom theme —
- * see themes/base/*.json for exactly how each was sourced (verbatim
- * exports or a reconstructed delta chain, both confirmed against the
- * installed Power BI Desktop app's own files, not inferred). A user's
- * theme still layers on top via mergeThemeOverBase; this is only the
- * fallback underneath it.
+ * The base-theme resource layer Power BI applies before any custom theme —
+ * see themes/base/*.json for exactly how each was sourced (verbatim installed
+ * resources or a reconstructed delta chain, confirmed against Power BI
+ * Desktop's own files rather than inferred). These resources are complete as
+ * source artifacts, but they are not a serialization of every effective
+ * visual default: Desktop also applies text-class roles and visual-capability
+ * defaults. A user's theme still layers on top; this is only one fallback
+ * layer underneath it.
  *
  * To add a newly-released base theme: drop its JSON in themes/base/,
  * add one entry below, and move DEFAULT_BASE_THEME_ID to it if it's now
  * the current default for new reports (Microsoft states this explicitly —
- * see themes/base/classic2026.json's _note). Nothing else needs to
- * change; every resolver already reads through whichever base theme is
- * selected.
+ * see themes/base/classic2026.json's _note). Then audit any new/changed text
+ * roles or capability defaults as well as switching the selected resource.
  */
 export type BaseThemeId = "classic2026" | "classic2018" | "fluent2";
 

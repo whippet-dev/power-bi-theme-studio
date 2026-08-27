@@ -5,10 +5,12 @@ import {
   colorProp,
   enumProp,
   numberProp,
+  resolveChromeEntry,
   resolveChromeValue,
   textProp,
   type VisualSchemaKey,
 } from "./properties";
+import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -1102,6 +1104,8 @@ export type ResolvedChromeStyle = {
     background: string;
     fontColor: string;
     fontFamily: string;
+    /** Effective CSS family; differs from the literal only for a text-role fallback. */
+    fontFamilyCss: string;
     fontSize: number;
     bold: boolean;
     italic: boolean;
@@ -1272,6 +1276,18 @@ export function resolveChromeStyle(
   base: ResolvedTheme,
 ): ResolvedChromeStyle {
   const p = CHROME_PROPERTIES;
+  const visualTitleText = resolveTextRole(theme, "visualTitle");
+  const titleFamilyEntry = resolveChromeEntry(
+    theme,
+    activeVisual,
+    p.title.fontFamily,
+    visualTitleText.fontFamily,
+  );
+  // Power BI expands font aliases while applying a text class, but leaves an
+  // explicit visualStyles fontFamily literal. Provenance is therefore part of
+  // the rendered value even when both raw strings happen to say "DIN".
+  const titleFontFamilyCss =
+    titleFamilyEntry.source === "fallback" ? visualTitleText.cssFontFamily : titleFamilyEntry.value;
   // Classic 2026 (themes/base/classic2026.json) overrides background.show
   // and visualHeader.show back to false for every "canvas object" visual
   // type (shape, image, actionButton, textbox, pageNavigator,
@@ -1293,10 +1309,11 @@ export function resolveChromeStyle(
       alignment: resolveChromeValue(theme, activeVisual, p.title.alignment, "left"),
       heading: resolveChromeValue(theme, activeVisual, p.title.heading, "Normal"),
       background: resolveChromeValue(theme, activeVisual, p.title.background, base.background),
-      fontColor: resolveChromeValue(theme, activeVisual, p.title.fontColor, base.foreground),
-      fontFamily: resolveChromeValue(theme, activeVisual, p.title.fontFamily, base.fontFamily),
-      fontSize: resolveChromeValue(theme, activeVisual, p.title.fontSize, base.titleSize),
-      bold: resolveChromeValue(theme, activeVisual, p.title.bold, true),
+      fontColor: resolveChromeValue(theme, activeVisual, p.title.fontColor, visualTitleText.color),
+      fontFamily: titleFamilyEntry.value,
+      fontFamilyCss: titleFontFamilyCss,
+      fontSize: resolveChromeValue(theme, activeVisual, p.title.fontSize, visualTitleText.fontSize),
+      bold: resolveChromeValue(theme, activeVisual, p.title.bold, false),
       italic: resolveChromeValue(theme, activeVisual, p.title.italic, false),
       underline: resolveChromeValue(theme, activeVisual, p.title.underline, false),
       // Verified against themes/base/classic2026.json's shared

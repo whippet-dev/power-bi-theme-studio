@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getBaseTheme } from "../app/lib/baseThemes";
 import { CHROME_PROPERTIES, chromeThemePath, resolveChromeStyle } from "../app/lib/chromeProperties";
-import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
+import { themeLayers, type VisualSchemaKey } from "../app/lib/properties";
+import { deleteThemeValue, resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 const STARTER_THEME: PowerBITheme = {
   name: "Sample theme",
@@ -14,6 +16,13 @@ const STARTER_THEME: PowerBITheme = {
   },
   visualStyles: {},
 };
+
+const EMPTY_THEME: PowerBITheme = { name: "No custom overrides", visualStyles: {} };
+
+function baseChrome(baseId: "classic2026" | "fluent2", visual: VisualSchemaKey, custom = EMPTY_THEME) {
+  const source = themeLayers(custom, getBaseTheme(baseId));
+  return resolveChromeStyle(source, visual, resolveTheme(source.roots));
+}
 
 // A theme-wide default (visualStyles["*"]["*"]) plus a Table-specific
 // override for the same property (visualStyles.tableEx["*"]) — the
@@ -46,6 +55,50 @@ test("resolveChromeStyle falls back to plain defaults when nothing is set anywhe
   // invisible only because it matches the canvas colour), not off.
   assert.equal(chrome.background.show, true);
   assert.equal(chrome.border.show, false);
+});
+
+test("Classic 2026 shared visual titles use the native largeTitle role for every visual family", () => {
+  for (const visual of ["lineChart", "clusteredBarChart", "clusteredColumnChart", "card", "tableEx"] as const) {
+    const title = baseChrome("classic2026", visual).title;
+    assert.equal(title.fontFamily, "DIN", `${visual} literal family`);
+    assert.equal(title.fontFamilyCss, "wf_standard-font, helvetica, arial, sans-serif", `${visual} CSS family`);
+    assert.equal(title.fontSize, 14, `${visual} size`);
+    assert.equal(title.bold, false, `${visual} weight`);
+  }
+});
+
+test("explicit title typography wins, stays literal, and reset returns to the Classic 2026 role", () => {
+  const familyPath = chromeThemePath("lineChart", CHROME_PROPERTIES.title.fontFamily);
+  const sizePath = chromeThemePath("lineChart", CHROME_PROPERTIES.title.fontSize);
+  const boldPath = chromeThemePath("lineChart", CHROME_PROPERTIES.title.bold);
+  let custom = updateThemeValue(EMPTY_THEME, familyPath, "DIN");
+  custom = updateThemeValue(custom, sizePath, 22);
+  custom = updateThemeValue(custom, boldPath, true);
+
+  const explicit = baseChrome("classic2026", "lineChart", custom).title;
+  assert.equal(explicit.fontFamily, "DIN");
+  assert.equal(explicit.fontFamilyCss, "DIN", "an explicit visualStyles family must not use the text-class alias");
+  assert.equal(explicit.fontSize, 22);
+  assert.equal(explicit.bold, true);
+
+  custom = deleteThemeValue(custom, familyPath);
+  custom = deleteThemeValue(custom, sizePath);
+  custom = deleteThemeValue(custom, boldPath);
+  const reset = baseChrome("classic2026", "lineChart", custom).title;
+  assert.equal(reset.fontFamily, "DIN");
+  assert.equal(reset.fontFamilyCss, "wf_standard-font, helvetica, arial, sans-serif");
+  assert.equal(reset.fontSize, 14);
+  assert.equal(reset.bold, false);
+});
+
+test("Fluent 2's explicit wildcard title typography remains authoritative", () => {
+  const title = baseChrome("fluent2", "lineChart").title;
+  const family = "'Segoe UI Semibold', wf_segoe-ui_semibold, helvetica, arial, sans-serif";
+
+  assert.equal(title.fontFamily, family);
+  assert.equal(title.fontFamilyCss, family);
+  assert.equal(title.fontSize, 15);
+  assert.equal(title.bold, false);
 });
 
 test("resolveChromeStyle applies the shared visualStyles['*']['*'] default to a visual with no specific override", () => {

@@ -622,7 +622,7 @@ function PreviewShell({
               textAlign: chrome.title.alignment as CSSProperties["textAlign"],
               backgroundColor: chrome.title.background,
               color: chrome.title.fontColor,
-              fontFamily: chrome.title.fontFamily,
+              fontFamily: chrome.title.fontFamilyCss,
               fontSize: themeFontSizeToCssPx(chrome.title.fontSize),
               fontWeight: chrome.title.bold ? 700 : 400,
               fontStyle: chrome.title.italic ? "italic" : "normal",

@@ -218,6 +218,7 @@ const titleOf = (over: Record<string, unknown> = {}) => ({
   text: "Applications by region",
   fontSize: 12,
   fontFamily: "Segoe UI",
+  fontFamilyCss: "Segoe UI",
   ...over,
 });
 

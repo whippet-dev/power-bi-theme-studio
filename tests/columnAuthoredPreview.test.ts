@@ -30,6 +30,7 @@ const title = {
   text: "Applications by region",
   fontSize: 12,
   fontFamily: "Segoe UI",
+  fontFamilyCss: "Segoe UI",
 };
 
 const legend = {
@@ -85,7 +86,10 @@ test("hiding Column title and legend returns their space to the chart", () => {
   const hiddenInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([hiddenTitle, hiddenLegend]));
 
   assert.equal(hiddenInner.height, 300);
-  assert.equal(hiddenInner.height - shownInner.height, shownTitle.height + shownLegend.height);
+  assert.ok(
+    Math.abs(hiddenInner.height - shownInner.height - (shownTitle.height + shownLegend.height)) < 1e-9,
+    "all title and legend height returns to the chart",
+  );
 });
 
 test("Clustered and Stacked Column share one box and one internal title owner", () => {
