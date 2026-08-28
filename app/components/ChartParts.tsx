@@ -195,19 +195,23 @@ export function ChartLegend({
   return (
     <span
       className={`chart-legend${vertical ? " chart-legend--vertical" : ""}`}
-      style={vertical ? undefined : { justifyContent: horizontalAlignment }}
     >
       {legend.showTitle && (
         <span className="chart-legend__title" style={textStyle(legend)}>
           {String(legend.titleText) || "Series"}
         </span>
       )}
-      {items.map((item) => (
-        <span className="chart-legend__item" key={item.label}>
-          <span className="chart-legend__swatch" style={{ backgroundColor: item.color }} />
-          <span style={textStyle(legend)}>{item.label}</span>
-        </span>
-      ))}
+      <span
+        className="chart-legend__entries"
+        style={vertical ? undefined : { justifyContent: horizontalAlignment }}
+      >
+        {items.map((item) => (
+          <span className="chart-legend__item" key={item.label}>
+            <span className="chart-legend__swatch" style={{ backgroundColor: item.color }} />
+            <span style={textStyle(legend)}>{item.label}</span>
+          </span>
+        ))}
+      </span>
     </span>
   );
 }

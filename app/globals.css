@@ -910,9 +910,9 @@ button { color: inherit; }
 /* Chart furniture shared by bar/column/stacked/line previews. */
 .chart-legend {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   margin-bottom: 6px;
 }
 
@@ -927,6 +927,19 @@ button { color: inherit; }
   font-weight: 650;
 }
 
+.chart-legend__entries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-legend--vertical .chart-legend__entries {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
 .chart-legend__item {
   display: inline-flex;
   align-items: center;
@@ -937,7 +950,7 @@ button { color: inherit; }
   flex-shrink: 0;
   width: 9px;
   height: 9px;
-  border-radius: 2px;
+  border-radius: 999px;
 }
 
 /* A side legend is a WIDTH band inside the authored visual. It must not turn
@@ -1497,6 +1510,14 @@ button { color: inherit; }
 .column-preview__plot {
   position: relative;
   margin-top: 22px;
+}
+
+/* A measured container inset belongs outside the plot and its two axis
+   strips. The frame is the positioning context for all ChartLayout output,
+   so CSS and the layout engine consume the same reduced rectangle. */
+.chart-preview__plot-frame {
+  position: absolute;
+  inset: 0;
 }
 
 /* An axis gutter. Its extent is set inline from the layout; CSS only says
