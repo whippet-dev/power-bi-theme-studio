@@ -798,6 +798,28 @@ button { color: inherit; }
   transform-origin: top left;
 }
 
+/* Fidelity comparisons show the entire literal authored visual. The wider
+   tile makes room for its existing frame padding; a constrained canvas
+   scrolls this one local region instead of fitting or clipping the chart. */
+.visual-hero-wrap--one-to-one {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.visual-hero-scale-wrap--one-to-one {
+  width: max-content;
+  max-width: none;
+  overflow: visible;
+}
+
+.visual-tile--hero.visual-tile--one-to-one {
+  width: max-content;
+  min-width: var(--hero-tile-width);
+  overflow: visible;
+}
+
 .visual-thumbnails {
   display: flex;
   flex-wrap: wrap;
