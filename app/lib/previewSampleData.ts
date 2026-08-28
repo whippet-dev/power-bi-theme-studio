@@ -108,10 +108,10 @@ export const CLUSTERED_DATA_MAX = clusteredMax(cartesianFixture) * VALUE_SCALE;
 export const STACKED_DATA_MAX = stackedMax(cartesianFixture) * VALUE_SCALE;
 
 /**
- * The line chart's value-axis maximum. Kept at 70,000 rather than derived:
- * it is a pre-existing convention of this preview, above the fixture's 68,
- * and whether Power BI would round an automatic maximum to it has not been
- * established. Changing it belongs with that question, not here.
+ * The line chart's value-axis input maximum. Kept at 70,000 rather than
+ * derived: it is a pre-existing fixture convention above the series' 68K.
+ * ChartLayout owns automatic domain/tick normalization, so this remains
+ * sample input rather than renderer-specific axis logic.
  */
 export const LINE_DATA_MAX = 70_000;
 

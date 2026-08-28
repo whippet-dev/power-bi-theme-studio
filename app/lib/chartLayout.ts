@@ -496,7 +496,9 @@ function parseBound(value: string | number | undefined): number | null {
 
 /**
  * The axis range: start falls back to 0, and a pinned end is only honoured
- * when it exceeds start.
+ * when it exceeds start. An automatic end is rounded up at its leading
+ * decimal place, matching the native cartesian behaviour established at
+ * 46K (50K domain) without changing an explicitly authored bound.
  *
  * These semantics began in `axisTicks` in ChartParts, which this was
  * written to match while both models were live. T10 deleted that one with
@@ -507,14 +509,46 @@ function parseBound(value: string | number | undefined): number | null {
 export function axisRange(axis: AxisLayoutStyle, dataMax: number): { start: number; end: number } {
   const start = parseBound(axis.start) ?? 0;
   const parsedEnd = parseBound(axis.end);
-  const end = parsedEnd !== null && parsedEnd > start ? parsedEnd : dataMax;
+  if (parsedEnd !== null && parsedEnd > start) return { start, end: parsedEnd };
+
+  const span = dataMax - start;
+  if (!Number.isFinite(span) || span <= 0) return { start, end: dataMax };
+
+  const magnitude = 10 ** Math.floor(Math.log10(span));
+  const roundedSpan = Math.ceil(span / magnitude - Number.EPSILON) * magnitude;
+  const end = start + roundedSpan;
   return { start, end };
 }
 
-/** Evenly spaced tick values across the range, in plot order. */
+/**
+ * Power BI-like nice step for an automatic cartesian axis.
+ *
+ * The domain and tick interval are intentionally related but distinct: the
+ * proven 46K state has a rounded 50K domain while its visible ticks are
+ * 0/20K/40K. Consequently the final tick need not sit on the far plot edge.
+ */
+function niceTickStep(span: number, count: number): number {
+  const targetIntervals = Math.max(1, Math.floor(count));
+  const rough = span / targetIntervals;
+  if (!Number.isFinite(rough) || rough <= 0) return 0;
+
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  const fraction = rough / magnitude;
+  const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
+  return niceFraction * magnitude;
+}
+
+/** Nice tick values within the resolved range, in plot order. */
 export function axisTickValues(axis: AxisLayoutStyle, dataMax: number, count = DEFAULT_TICK_COUNT): number[] {
   const { start, end } = axisRange(axis, dataMax);
-  const ticks = Array.from({ length: count + 1 }, (_, i) => start + ((end - start) * i) / count);
+  const step = niceTickStep(end - start, count);
+  const epsilon = Math.abs(end - start) * 1e-12;
+  const ticks = step > 0
+    ? Array.from(
+        { length: Math.max(1, Math.floor((end - start + epsilon) / step) + 1) },
+        (_, i) => start + step * i,
+      ).filter((tick) => tick <= end + epsilon)
+    : [start];
   return axis.invertAxis ? ticks.reverse() : ticks;
 }
 

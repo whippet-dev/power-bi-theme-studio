@@ -212,14 +212,15 @@ test("the unproven roles keep their old fallbacks in every cartesian registry", 
   }
 });
 
-test("Line's secondary axis and series labels are deliberately left alone", () => {
-  // Power BI's bundle binds no text class to either, so both keep the old
-  // literal until a role can be proven.
+test("Line's secondary axis has proven native defaults while series labels remain alone", () => {
+  // With a secondary measure bound, Desktop exposes independent Segoe UI 9pt
+  // Values and DIN 12pt Title defaults. Series labels still have no proven role.
   const src = themeLayers(EMPTY, getBaseTheme("classic2026"));
   const s = resolveLineChartStyle(src, resolveTheme(src.roots));
-  assert.equal(s.y2Axis.secFontSize, 6);
-  assert.equal(s.y2Axis.secFontFamily, "");
-  assert.equal(s.y2Axis.secTitleFontSize, 6);
+  assert.equal(s.y2Axis.secFontSize, s.valueAxis.fontSize);
+  assert.equal(s.y2Axis.secFontFamily, s.valueAxis.fontFamily);
+  assert.equal(s.y2Axis.secTitleFontSize, s.valueAxis.titleFontSize);
+  assert.equal(s.y2Axis.secTitleFontFamily, s.valueAxis.titleFontFamily);
   assert.equal(s.seriesLabels.textSize, 6);
   assert.equal(s.seriesLabels.seriesFontFamily, "");
 });
