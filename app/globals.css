@@ -932,9 +932,9 @@ button { color: inherit; }
 /* Chart furniture shared by bar/column/stacked/line previews. */
 .chart-legend {
   display: flex;
-  flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  flex-direction: row;
+  gap: 10px;
   margin-bottom: 6px;
 }
 
@@ -3069,6 +3069,21 @@ button { color: inherit; }
 .chart-preview__legend-band {
   display: block;
   overflow: hidden;
+}
+
+/* Classic 2026 paints a horizontal legend title inline with its entries.
+   The existing authored band still owns its title-line allowance, preserving
+   fixed plot geometry; only the shared 4px visual-title-to-legend gap is
+   painted above the now-single row. */
+.chart-preview--authored:not(.chart-preview--legend-side):not(.chart-preview--legend-after) .chart-preview__legend-band {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 4px;
+}
+
+.chart-preview--authored:not(.chart-preview--legend-side).chart-preview--legend-after .chart-preview__legend-band {
+  display: flex;
+  align-items: flex-start;
 }
 
 /* legendExtent owns the authored budget, so old visual-spacing margins must

@@ -47,7 +47,7 @@ test("Clustered Column keeps the native legend title enabled by default without 
   assert.equal(styleOf(hidden).legend.showTitle, false);
 });
 
-test("a shown fallback legend title receives its own authored band", () => {
+test("a shown fallback legend title reserves the native title-to-legend spacing", () => {
   const untitled = legendBandExtent(
     { show: true, position: "Top", fontSize: 10, fontFamily: "Segoe UI", showTitle: false, titleText: "" },
     ["Online", "Phone", "Post"],

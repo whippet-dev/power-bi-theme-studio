@@ -420,9 +420,12 @@ export function legendExtent(
     width: Math.max(entryText.width, titleText.width),
     height: Math.max(entryText.height, titleText.height),
   };
-  // Power BI presents a legend title as its own heading, above the entry
-  // row/stack. It therefore spends a second line of a horizontal legend's
-  // authored height rather than sharing the entries' line.
+  // Horizontal Classic 2026 chrome paints the title inline with the entry
+  // row, but still reserves this title-line allowance as the measured gap
+  // between the visual title and that row. Keeping the existing reservation
+  // preserves the authored plot geometry; the renderer places the row at
+  // the far edge of its band. Side legends remain a vertical title/entry
+  // stack and use the same title width when they need it.
   const titleHeight = title ? titleText.height + labelGap : 0;
   return vertical
     ? { width: text.width + LEGEND_SWATCH_EXTENT + labelGap, height: 0, vertical, afterPlot }
