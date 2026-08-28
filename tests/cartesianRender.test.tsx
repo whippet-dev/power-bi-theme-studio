@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ChartLegend } from "../app/components/ChartParts";
 import { BarChartPreview } from "../app/components/previews/BarChartPreview";
 import { LineChartPreview } from "../app/components/previews/LineChartPreview";
 import { StackedBarChartPreview } from "../app/components/previews/StackedBarChartPreview";
@@ -47,6 +48,27 @@ const renderLine = (custom: PowerBITheme = EMPTY) => {
   const style = resolveLineChartStyle(src, resolveTheme(src.roots));
   return renderToStaticMarkup(<LineChartPreview lineChartStyle={style} palette={PALETTE} />);
 };
+
+test("legend title remains semibold while entries retain their resolved weight", () => {
+  const base = {
+    show: true,
+    position: "Top",
+    showTitle: true,
+    titleText: "Series",
+    labelColor: "#333333",
+    fontFamily: "Segoe UI",
+    fontSize: 10,
+    bold: false,
+    italic: false,
+    underline: false,
+  };
+  const normal = renderToStaticMarkup(<ChartLegend legend={base} items={[{ label: "Online", color: "#005EA5" }]} />);
+  assert.match(normal, /class="chart-legend__title"(?![^>]*font-weight:400)/, "the title must not override its semibold class with 400");
+  assert.match(normal, /font-weight:400/, "entries retain the resolved normal weight");
+
+  const bold = renderToStaticMarkup(<ChartLegend legend={{ ...base, bold: true }} items={[{ label: "Online", color: "#005EA5" }]} />);
+  assert.match(bold, /class="chart-legend__title"[^>]*font-weight:700/, "Bold promotes the title too");
+});
 
 /** Markers are off unless the theme asks for them. */
 const WITH_MARKERS = updateThemeValue(

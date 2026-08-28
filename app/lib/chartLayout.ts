@@ -407,13 +407,29 @@ export function legendExtent(
   const afterPlot = position.startsWith("Bottom") || position.startsWith("Right");
   // A legend is sized by its entries, measured in the LEGEND's own font —
   // not the axis's — and its title counts as an entry when shown.
-  const entries = legend.showTitle && String(legend.titleText ?? "")
-    ? [String(legend.titleText), ...seriesLabels]
-    : seriesLabels;
-  const text = widestText(entries, legend.fontSize, legend.fontFamily, measureText);
+  // The renderer falls back to "Series" when the feature is enabled but a
+  // report has no explicit legend title. Measurement must reserve for that
+  // same rendered text rather than treating the heading as zero-height.
+  const title = legend.showTitle ? (String(legend.titleText ?? "") || "Series") : "";
+  const entries = seriesLabels;
+  const entryText = widestText(entries, legend.fontSize, legend.fontFamily, measureText);
+  const titleText = title
+    ? measureText(title, legend.fontSize, legend.fontFamily)
+    : { width: 0, height: 0 };
+  const text = {
+    width: Math.max(entryText.width, titleText.width),
+    height: Math.max(entryText.height, titleText.height),
+  };
+  // Horizontal Classic 2026 chrome paints the title inline with the entry
+  // row, but still reserves this title-line allowance as the measured gap
+  // between the visual title and that row. Keeping the existing reservation
+  // preserves the authored plot geometry; the renderer places the row at
+  // the far edge of its band. Side legends remain a vertical title/entry
+  // stack and use the same title width when they need it.
+  const titleHeight = title ? titleText.height + labelGap : 0;
   return vertical
     ? { width: text.width + LEGEND_SWATCH_EXTENT + labelGap, height: 0, vertical, afterPlot }
-    : { width: 0, height: (entries.length ? text.height : 0) + labelGap, vertical, afterPlot };
+    : { width: 0, height: (entries.length ? entryText.height : 0) + titleHeight + labelGap, vertical, afterPlot };
 }
 
 /** Just enough of a visual title to size its band. */

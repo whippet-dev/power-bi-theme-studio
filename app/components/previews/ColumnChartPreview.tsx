@@ -20,7 +20,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
@@ -51,7 +51,7 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
   // chart cannot end up with two disagreeing coordinate systems the way
   // the CSS-derived version did (RENDERER_AUDIT §2.4, §3).
   const layout = computePreviewCartesianLayout({
-    box: authoredInner,
+    box: { ...authoredInner, width: authoredInner.width - COLUMN_PLOT_INSETS.right, height: authoredInner.height - COLUMN_PLOT_INSETS.bottom },
     orientation: "vertical",
     categoryAxis: columnChartStyle.categoryAxis,
     valueAxis: columnChartStyle.valueAxis,
@@ -88,6 +88,7 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
           <span className="column-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
+            <span className="chart-preview__plot-frame" style={{ right: COLUMN_PLOT_INSETS.right, bottom: COLUMN_PLOT_INSETS.bottom }}>
             <ValueAxisGutter
               axis={columnChartStyle.valueAxis}
               layout={layout}
@@ -199,6 +200,7 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
               offset={valueGutter}
               titleFallback="Region"
             />
+            </span>
           </span>
         </span>
       </span>

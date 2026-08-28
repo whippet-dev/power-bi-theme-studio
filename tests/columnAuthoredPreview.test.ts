@@ -109,5 +109,6 @@ test("the old 372 x 128 Column constraint cannot re-enter authored layout", () =
   for (const source of [clusteredSource, stackedSource]) {
     assert.doesNotMatch(source, /372|128/);
   }
-  assert.doesNotMatch(cssSource, /\.column-preview__plot\s*\{[\s\S]*?height\s*:\s*128px/);
+  const columnPlotRule = cssSource.match(/\.column-preview__plot\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.doesNotMatch(columnPlotRule, /height\s*:\s*128px/);
 });

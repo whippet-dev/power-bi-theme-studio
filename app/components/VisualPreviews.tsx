@@ -21,6 +21,7 @@ import { ColumnChartPreview } from "./previews/ColumnChartPreview";
 import { LineChartPreview } from "./previews/LineChartPreview";
 import { StackedBarChartPreview } from "./previews/StackedBarChartPreview";
 import { StackedColumnChartPreview } from "./previews/StackedColumnChartPreview";
+import { PresentationScaleEnabledContext } from "./previews/PresentationScale";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -567,7 +568,7 @@ function PreviewShell({
     <div
       role="button"
       tabIndex={0}
-      className={`visual-tile visual-tile--${variant}${selected ? " is-selected" : ""}`}
+      className={`visual-tile visual-tile--${variant}${selected ? " is-selected" : ""}${variant === "hero" && oneToOneHero ? " visual-tile--one-to-one" : ""}`}
       onClick={() => onSelect(id)}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -721,9 +722,9 @@ function PreviewShell({
   // and keeps it outside the footprint the wrap reserves, so showing or
   // hiding it cannot move the hero's own bounds.
   return (
-    <span className="visual-hero-wrap" ref={heroWrapRef}>
+    <span className={`visual-hero-wrap${oneToOneHero ? " visual-hero-wrap--one-to-one" : ""}`} ref={heroWrapRef}>
       <span
-        className="visual-hero-scale-wrap"
+        className={`visual-hero-scale-wrap${oneToOneHero ? " visual-hero-scale-wrap--one-to-one" : ""}`}
         // The reserved footprint, in both dimensions, is the tile's
         // measured natural size times the chosen scale — never a guess.
         style={
@@ -735,9 +736,13 @@ function PreviewShell({
         <span
           className="visual-hero-scale"
           ref={heroScaleRef}
-          style={presentationScale ? { transform: `scale(${presentationScale})` } : undefined}
+          // The stylesheet supplies a 1.5x pre-measurement fallback for a
+          // normal Hero. Neutralise it explicitly for the fidelity view.
+          style={oneToOneHero ? { transform: "none" } : presentationScale ? { transform: `scale(${presentationScale})` } : undefined}
         >
-          {tile}
+          <PresentationScaleEnabledContext.Provider value={!oneToOneHero}>
+            {tile}
+          </PresentationScaleEnabledContext.Provider>
         </span>
       </span>
     </span>

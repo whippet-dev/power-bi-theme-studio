@@ -21,7 +21,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
@@ -50,7 +50,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
   // column chart — the two share the CSS and must share the coordinate
   // system too, or they drift apart.
   const layout = computePreviewCartesianLayout({
-    box: authoredInner,
+    box: { ...authoredInner, width: authoredInner.width - COLUMN_PLOT_INSETS.right, height: authoredInner.height - COLUMN_PLOT_INSETS.bottom },
     orientation: "vertical",
     categoryAxis: stackedColumnChartStyle.categoryAxis,
     valueAxis: stackedColumnChartStyle.valueAxis,
@@ -74,6 +74,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
           <span className="column-preview__plot" style={{ width: authoredInner.width, height: authoredInner.height }}>
+            <span className="chart-preview__plot-frame" style={{ right: COLUMN_PLOT_INSETS.right, bottom: COLUMN_PLOT_INSETS.bottom }}>
             <ValueAxisGutter
               axis={stackedColumnChartStyle.valueAxis}
               layout={layout}
@@ -188,6 +189,7 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
               offset={valueGutter}
               titleFallback="Region"
             />
+            </span>
           </span>
         </span>
       </span>

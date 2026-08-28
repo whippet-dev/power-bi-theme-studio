@@ -881,7 +881,7 @@ export function resolveColumnChartStyle(theme: ThemeSource, base: ResolvedTheme)
       // Verified against themes/base/classic2026.json's clusteredColumnChart override.
       showGradientLegend: resolvePropertyValue(theme, p.legend.showGradientLegend, true),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
-      showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
+      showTitle: resolvePropertyValue(theme, p.legend.showTitle, true),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
     },
     labels: {

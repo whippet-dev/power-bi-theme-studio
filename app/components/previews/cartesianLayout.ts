@@ -118,6 +118,14 @@ export function minimumPlotHeight(divisions: number, axisLabelFontSizeCssPx: num
 export const COLUMN_CHART_BOX: Rect = { x: 0, y: 0, width: 450, height: 300 };
 
 /**
+ * Native Classic 2026 leaves a small unpainted gutter on the bottom and far
+ * side of the Column-family chart area. These are container insets, not axis
+ * gutter costs: the left value-axis and bottom category-axis strips still
+ * derive from the text they render.
+ */
+export const COLUMN_PLOT_INSETS = { right: 7, bottom: 5 } as const;
+
+/**
  * The bar chart's **authored** size — the dimensions ChartLayout and the
  * renderer believe the Power BI visual has.
  *

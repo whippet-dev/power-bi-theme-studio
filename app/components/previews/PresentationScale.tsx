@@ -1,6 +1,17 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
+
+/**
+ * A fidelity comparison needs literal authored output, not a fit-to-frame
+ * presentation. The gallery supplies false only for its selected 1:1 Hero.
+ */
+export const PresentationScaleEnabledContext = createContext(true);
+
+/** A disabled presentation layer must not leave even an identity transform. */
+export function presentationScaleTransform(enabled: boolean, scale?: number): string | undefined {
+  return enabled && scale !== undefined ? `scale(${scale})` : undefined;
+}
 
 /**
  * Displays a finished visual at whatever size the UI has room for, without
@@ -31,6 +42,7 @@ export function PresentationScale({
   width: number;
   children: React.ReactNode;
 }) {
+  const enabled = useContext(PresentationScaleEnabledContext);
   const frameRef = useRef<HTMLSpanElement>(null);
   const contentRef = useRef<HTMLSpanElement>(null);
   const [fit, setFit] = useState<{ scale: number; height: number } | null>(null);
@@ -62,10 +74,12 @@ export function PresentationScale({
   // whenever an edit adds or removes a legend or an axis — a re-render with
   // no remount and no resize.
   useLayoutEffect(() => {
+    if (!enabled) return;
     measure();
-  });
+  }, [enabled, measure]);
 
   useLayoutEffect(() => {
+    if (!enabled) return;
     const frame = frameRef.current;
     if (!frame) return;
     // Only the FRAME is observed. Observing the content would watch an
@@ -73,7 +87,7 @@ export function PresentationScale({
     const observer = new ResizeObserver(measure);
     observer.observe(frame);
     return () => observer.disconnect();
-  }, [measure]);
+  }, [enabled, measure]);
 
   return (
     <span
@@ -81,14 +95,14 @@ export function PresentationScale({
       ref={frameRef}
       // Reserve exactly what the scaled result occupies, so surrounding flow
       // is honest about the visual's footprint.
-      style={fit ? { height: fit.height * fit.scale } : undefined}
+      style={enabled && fit ? { height: fit.height * fit.scale } : undefined}
     >
       <span
         className="authored-visual__content"
         ref={contentRef}
         style={{
           width,
-          transform: fit ? `scale(${fit.scale})` : undefined,
+          transform: presentationScaleTransform(enabled, fit?.scale),
         }}
       >
         {children}
