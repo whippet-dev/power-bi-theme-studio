@@ -75,6 +75,8 @@ test("authored Line neutralises its old plot margin", () => {
     cssSource,
     /\.chart-preview--authored \.chart-preview__body,[\s\S]*?\.chart-preview--authored \.line-preview__plot\s*\{\s*margin-top: 0;/,
   );
-  assert.match(lineSource, /right: secondaryGutter/,
-    "the canonical plot must pay for the secondary gutter");
+  assert.match(lineSource, /right: 0/,
+    "the legend-generated Line fixture must not reserve an unbound secondary gutter");
+  assert.doesNotMatch(lineSource, /data-secondary-series|secondarySeriesIndex/,
+    "the representative preview must not invent a Post-to-Y2 binding");
 });
