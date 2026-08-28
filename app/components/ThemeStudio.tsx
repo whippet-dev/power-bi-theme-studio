@@ -61,6 +61,14 @@ const VISUAL_SCHEMA_KEY: Record<VisualKind, VisualSchemaKey> = {
   image: "image",
 };
 
+const AUTHORED_HERO_DIMENSIONS: Partial<Record<VisualKind, string>> = {
+  bar: "450 × 250",
+  stackedBar: "450 × 250",
+  column: "450 × 300",
+  stackedColumn: "450 × 300",
+  line: "450 × 300",
+};
+
 export function ThemeStudio() {
   const [theme, setTheme] = useState<PowerBITheme>(() => cloneNewTheme());
   const [selectedVisual, setSelectedVisual] = useState<VisualKind>(DEFAULT_HERO_VISUAL);
@@ -70,6 +78,7 @@ export function ThemeStudio() {
   // theme state, so hiding them costs nothing to try and nothing is lost.
   const [showFilterPane, setShowFilterPane] = useState(true);
   const [showPaletteLegend, setShowPaletteLegend] = useState(true);
+  const [oneToOneHero, setOneToOneHero] = useState(false);
   // Which real Power BI base theme underlies every default this app shows
   // when the working theme itself is silent on a value — see baseThemes.ts.
   // Defaults to Classic 2026 (Power BI's own current default for new
@@ -303,6 +312,10 @@ export function ThemeStudio() {
                 <input type="checkbox" checked={showPaletteLegend} onChange={(event) => setShowPaletteLegend(event.target.checked)} />
                 Colour reference
               </label>
+              <label className="canvas-toggle">
+                <input type="checkbox" checked={oneToOneHero} onChange={(event) => setOneToOneHero(event.target.checked)} />
+                1:1 preview{oneToOneHero && AUTHORED_HERO_DIMENSIONS[selectedVisual] ? ` (${AUTHORED_HERO_DIMENSIONS[selectedVisual]})` : ""}
+              </label>
               <span className="preview-badge">
                 <span /> {ALL_VISUALS.length} previews
               </span>
@@ -349,6 +362,7 @@ export function ThemeStudio() {
                 imageStyle={imageStyle}
                 chromeStyles={chromeStyles}
                 selected={selectedVisual}
+                oneToOneHero={oneToOneHero}
                 onSelect={setSelectedVisual}
               />
             </div>

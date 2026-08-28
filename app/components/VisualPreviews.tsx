@@ -69,6 +69,7 @@ type VisualGalleryProps = {
   imageStyle: ResolvedImageStyle;
   chromeStyles: Record<VisualKind, ResolvedChromeStyle>;
   selected: VisualKind;
+  oneToOneHero?: boolean;
   onSelect: (visual: VisualKind) => void;
 };
 
@@ -85,6 +86,7 @@ type PreviewShellProps = {
    * The tile must not draw a second one above it.
    */
   titleInsideVisual?: boolean;
+  oneToOneHero?: boolean;
   onSelect: (visual: VisualKind) => void;
   children: ReactNode;
 };
@@ -364,6 +366,7 @@ function PreviewShell({
   theme,
   chrome,
   titleInsideVisual = false,
+  oneToOneHero = false,
   onSelect,
   children,
 }: PreviewShellProps) {
@@ -706,6 +709,7 @@ function PreviewShell({
   );
 
   if (variant !== "hero") return tile;
+  const presentationScale = oneToOneHero ? 1 : heroFit?.scale;
 
   // Real Power BI draws a hover tooltip floating over/beside the visual,
   // not squeezed into its own box — and here it can't be squeezed in
@@ -723,15 +727,15 @@ function PreviewShell({
         // The reserved footprint, in both dimensions, is the tile's
         // measured natural size times the chosen scale — never a guess.
         style={
-          heroFit
-            ? { width: heroFit.naturalWidth * heroFit.scale, height: heroFit.naturalHeight * heroFit.scale }
+          heroFit && presentationScale
+            ? { width: heroFit.naturalWidth * presentationScale, height: heroFit.naturalHeight * presentationScale }
             : undefined
         }
       >
         <span
           className="visual-hero-scale"
           ref={heroScaleRef}
-          style={heroFit ? { transform: `scale(${heroFit.scale})` } : undefined}
+          style={presentationScale ? { transform: `scale(${presentationScale})` } : undefined}
         >
           {tile}
         </span>
@@ -760,6 +764,7 @@ export function VisualGallery({
   imageStyle,
   chromeStyles,
   selected,
+  oneToOneHero = false,
   onSelect,
 }: VisualGalleryProps) {
   const palette = theme.palette;
@@ -1887,6 +1892,7 @@ export function VisualGallery({
           theme={theme}
           chrome={hero.chrome}
           titleInsideVisual={hero.titleInsideVisual}
+          oneToOneHero={oneToOneHero}
           onSelect={onSelect}
         >
           {hero.content}
