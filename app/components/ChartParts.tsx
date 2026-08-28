@@ -177,6 +177,16 @@ export function legendHorizontalAlignment(position: string | number): "flex-star
 }
 
 /**
+ * The legend's Bold property belongs to its entries. A native legend title
+ * is semibold by default, so it must not inherit the entries' explicit 400;
+ * when Bold is on it still moves with the rest of the legend to 700.
+ */
+function legendTitleStyle(legend: LegendStyle): CSSProperties {
+  const shared = textStyle(legend);
+  return { ...shared, fontWeight: legend.bold ? 700 : undefined };
+}
+
+/**
  * A legend with one entry per series, honouring the title and all four
  * placements. Previously previews drew a single hardcoded swatch and only
  * distinguished top from bottom, so most legend settings did nothing.
@@ -198,7 +208,7 @@ export function ChartLegend({
       style={vertical ? undefined : { justifyContent: horizontalAlignment }}
     >
       {legend.showTitle && (
-        <span className="chart-legend__title" style={textStyle(legend)}>
+        <span className="chart-legend__title" style={legendTitleStyle(legend)}>
           {String(legend.titleText) || "Series"}
         </span>
       )}
