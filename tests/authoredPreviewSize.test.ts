@@ -18,6 +18,7 @@ import {
 import { legendExtent } from "../app/lib/chartLayout";
 import { headingAria } from "../app/lib/headingAria";
 import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
+import { presentationScaleTransform } from "../app/components/previews/PresentationScale";
 
 /**
  * Authored size versus presentation size.
@@ -150,6 +151,11 @@ test("nothing about the display size can reach the layout", () => {
   assert.deepEqual(first.valueAxis, second.valueAxis);
   assert.equal(first.scale.category(1, 4).start, second.scale.category(1, 4).start);
   assert.equal(first.scale.categoryWidth(4), second.scale.categoryWidth(4));
+});
+
+test("fidelity mode leaves no cartesian presentation transform behind", () => {
+  assert.equal(presentationScaleTransform(false, 0.72), undefined);
+  assert.equal(presentationScaleTransform(true, 0.72), "scale(0.72)");
 });
 
 test("a bigger authored box gives its extra space to the plot, not to the gutter", () => {

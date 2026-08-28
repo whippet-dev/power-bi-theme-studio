@@ -21,6 +21,7 @@ import { ColumnChartPreview } from "./previews/ColumnChartPreview";
 import { LineChartPreview } from "./previews/LineChartPreview";
 import { StackedBarChartPreview } from "./previews/StackedBarChartPreview";
 import { StackedColumnChartPreview } from "./previews/StackedColumnChartPreview";
+import { PresentationScaleEnabledContext } from "./previews/PresentationScale";
 import type { ResolvedShapeFamilyCore } from "../lib/shapeFamilyProperties";
 import type { ResolvedShapeStyle } from "../lib/shapeProperties";
 import type { ResolvedSlicerStyle } from "../lib/slicerProperties";
@@ -735,9 +736,13 @@ function PreviewShell({
         <span
           className="visual-hero-scale"
           ref={heroScaleRef}
-          style={presentationScale ? { transform: `scale(${presentationScale})` } : undefined}
+          // The stylesheet supplies a 1.5x pre-measurement fallback for a
+          // normal Hero. Neutralise it explicitly for the fidelity view.
+          style={oneToOneHero ? { transform: "none" } : presentationScale ? { transform: `scale(${presentationScale})` } : undefined}
         >
-          {tile}
+          <PresentationScaleEnabledContext.Provider value={!oneToOneHero}>
+            {tile}
+          </PresentationScaleEnabledContext.Provider>
         </span>
       </span>
     </span>
