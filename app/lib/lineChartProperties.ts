@@ -677,6 +677,7 @@ export type ResolvedLineChartStyle = {
     secBold: boolean;
     secEnd: number;
     secFontFamily: string;
+    secFontFamilyCss: string;
     secFontSize: number;
     secItalic: boolean;
     secLabelColor: string;
@@ -690,6 +691,7 @@ export type ResolvedLineChartStyle = {
     secTitleBold: boolean;
     secTitleColor: string;
     secTitleFontFamily: string;
+    secTitleFontFamilyCss: string;
     secTitleFontSize: number;
     secTitleItalic: boolean;
     secTitleText: string;
@@ -1051,8 +1053,10 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
    * first, so Fluent 2's explicit axis typography continues to win.
    *
    * Only roles Power BI's own model proves are used here. Series labels,
-   * totals, sub-headers, error-bar labels, data-label titles and the
-   * secondary value axis keep their old fallbacks — see PHASE_2_BACKLOG.md.
+   * totals, sub-headers, error-bar labels and data-label titles keep their
+   * old fallbacks — see PHASE_2_BACKLOG.md. A bound secondary value axis has
+   * independent native defaults that happen to match Y1 initially; changing
+   * Y1 before binding Y2 does not propagate those changes to Y2.
    */
   const categoryAxisLabelText = resolveTextRole(theme, "categoryAxisLabel");
   const categoryAxisTitleText = resolveTextRole(theme, "categoryAxisTitle");
@@ -1074,6 +1078,52 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
   const valTitleFamily = effectiveFontFamily(theme, p.valueAxis.titleFontFamily, valueAxisTitleText);
   const legendFamily = effectiveFontFamily(theme, p.legend.fontFamily, legendText);
   const dataLabelFamily = effectiveFontFamily(theme, p.labels.fontFamily, dataLabelText);
+  const valueAxisStyle = {
+    show: resolvePropertyValue(theme, p.valueAxis.show, true),
+    axisStyle: resolvePropertyValue(theme, p.valueAxis.axisStyle, "showTitleOnly"),
+    bold: resolvePropertyValue(theme, p.valueAxis.bold, false),
+    end: resolvePropertyValue(theme, p.valueAxis.end, ""),
+    fontFamily: valLabelFamily.value,
+    fontFamilyCss: valLabelFamily.css,
+    fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
+    invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
+    italic: resolvePropertyValue(theme, p.valueAxis.italic, false),
+    labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, valueAxisLabelText.color),
+    labelDisplayUnits: resolvePropertyValue(theme, p.valueAxis.labelDisplayUnits, 0),
+    labelPrecision: resolvePropertyValue(theme, p.valueAxis.labelPrecision, 0),
+    logAxisScale: resolvePropertyValue(theme, p.valueAxis.logAxisScale, false),
+    roundRange: resolvePropertyValue(theme, p.valueAxis.roundRange, false),
+    scaleToFit: resolvePropertyValue(theme, p.valueAxis.scaleToFit, false),
+    sharedAxis: resolvePropertyValue(theme, p.valueAxis.sharedAxis, false),
+    showAxisTitle: resolvePropertyValue(theme, p.valueAxis.showAxisTitle, false),
+    start: resolvePropertyValue(theme, p.valueAxis.start, ""),
+    switchAxisPosition: resolvePropertyValue(theme, p.valueAxis.switchAxisPosition, false),
+    underline: resolvePropertyValue(theme, p.valueAxis.underline, false),
+    gridlineAutoScale: resolvePropertyValue(theme, p.valueAxis.gridlineAutoScale, false),
+    gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
+    gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
+    gridlineDashCap: resolvePropertyValue(theme, p.valueAxis.gridlineDashCap, "none"),
+    gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, true),
+    gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, "solid"),
+    gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
+    gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
+    titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
+    titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, valueAxisTitleText.color),
+    titleFontFamily: valTitleFamily.value,
+    titleFontFamilyCss: valTitleFamily.css,
+    titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, valueAxisTitleText.fontSize),
+    titleItalic: resolvePropertyValue(theme, p.valueAxis.titleItalic, false),
+    titleText: resolvePropertyValue(theme, p.valueAxis.titleText, ""),
+    titleUnderline: resolvePropertyValue(theme, p.valueAxis.titleUnderline, false),
+  };
+  const secLabelFamily = effectiveFontFamily(theme, p.y2Axis.secFontFamily, {
+    fontFamily: valueAxisLabelText.fontFamily,
+    cssFontFamily: valueAxisLabelText.cssFontFamily,
+  });
+  const secTitleFamily = effectiveFontFamily(theme, p.y2Axis.secTitleFontFamily, {
+    fontFamily: valueAxisTitleText.fontFamily,
+    cssFontFamily: valueAxisTitleText.cssFontFamily,
+  });
   return {
     usesSmallMultiples: isGroupSetBy(theme, "lineChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
@@ -1162,66 +1212,32 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       titleText: resolvePropertyValue(theme, p.categoryAxis.titleText, ""),
       titleUnderline: resolvePropertyValue(theme, p.categoryAxis.titleUnderline, false),
     },
-    valueAxis: {
-      show: resolvePropertyValue(theme, p.valueAxis.show, true),
-      axisStyle: resolvePropertyValue(theme, p.valueAxis.axisStyle, "showTitleOnly"),
-      bold: resolvePropertyValue(theme, p.valueAxis.bold, false),
-      end: resolvePropertyValue(theme, p.valueAxis.end, ""),
-      fontFamily: valLabelFamily.value,
-      fontFamilyCss: valLabelFamily.css,
-      fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
-      invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
-      italic: resolvePropertyValue(theme, p.valueAxis.italic, false),
-      labelColor: resolvePropertyValue(theme, p.valueAxis.labelColor, valueAxisLabelText.color),
-      labelDisplayUnits: resolvePropertyValue(theme, p.valueAxis.labelDisplayUnits, 0),
-      labelPrecision: resolvePropertyValue(theme, p.valueAxis.labelPrecision, 0),
-      logAxisScale: resolvePropertyValue(theme, p.valueAxis.logAxisScale, false),
-      roundRange: resolvePropertyValue(theme, p.valueAxis.roundRange, false),
-      scaleToFit: resolvePropertyValue(theme, p.valueAxis.scaleToFit, false),
-      sharedAxis: resolvePropertyValue(theme, p.valueAxis.sharedAxis, false),
-      showAxisTitle: resolvePropertyValue(theme, p.valueAxis.showAxisTitle, false),
-      start: resolvePropertyValue(theme, p.valueAxis.start, ""),
-      switchAxisPosition: resolvePropertyValue(theme, p.valueAxis.switchAxisPosition, false),
-      underline: resolvePropertyValue(theme, p.valueAxis.underline, false),
-      gridlineAutoScale: resolvePropertyValue(theme, p.valueAxis.gridlineAutoScale, false),
-      gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
-      gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
-      gridlineDashCap: resolvePropertyValue(theme, p.valueAxis.gridlineDashCap, "none"),
-      // Power BI draws value-axis gridlines on a new visual by default,
-      // so a preview that hides them does not match an unstyled chart.
-      gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, true),
-      gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, "solid"),
-      gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
-      gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
-      titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.valueAxis.titleColor, valueAxisTitleText.color),
-      titleFontFamily: valTitleFamily.value,
-      titleFontFamilyCss: valTitleFamily.css,
-      titleFontSize: resolvePropertyValue(theme, p.valueAxis.titleFontSize, valueAxisTitleText.fontSize),
-      titleItalic: resolvePropertyValue(theme, p.valueAxis.titleItalic, false),
-      titleText: resolvePropertyValue(theme, p.valueAxis.titleText, ""),
-      titleUnderline: resolvePropertyValue(theme, p.valueAxis.titleUnderline, false),
-    },
+    valueAxis: valueAxisStyle,
     y2Axis: {
+      // Visibility formatting is independent of whether a secondary data
+      // role exists. The representative preview binds Post to Y2; the base
+      // theme's inherited Show value then decides whether that axis paints.
       show: resolvePropertyValue(theme, p.y2Axis.show, false),
       secAxisStyle: resolvePropertyValue(theme, p.y2Axis.secAxisStyle, "showTitleOnly"),
       secBold: resolvePropertyValue(theme, p.y2Axis.secBold, false),
       secEnd: resolvePropertyValue(theme, p.y2Axis.secEnd, 0),
-      secFontFamily: resolvePropertyValue(theme, p.y2Axis.secFontFamily, ""),
-      secFontSize: resolvePropertyValue(theme, p.y2Axis.secFontSize, 6),
+      secFontFamily: secLabelFamily.value,
+      secFontFamilyCss: secLabelFamily.css,
+      secFontSize: resolvePropertyValue(theme, p.y2Axis.secFontSize, valueAxisLabelText.fontSize),
       secItalic: resolvePropertyValue(theme, p.y2Axis.secItalic, false),
-      secLabelColor: resolvePropertyValue(theme, p.y2Axis.secLabelColor, base.foreground),
+      secLabelColor: resolvePropertyValue(theme, p.y2Axis.secLabelColor, valueAxisLabelText.color),
       secLabelDisplayUnits: resolvePropertyValue(theme, p.y2Axis.secLabelDisplayUnits, 0),
       secLabelPrecision: resolvePropertyValue(theme, p.y2Axis.secLabelPrecision, 0),
       secLogAxisScale: resolvePropertyValue(theme, p.y2Axis.secLogAxisScale, false),
-      secRoundRange: resolvePropertyValue(theme, p.y2Axis.secRoundRange, false),
-      secShowAxisTitle: resolvePropertyValue(theme, p.y2Axis.secShowAxisTitle, false),
+      secRoundRange: resolvePropertyValue(theme, p.y2Axis.secRoundRange, true),
+      secShowAxisTitle: resolvePropertyValue(theme, p.y2Axis.secShowAxisTitle, true),
       secStart: resolvePropertyValue(theme, p.y2Axis.secStart, 0),
       secUnderline: resolvePropertyValue(theme, p.y2Axis.secUnderline, false),
       secTitleBold: resolvePropertyValue(theme, p.y2Axis.secTitleBold, false),
-      secTitleColor: resolvePropertyValue(theme, p.y2Axis.secTitleColor, base.foreground),
-      secTitleFontFamily: resolvePropertyValue(theme, p.y2Axis.secTitleFontFamily, ""),
-      secTitleFontSize: resolvePropertyValue(theme, p.y2Axis.secTitleFontSize, 6),
+      secTitleColor: resolvePropertyValue(theme, p.y2Axis.secTitleColor, valueAxisTitleText.color),
+      secTitleFontFamily: secTitleFamily.value,
+      secTitleFontFamilyCss: secTitleFamily.css,
+      secTitleFontSize: resolvePropertyValue(theme, p.y2Axis.secTitleFontSize, valueAxisTitleText.fontSize),
       secTitleItalic: resolvePropertyValue(theme, p.y2Axis.secTitleItalic, false),
       secTitleText: resolvePropertyValue(theme, p.y2Axis.secTitleText, ""),
       secTitleUnderline: resolvePropertyValue(theme, p.y2Axis.secTitleUnderline, false),
@@ -1238,7 +1254,7 @@ export function resolveLineChartStyle(theme: ThemeSource, base: ResolvedTheme): 
       matchLineColor: resolvePropertyValue(theme, p.legend.matchLineColor, false),
       position: resolvePropertyValue(theme, p.legend.position, "Top"),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
-      showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
+      showTitle: resolvePropertyValue(theme, p.legend.showTitle, true),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
     },
     labels: {

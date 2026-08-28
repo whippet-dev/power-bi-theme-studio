@@ -280,7 +280,12 @@ test("Y2 reserves a right gutter and gives only the representative Post series a
 });
 
 test("rendered Y2 gutters occupy opposite sides of the plot without overlap", () => {
-  const html = renderLine();
+  const y2On = updateThemeValue(
+    EMPTY,
+    ["visualStyles", "lineChart", "*", "y2Axis", 0, "show"],
+    true,
+  );
+  const html = renderLine(y2On);
   const authoredWidth = 450;
   const tagFor = (className: string) => {
     const tag = html.match(new RegExp(`<span class="[^"]*${className}[^"]*"[^>]*>`))?.[0];
@@ -306,7 +311,7 @@ test("rendered Y2 gutters occupy opposite sides of the plot without overlap", ()
 
   assert.ok(primaryRight <= plotLeft, `primary ${primaryRight} overlaps plot starting at ${plotLeft}`);
   assert.ok(secondaryLeft >= plotRight, `secondary ${secondaryLeft} overlaps plot ending at ${plotRight}`);
-  assert.ok(secondaryRight <= authoredWidth, `secondary ends outside authored root at ${secondaryRight}`);
+  assert.ok(secondaryRight <= authoredWidth + 1e-6, `secondary ends outside authored root at ${secondaryRight}`);
   assert.equal(px(category, "left"), plotLeft, "category gutter must start at the plot's left edge");
   assert.equal(authoredWidth - px(category, "right"), plotRight,
     "category gutter must end at the plot's right edge");
@@ -316,6 +321,7 @@ test("rendered Y2 gutters occupy opposite sides of the plot without overlap", ()
 test("Y2 range and typography settings reach the rendered right axis", () => {
   let custom = EMPTY;
   for (const [property, value] of [
+    ["show", true],
     ["secStart", 0],
     ["secEnd", 1000],
     ["secFontSize", 14],
@@ -333,8 +339,10 @@ test("Y2 range and typography settings reach the rendered right axis", () => {
   const html = renderLine(custom);
   const secondary = html.match(/<span class="chart-axis-gutter chart-axis-gutter--value chart-axis-gutter--secondary"[\s\S]*?<\/span><\/span>/)?.[0];
   assert.ok(secondary, "missing rendered Y2 axis");
-  assert.match(secondary, /color:#B1005A;font-size:18\.666/);
-  assert.match(html, /color:#00703C;font-size:21\.333/);
+  assert.match(secondary, /color:#B1005A/);
+  assert.match(secondary, /font-size:18\.666/);
+  assert.match(html, /color:#00703C/);
+  assert.match(html, /font-size:21\.333/);
   assert.match(html, />Post volume</);
   assert.match(secondary, />0\.3K</, "the pinned 0..1000 secondary range must drive its own formatted ticks");
   assert.match(secondary, />1\.0K</);

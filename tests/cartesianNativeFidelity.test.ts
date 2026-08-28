@@ -71,7 +71,52 @@ test("NATIVE: axis titles keep the title class", () => {
   // Measured at 16px = 12pt on the same visuals.
   const s = styleOf(EMPTY, "classic2026");
   assert.equal(s.categoryAxis.titleFontSize, 12);
+  assert.equal(s.valueAxis.titleFontSize, 12);
+  assert.equal(s.categoryAxis.titleFontFamily, "DIN");
+  assert.equal(s.valueAxis.titleFontFamily, "DIN");
   assert.equal(themeFontSizeToCssPx(s.categoryAxis.titleFontSize), 16);
+});
+
+test("Classic 2026 cartesian legends show their native title by default", () => {
+  for (const entry of CARTESIAN) {
+    const src = themeLayers(EMPTY, getBaseTheme("classic2026"));
+    const s = entry.resolve(src, resolveTheme(src.roots));
+    assert.equal(s.legend.showTitle, true, `${entry.name} legend title`);
+  }
+});
+
+test("Line preserves Classic 2026's Y2 visibility formatting independently of binding", () => {
+  const source = themeLayers(EMPTY, getBaseTheme("classic2026"));
+  assert.equal(resolveLineChartStyle(source, resolveTheme(source.roots)).y2Axis.show, true);
+
+  const disabled = updateThemeValue(EMPTY, ["visualStyles", "lineChart", "*", "y2Axis", 0, "show"], false);
+  const disabledSource = themeLayers(disabled, getBaseTheme("classic2026"));
+  assert.equal(resolveLineChartStyle(disabledSource, resolveTheme(disabledSource.roots)).y2Axis.show, false);
+});
+
+test("Line Y2 keeps independent defaults when Y1 is customized", () => {
+  const y1Theme = [
+    [["visualStyles", "lineChart", "*", "valueAxis", 0, "fontFamily"], "Arial"],
+    [["visualStyles", "lineChart", "*", "valueAxis", 0, "fontSize"], 17],
+    [["visualStyles", "lineChart", "*", "valueAxis", 0, "labelColor"], { solid: { color: "#123456" } }],
+    [["visualStyles", "lineChart", "*", "valueAxis", 0, "titleFontFamily"], "Calibri"],
+    [["visualStyles", "lineChart", "*", "valueAxis", 0, "titleFontSize"], 19],
+  ].reduce((theme, [path, value]) => updateThemeValue(theme, path as (string | number)[], value), EMPTY);
+  const y1Source = themeLayers(y1Theme, getBaseTheme("classic2026"));
+  const independent = resolveLineChartStyle(y1Source, resolveTheme(y1Source.roots));
+  assert.equal(independent.y2Axis.secFontFamily, "Segoe UI");
+  assert.equal(independent.y2Axis.secFontSize, 9);
+  assert.equal(independent.y2Axis.secLabelColor, "#605E5C");
+  assert.equal(independent.y2Axis.secTitleFontFamily, "DIN");
+  assert.equal(independent.y2Axis.secTitleFontSize, 12);
+
+  const y2Theme = updateThemeValue(
+    y1Theme,
+    ["visualStyles", "lineChart", "*", "y2Axis", 0, "secFontSize"],
+    23,
+  );
+  const y2Source = themeLayers(y2Theme, getBaseTheme("classic2026"));
+  assert.equal(resolveLineChartStyle(y2Source, resolveTheme(y2Source.roots)).y2Axis.secFontSize, 23);
 });
 
 for (const entry of CARTESIAN) {

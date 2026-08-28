@@ -907,7 +907,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       show: resolvePropertyValue(theme, p.legend.show, true),
       // Verified against themes/base/classic2026.json's clusteredBarChart override.
       showGradientLegend: resolvePropertyValue(theme, p.legend.showGradientLegend, true),
-      showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
+      showTitle: resolvePropertyValue(theme, p.legend.showTitle, true),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
     },

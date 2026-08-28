@@ -197,7 +197,7 @@ test("AUDIT §2.2: hiding the category axis leaves the data in the axis's coordi
     const first = l.scale.value(l.scale.ticks[0]);
     const last = l.scale.value(l.scale.ticks[l.scale.ticks.length - 1]);
     assert.ok(near(first, l.plot.x), `show=${show}: first gridline must sit on the plot's left edge`);
-    assert.ok(near(last, l.plot.x + l.plot.width), `show=${show}: last gridline must sit on the right edge`);
+    assert.ok(last <= l.plot.x + l.plot.width, `show=${show}: last gridline must stay inside the plot`);
     // And a data mark spanning the full range spans exactly the plot.
     const { start, end } = axisRange(axis(), DATA_MAX);
     assert.ok(near(l.scale.value(end) - l.scale.value(start), l.plot.width), `show=${show}: mark span != plot width`);
@@ -282,12 +282,13 @@ test("an axis title adds to its own gutter and nothing else", () => {
 // 5/6/7. Value range, pinned range, inversion
 // ---------------------------------------------------------------------------
 
-test("an unpinned axis spans 0..dataMax", () => {
+test("an unpinned axis rounds its automatic domain above the data maximum", () => {
   const r = axisRange(axis(), DATA_MAX);
-  assert.deepEqual(r, { start: 0, end: DATA_MAX });
+  assert.deepEqual(r, { start: 0, end: 90_000 });
   const l = layout();
   assert.ok(near(l.scale.value(0), l.plot.y + l.plot.height), "0 sits on the baseline");
-  assert.ok(near(l.scale.value(DATA_MAX), l.plot.y), "dataMax sits on the top edge");
+  assert.ok(l.scale.value(DATA_MAX) > l.plot.y, "dataMax sits inside the rounded domain");
+  assert.ok(near(l.scale.value(90_000), l.plot.y), "the rounded end sits on the top edge");
 });
 
 test("AUDIT finding 4: a pinned start/end drives geometry, not just the labels", () => {
@@ -328,7 +329,7 @@ test("invertAxis inverts the value mapping itself, not only tick order", () => {
 // 8. Tick/scale agreement — there is no second gridline scale
 // ---------------------------------------------------------------------------
 
-test("every tick maps inside the plot, evenly spaced in index order, inverted or not", () => {
+test("every nice tick maps inside the plot at an even value interval, inverted or not", () => {
   for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
     for (const invertAxis of [false, true]) {
       const l = layout({ orientation, valueAxis: axis({ invertAxis }) });
@@ -347,24 +348,22 @@ test("every tick maps inside the plot, evenly spaced in index order, inverted or
           `${orientation} invert=${invertAxis}: ticks not evenly spaced`,
         );
       }
-      assert.ok(near(Math.abs(step) * (positions.length - 1), hi - lo, 1e-6), "ticks must span the whole plot");
+      assert.ok(
+        Math.abs(step) * (positions.length - 1) <= hi - lo + 1e-6,
+        "nice ticks may stop before the rounded domain edge, but never pass it",
+      );
     }
   }
 });
 
-test("the tick model is pinned to its original semantics", () => {
-  // This began as an equivalence check against ChartParts.axisTicks while
-  // both models were live. T10 deleted that one with its last consumer, so
-  // the semantics it guarded are pinned here as data instead: start falls
-  // back to 0, a pinned end is honoured only when it exceeds start, there
-  // are count+1 evenly spaced values, and invertAxis reverses the array.
+test("the tick model uses nice automatic intervals while preserving explicit bounds", () => {
   const cases: Array<[Partial<AxisLayoutStyle>, number, number[]]> = [
-    [{}, 4, [0, 20500, 41000, 61500, 82000]],
+    [{}, 4, [0, 25000, 50000, 75000]],
     [{ start: "20", end: "60" }, 4, [20, 30, 40, 50, 60]],
-    [{ start: "", end: "" }, 2, [0, 41000, 82000]],
-    // A pinned end below start is ignored, falling back to dataMax.
-    [{ start: "50", end: "10" }, 2, [50, 41025, 82000]],
-    [{ invertAxis: true }, 4, [82000, 61500, 41000, 20500, 0]],
+    [{ start: "", end: "" }, 2, [0, 50000]],
+    // A pinned end below start is ignored, falling back to a rounded automatic end.
+    [{ start: "50", end: "10" }, 2, [50, 50050]],
+    [{ invertAxis: true }, 4, [75000, 50000, 25000, 0]],
     [{ start: "0", end: "100000", invertAxis: true }, 4, [100000, 75000, 50000, 25000, 0]],
   ];
   for (const [over, count, expected] of cases) {
@@ -374,6 +373,13 @@ test("the tick model is pinned to its original semantics", () => {
       `ticks for ${JSON.stringify(over)} count=${count}`,
     );
   }
+});
+
+test("native automatic examples separate the rounded domain from nice visible ticks", () => {
+  assert.deepEqual(axisRange(axis(), 46_000), { start: 0, end: 50_000 });
+  assert.deepEqual(axisTickValues(axis(), 46_000), [0, 20_000, 40_000]);
+  assert.deepEqual(axisRange(axis(), 70_000), { start: 0, end: 70_000 });
+  assert.deepEqual(axisTickValues(axis(), 70_000), [0, 20_000, 40_000, 60_000]);
 });
 
 // ---------------------------------------------------------------------------
@@ -471,9 +477,11 @@ test("horizontal and vertical layouts are exact transposes, so bar and column ca
   );
   void labelWidth;
 
-  // Each value scale spans its own plot fully, in the transposed direction.
-  assert.ok(near(v.scale.value(0) - v.scale.value(DATA_MAX), v.plot.height), "vertical value scale must span the plot");
-  assert.ok(near(h.scale.value(DATA_MAX) - h.scale.value(0), h.plot.width), "horizontal value scale must span the plot");
+  // Each resolved value DOMAIN spans its plot fully, in the transposed
+  // direction. The highest automatic tick may sit below that rounded end.
+  const range = axisRange(axis(), DATA_MAX);
+  assert.ok(near(v.scale.value(range.start) - v.scale.value(range.end), v.plot.height), "vertical value domain");
+  assert.ok(near(h.scale.value(range.end) - h.scale.value(range.start), h.plot.width), "horizontal value domain");
   // And each category scale is inset from both ends of its own plot by the
   // same outer padding, in the transposed direction. Native reserves 0.4 of
   // a step at each end rather than tiling edge to edge, and a transpose that
@@ -939,8 +947,8 @@ test("secondary and primary value scales share the plot but map different domain
   });
   assert.ok(l.secondaryScale);
   assert.equal(l.scale.value(0), l.secondaryScale.value(0));
-  assert.equal(l.scale.value(70_000), l.plot.y);
-  assert.equal(l.secondaryScale.value(26_000), l.plot.y);
+  assert.equal(l.scale.value(axisRange(axis(), 70_000).end), l.plot.y);
+  assert.equal(l.secondaryScale.value(axisRange(axis(), 26_000).end), l.plot.y);
   assert.notEqual(l.scale.value(21_000), l.secondaryScale.value(21_000));
   assert.deepEqual(l.scale.category(2, 4), l.secondaryScale.category(2, 4));
 });

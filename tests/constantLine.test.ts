@@ -92,14 +92,15 @@ const near = (a: number, b: number, tolerance = 1e-9): boolean => Math.abs(a - b
 
 test("the line's fraction comes from the value scale, on both orientations", () => {
   // The whole point of doing this in phase 2: the coordinate is the scale's,
-  // not a percentage of a sample maximum. Half of 0..82000 is half the plot.
+  // not a percentage of a sample maximum. The automatic 82K domain rounds
+  // to 90K, and reference-line geometry uses that same shared range.
   for (const orientation of ["vertical", "horizontal"] as CartesianOrientation[]) {
     const layout = layoutFor(orientation);
     for (const [value, expected] of [
       [0, 0],
-      [20_500, 0.25],
-      [41_000, 0.5],
-      [82_000, 1],
+      [20_500, 20_500 / 90_000],
+      [41_000, 41_000 / 90_000],
+      [82_000, 82_000 / 90_000],
     ] as Array<[number, number]>) {
       const geometry = constantLineGeometry(line({ value }), layout, axis(), DATA_MAX);
       assert.ok(near(geometry.fraction, expected), `${orientation}: ${value} -> ${geometry.fraction}`);
@@ -181,8 +182,11 @@ test("before shades towards the axis start and after towards its end", () => {
     axis(),
     DATA_MAX,
   );
-  assert.deepEqual(before.shade, { from: 0, to: 0.5 });
-  assert.deepEqual(after.shade, { from: 0.5, to: 1 });
+  const fraction = 41_000 / 90_000;
+  assert.ok(near(before.shade?.from ?? -1, 0));
+  assert.ok(near(before.shade?.to ?? -1, fraction));
+  assert.ok(near(after.shade?.from ?? -1, fraction));
+  assert.ok(near(after.shade?.to ?? -1, 1));
   // The two must partition the plot at the line, not overlap or leave a gap.
   assert.equal(before.shade?.to, after.shade?.from);
 });
@@ -206,8 +210,11 @@ test("BEFORE/AFTER follow the axis direction, not left and right", () => {
     inverted,
     DATA_MAX,
   );
-  assert.deepEqual(before.shade, { from: 0.5, to: 1 }, "inverted, before must shade the far side");
-  assert.deepEqual(after.shade, { from: 0, to: 0.5 }, "inverted, after must shade the near side");
+  const middle = 1 - 41_000 / 90_000;
+  assert.ok(near(before.shade?.from ?? -1, middle), "inverted, before must shade the far side");
+  assert.ok(near(before.shade?.to ?? -1, 1));
+  assert.ok(near(after.shade?.from ?? -1, 0), "inverted, after must shade the near side");
+  assert.ok(near(after.shade?.to ?? -1, middle));
 
   // An asymmetric value proves it is mirroring rather than coincidentally
   // symmetric about the midpoint.
@@ -217,7 +224,8 @@ test("BEFORE/AFTER follow the axis direction, not left and right", () => {
     inverted,
     DATA_MAX,
   );
-  assert.deepEqual(low.shade, { from: 0.75, to: 1 });
+  assert.ok(near(low.shade?.from ?? -1, 1 - 20_500 / 90_000));
+  assert.ok(near(low.shade?.to ?? -1, 1));
 });
 
 test("shading is off unless asked for, and region none means none", () => {

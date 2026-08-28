@@ -118,11 +118,11 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
   const secondaryAxisStyle = {
     show: y2.show,
     fontSize: y2.secFontSize,
-    fontFamily: y2.secFontFamily,
+    fontFamily: y2.secFontFamilyCss,
     showAxisTitle: y2.secShowAxisTitle,
     titleText: String(y2.secTitleText) || secondarySeries.label,
     titleFontSize: y2.secTitleFontSize,
-    titleFontFamily: y2.secTitleFontFamily,
+    titleFontFamily: y2.secTitleFontFamilyCss,
     start: y2.secStart,
     end: y2.secEnd,
     labelDisplayUnits: y2.secLabelDisplayUnits,
@@ -379,7 +379,7 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
   const secondaryGutterLeft = layout.secondaryValueAxis?.x ?? authoredInner.width;
   const y2TextStyle: CSSProperties = {
     color: y2.secLabelColor,
-    fontFamily: y2.secFontFamily || undefined,
+    fontFamily: y2.secFontFamilyCss || undefined,
     fontSize: themeFontSizeToCssPx(y2.secFontSize),
     fontWeight: y2.secBold ? 700 : 400,
     fontStyle: y2.secItalic ? "italic" : "normal",
@@ -411,7 +411,7 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, titleFa
           className="chart-preview__axis-title chart-preview__axis-title--rotated chart-preview__axis-title--secondary"
           style={{
             color: y2.secTitleColor,
-            fontFamily: y2.secTitleFontFamily || undefined,
+            fontFamily: y2.secTitleFontFamilyCss || undefined,
             fontSize: themeFontSizeToCssPx(y2.secTitleFontSize),
             fontWeight: y2.secTitleBold ? 700 : 400,
             fontStyle: y2.secTitleItalic ? "italic" : "normal",
