@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { FontFamilyControl, PropertyRow, RegistryGroupBody } from "../app/components/PropertyEditor";
 import {
   fontFamilyOptions,
+  expansionScrollDelta,
   filterFontFamilyOptions,
   inactivePropertyGroup,
   isFontFamilyProperty,
@@ -279,7 +280,7 @@ test("font search is case-insensitive, prefix-first, and never promotes raw stac
   const raw = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
   const seg = filterFontFamilyOptions("seg", "Arial");
 
-  assert.deepEqual(seg.slice(0, 5), ["Segoe UI", "Segoe UI Light", "Segoe UI Semilight", "Segoe UI Semibold", "Segoe UI Bold"]);
+  assert.deepEqual(seg.slice(0, 5), ["Segoe UI", "Segoe UI Bold", "Segoe UI Light", "Segoe UI Semibold", "Segoe UI Semilight"]);
   assert.equal(seg.includes(raw), false);
   assert.equal(filterFontFamilyOptions("DIn", "Arial").includes("DIN"), true);
   assert.equal(fontFamilyOptions(raw)[0], raw, "an imported stack stays visible at the property that owns it");
@@ -293,6 +294,13 @@ test("opening a font picker browses every friendly choice while retaining the cu
   assert.ok(openedWithDin.includes("Arial"));
   assert.equal(openedWithDin[openedWithDin.indexOf("DIN")], "DIN");
   assert.equal(filterFontFamilyOptions("", raw)[0], raw);
+  assert.deepEqual(KNOWN_FONT_FAMILIES, [...KNOWN_FONT_FAMILIES].sort((left, right) => left.localeCompare(right)));
+});
+
+test("expanded groups request only the settings-pane scroll needed to reveal their header", () => {
+  assert.equal(expansionScrollDelta({ top: 100, bottom: 500 }, { top: 124, bottom: 180 }), 0);
+  assert.equal(expansionScrollDelta({ top: 100, bottom: 500 }, { top: 560, bottom: 600 }), 448);
+  assert.equal(expansionScrollDelta({ top: 100, bottom: 500 }, { top: 70, bottom: 110 }), -42);
 });
 
 test("opening a font picker is presentation-only; literal writes and reset paths stay unchanged", () => {

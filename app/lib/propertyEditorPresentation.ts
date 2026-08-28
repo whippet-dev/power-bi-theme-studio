@@ -73,23 +73,32 @@ export function isFontFamilyProperty(definition: PropertyDefinition): boolean {
  * must never become ordinary author-facing options.
  */
 export const KNOWN_FONT_FAMILIES = [
-  "Segoe UI",
-  "Segoe UI Light",
-  "Segoe UI Semilight",
-  "Segoe UI Semibold",
-  "Segoe UI Bold",
   "Arial",
   "Calibri",
   "Cambria",
-  "Georgia",
-  "Tahoma",
-  "Trebuchet MS",
-  "Verdana",
-  "Times New Roman",
   "Courier New",
   "DIN",
   "DIN Light",
+  "Georgia",
+  "Segoe UI",
+  "Segoe UI Bold",
+  "Segoe UI Light",
+  "Segoe UI Semibold",
+  "Segoe UI Semilight",
+  "Tahoma",
+  "Times New Roman",
+  "Trebuchet MS",
+  "Verdana",
 ] as const;
+
+/** Returns zero when a newly opened group's header is already fully visible. */
+export function expansionScrollDelta(
+  pane: { top: number; bottom: number },
+  header: { top: number; bottom: number },
+  inset = 12,
+): number {
+  return header.top >= pane.top + inset && header.bottom <= pane.bottom ? 0 : header.top - pane.top - inset;
+}
 
 /**
  * Friendly choices, plus the literal currently stored in an imported theme

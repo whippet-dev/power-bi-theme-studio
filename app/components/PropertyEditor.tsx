@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ACTION_BUTTON_PROPERTIES, propertyThemePath as actionButtonPropertyThemePath } from "../lib/actionButtonProperties";
 import type { ResolvedActionButtonStyle } from "../lib/actionButtonProperties";
 import { BAR_CHART_PROPERTIES, propertyThemePath as barChartPropertyThemePath } from "../lib/barChartProperties";
@@ -33,6 +33,7 @@ import { forState, groupSupportsStates, INTERACTION_STATES, stateEntryIndex, typ
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
 import {
+  expansionScrollDelta,
   inactivePropertyGroup,
   isFontFamilyProperty,
   isMasterActivationProperty,
@@ -782,6 +783,7 @@ export function PropertyEditor({
 }: PropertyEditorProps) {
   const [tab, setTab] = useState<Tab>("visual");
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const scrollContainer = useRef<HTMLDivElement>(null);
   // Which interaction state is being edited, for the visuals whose groups
   // are keyed by `$id` (buttons and navigators). Not theme data — it
   // selects which array entry the controls read and write.
@@ -796,6 +798,17 @@ export function PropertyEditor({
     setTrackedContext({ tab, selected });
     setOpenGroupId(null);
   }
+
+  useEffect(() => {
+    if (!openGroupId) return;
+
+    const pane = scrollContainer.current;
+    const header = pane?.querySelector<HTMLElement>(".property-detail__header");
+    if (!pane || !header) return;
+
+    const delta = expansionScrollDelta(pane.getBoundingClientRect(), header.getBoundingClientRect());
+    if (delta) pane.scrollBy({ top: delta, behavior: "smooth" });
+  }, [openGroupId]);
 
   const chromeGroupKeys = Object.keys(CHROME_PROPERTIES) as Array<keyof typeof CHROME_PROPERTIES>;
 
@@ -1421,7 +1434,7 @@ export function PropertyEditor({
         </button>
       </div>
 
-      <div className="properties-panel__scroll">
+      <div className="properties-panel__scroll" ref={scrollContainer}>
         {openGroup ? (
           <GroupDetail title={openGroup.title} onBack={() => setOpenGroupId(null)}>
             {renderGroupContent(openGroup.id)}
