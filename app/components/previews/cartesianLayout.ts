@@ -304,6 +304,8 @@ export function authoredInnerBox(box: Rect, chrome: { width: number; height: num
  * cannot quietly lose one.
  */
 export type VisualTitleChrome = ResolvedChromeStyle["title"];
+/** The shared visual subtitle chrome, rendered inside authored cartesian boxes. */
+export type VisualSubtitleChrome = ResolvedChromeStyle["subTitle"];
 
 /**
  * The visual title's band, in the authored visual's own pixels.
@@ -331,6 +333,30 @@ export function visualTitleBandExtent(
     spaceBelowTitle,
   );
   return { width: 0, height: band.height, textHeight: band.textHeight, spaceBelow: band.spaceBelow };
+}
+
+/**
+ * The subtitle band that follows a renderer-owned visual title.
+ *
+ * Unlike a title, a subtitle has no native title-padding allowance: it keeps
+ * PreviewShell's existing text treatment and only reserves its measured line
+ * plus the configured spacing. Keeping the extent and inline style together
+ * makes it impossible for a subtitle to grow an authored visual after layout.
+ */
+export function visualSubtitleBandExtent(
+  subtitle: VisualSubtitleChrome | undefined,
+  spaceAboveSubtitle = 0,
+  spaceBelowSubtitle = 0,
+  measure: TextMeasure = canvasTextMeasure,
+): { width: number; height: number; textHeight: number; spaceAbove: number; spaceBelow: number } {
+  const text = String(subtitle?.text ?? "");
+  if (!subtitle?.show || !text) {
+    return { width: 0, height: 0, textHeight: 0, spaceAbove: 0, spaceBelow: 0 };
+  }
+  const textHeight = measure(text, themeFontSizeToCssPx(subtitle.fontSize), subtitle.fontFamily).height;
+  const spaceAbove = Math.max(0, spaceAboveSubtitle);
+  const spaceBelow = Math.max(0, spaceBelowSubtitle);
+  return { width: 0, height: textHeight + spaceAbove + spaceBelow, textHeight, spaceAbove, spaceBelow };
 }
 
 /** Two renderer-owned chrome bands, summed for the authored budget. */
@@ -379,6 +405,31 @@ export function visualTitleStyle(
   };
 }
 
+/** The subtitle style shared by every authored cartesian preview. */
+export function visualSubtitleStyle(
+  subtitle: VisualSubtitleChrome | undefined,
+  band: { textHeight: number; spaceAbove: number; spaceBelow: number },
+  titleBackground?: string,
+): Record<string, string | number | undefined> {
+  return {
+    height: band.textHeight,
+    marginTop: band.spaceAbove || undefined,
+    marginBottom: band.spaceBelow || undefined,
+    textAlign: subtitle?.alignment === undefined ? undefined : String(subtitle.alignment),
+    // subTitle has no background property of its own; it inherits Title.
+    backgroundColor: titleBackground,
+    color: subtitle?.fontColor,
+    fontFamily: subtitle?.fontFamily,
+    fontSize: subtitle ? themeFontSizeToCssPx(subtitle.fontSize) : undefined,
+    fontWeight: subtitle?.bold ? 700 : 400,
+    fontStyle: subtitle?.italic ? "italic" : "normal",
+    textDecoration: subtitle?.underline ? "underline" : "none",
+    whiteSpace: subtitle?.titleWrap ? "normal" : "nowrap",
+    overflow: "hidden",
+    textOverflow: subtitle?.titleWrap ? "clip" : "ellipsis",
+  };
+}
+
 /** The band a renderer-owned legend occupies, as an inline style. */
 export function legendBandStyle(band: { width: number; height: number }): { width?: number; height?: number } {
   if (band.width > 0) return { width: band.width };
@@ -387,17 +438,17 @@ export function legendBandStyle(band: { width: number; height: number }): { widt
 }
 
 /**
- * CSS needs the same title/legend bands that authoredInnerBox deducted: a
- * title consumes height, while a side legend consumes width.
+ * CSS needs the same top chrome/legend bands that authoredInnerBox deducted:
+ * title + subtitle consume height, while a side legend consumes width.
  */
 export function authoredRootStyle(
   base: CSSProperties,
-  titleBand: { height: number },
+  topChromeBand: { height: number },
   legendBand: { width: number },
 ): CSSProperties {
   return {
     ...base,
-    "--chart-title-band-height": `${titleBand.height}px`,
+    "--chart-title-band-height": `${topChromeBand.height}px`,
     "--chart-legend-band-width": `${legendBand.width}px`,
   } as CSSProperties;
 }

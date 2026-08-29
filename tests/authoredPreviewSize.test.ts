@@ -12,6 +12,8 @@ import {
   authoredInnerBox,
   authoredRootStyle,
   legendBandExtent,
+  visualSubtitleBandExtent,
+  visualSubtitleStyle,
   visualTitleBandExtent,
   visualTitleStyle,
 } from "../app/components/previews/cartesianLayout";
@@ -228,6 +230,20 @@ const titleOf = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const subtitleOf = (over: Record<string, unknown> = {}) => ({
+  show: true,
+  text: "Comparison period: current year",
+  fontSize: 10,
+  fontFamily: "Segoe UI",
+  alignment: "left",
+  fontColor: "#605E5C",
+  bold: false,
+  italic: false,
+  underline: false,
+  titleWrap: false,
+  ...over,
+});
+
 test("a shown visual title takes a band out of the authored budget", () => {
   // Native Classic 2026 at 450 x 250 spends 35px on its title band for a 16px
   // title. This is the same money coming out of the same pocket.
@@ -297,6 +313,44 @@ test("the rendered title band IS the reserved band", () => {
   const band = visualTitleBandExtent(titleOf() as never, "", 0, measure);
   const style = visualTitleStyle(titleOf() as never, band);
   assert.equal(style.height, band.height);
+});
+
+test("a shown subtitle follows the title inside the authored budget", () => {
+  const title = visualTitleBandExtent(titleOf() as never, "", 0, measure);
+  const subtitle = visualSubtitleBandExtent(subtitleOf() as never, 3, 5, measure);
+  const legend = legendBandExtent(
+    { show: true, position: "Top", fontSize: 9, fontFamily: "Segoe UI", showTitle: false, titleText: "" } as never,
+    ["Online", "Phone", "Post"],
+    measure,
+  );
+  const chrome = authoredChromeExtent([title, subtitle, legend]);
+  const inner = authoredInnerBox(BAR_CHART_BOX, chrome);
+  assert.equal(title.height + subtitle.height + legend.height + inner.height, BAR_CHART_BOX.height);
+  assert.equal(subtitle.height, subtitle.textHeight + subtitle.spaceAbove + subtitle.spaceBelow);
+  assert.ok(subtitle.height > 0);
+});
+
+test("hidden or empty subtitles return every pixel to the chart", () => {
+  assert.deepEqual(
+    visualSubtitleBandExtent(subtitleOf({ show: false }) as never, 4, 6, measure),
+    { width: 0, height: 0, textHeight: 0, spaceAbove: 0, spaceBelow: 0 },
+  );
+  assert.deepEqual(
+    visualSubtitleBandExtent(subtitleOf({ text: "" }) as never, 4, 6, measure),
+    { width: 0, height: 0, textHeight: 0, spaceAbove: 0, spaceBelow: 0 },
+  );
+});
+
+test("subtitle styling and configured spacing are the same values that were reserved", () => {
+  const subtitle = visualSubtitleBandExtent(subtitleOf() as never, 7, 9, measure);
+  const style = visualSubtitleStyle(subtitleOf() as never, subtitle, "#eeeeee");
+  assert.equal(style.height, subtitle.textHeight);
+  assert.equal(style.marginTop, subtitle.spaceAbove);
+  assert.equal(style.marginBottom, subtitle.spaceBelow);
+  assert.equal(style.backgroundColor, "#eeeeee");
+  assert.equal(style.fontFamily, "Segoe UI");
+  assert.equal(style.whiteSpace, "nowrap");
+  assert.equal(style.overflow, "hidden");
 });
 
 // ---------------------------------------------------------------------------

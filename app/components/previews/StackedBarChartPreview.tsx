@@ -26,7 +26,10 @@ import {
   authoredRootStyle,
   legendBandExtent,
   legendBandStyle,
+  visualSubtitleBandExtent,
+  visualSubtitleStyle,
   visualTitleBandExtent,
+  type VisualSubtitleChrome,
   type VisualTitleChrome,
   visualTitleStyle,
 } from "./cartesianLayout";
@@ -42,12 +45,15 @@ type Props = {
    * different thing and stays outside.
    */
   titleChrome?: VisualTitleChrome;
+  subtitleChrome?: VisualSubtitleChrome;
   titleFallback?: string;
   /** Only applies when the theme's "Customize spacing" is on, as in the tile. */
   spaceBelowTitle?: number;
+  spaceAboveSubtitle?: number;
+  spaceBelowSubtitle?: number;
   stackedBarChartStyle: ResolvedStackedBarChartStyle; palette: string[] };
 
-export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
+export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChrome, subtitleChrome, titleFallback = "", spaceBelowTitle = 0, spaceAboveSubtitle = 0, spaceBelowSubtitle = 0 }: Props) {
   // Every legend entry has a segment and every segment has an entry: both
   // come from the same fixture series, in the same order, with the same
   // palette slots the clustered charts use.
@@ -68,7 +74,9 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
   // left - otherwise the finished visual is taller than the size it claims.
   const legendBand = legendBandExtent(stackedBarChartStyle.legend, stackedBarSeries.map((item) => item.label));
   const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
-  const authoredInner = authoredInnerBox(BAR_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
+  const subtitleBand = visualSubtitleBandExtent(subtitleChrome, spaceAboveSubtitle, spaceBelowSubtitle);
+  const topChromeBand = authoredChromeExtent([titleBand, subtitleBand]);
+  const authoredInner = authoredInnerBox(BAR_CHART_BOX, authoredChromeExtent([titleBand, subtitleBand, legendBand]));
 
   const layout = computePreviewCartesianLayout({
     box: authoredInner,
@@ -93,7 +101,7 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
         opacity: 1 - stackedBarChartStyle.plotArea.transparency / 100,
         width: BAR_CHART_BOX.width,
         height: BAR_CHART_BOX.height,
-      }, titleBand, legendBand)}
+      }, topChromeBand, legendBand)}
     >
       {titleBand.height > 0 && (
         <span
@@ -102,6 +110,15 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
           style={visualTitleStyle(titleChrome, titleBand)}
         >
           {String(titleChrome?.text ?? "") || titleFallback}
+        </span>
+      )}
+      {subtitleBand.height > 0 && (
+        <span
+          className="chart-preview__visual-subtitle"
+          {...headingAria(subtitleChrome?.heading ?? "")}
+          style={visualSubtitleStyle(subtitleChrome, subtitleBand, titleChrome?.background)}
+        >
+          {subtitleChrome?.text}
         </span>
       )}
       {!stackedBarLegendAtBottom && (
