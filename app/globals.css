@@ -3103,3 +3103,13 @@ button { color: inherit; }
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Like the visual title, this is renderer-owned chrome inside the fixed
+   cartesian boundary. Its measured band and its spacing are deducted before
+   ChartLayout receives the plot box. */
+.chart-preview__visual-subtitle {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  line-height: 1.3;
+}

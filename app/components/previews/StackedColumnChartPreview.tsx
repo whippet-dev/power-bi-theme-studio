@@ -21,14 +21,14 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
 
-type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; titleFallback?: string; spaceBelowTitle?: number };
+type Props = { stackedColumnChartStyle: ResolvedStackedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; subtitleChrome?: VisualSubtitleChrome; titleFallback?: string; spaceBelowTitle?: number; spaceAboveSubtitle?: number; spaceBelowSubtitle?: number };
 
-export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
+export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, titleChrome, subtitleChrome, titleFallback = "", spaceBelowTitle = 0, spaceAboveSubtitle = 0, spaceBelowSubtitle = 0 }: Props) {
   // The transpose of the stacked bar chart, from the same fixture series
   // and the same palette slots, so a swatch means the same thing in both.
   const stackedColumnLegendNode = (
@@ -44,7 +44,9 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
   const stackedColumnLegendVertical = legendIsVertical(stackedColumnChartStyle.legend.position);
   const legendBand = legendBandExtent(stackedColumnChartStyle.legend, cartesianFixture.series.map((s) => s.label));
   const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
-  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
+  const subtitleBand = visualSubtitleBandExtent(subtitleChrome, spaceAboveSubtitle, spaceBelowSubtitle);
+  const topChromeBand = authoredChromeExtent([titleBand, subtitleBand]);
+  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, subtitleBand, legendBand]));
 
   // Same engine, same box and the same shared furniture as the clustered
   // column chart — the two share the CSS and must share the coordinate
@@ -67,9 +69,10 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
   return (
     <PresentationScale width={COLUMN_CHART_BOX.width}><span
       className={`chart-preview chart-preview--authored${stackedColumnLegendVertical ? " chart-preview--legend-side" : ""}${stackedColumnLegendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(stackedColumnChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
-      style={authoredRootStyle({ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }, titleBand, legendBand)}
+      style={authoredRootStyle({ opacity: 1 - stackedColumnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }, topChromeBand, legendBand)}
     >
       {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
+      {subtitleBand.height > 0 && <span className="chart-preview__visual-subtitle" {...headingAria(subtitleChrome?.heading ?? "")} style={visualSubtitleStyle(subtitleChrome, subtitleBand, titleChrome?.background)}>{subtitleChrome?.text}</span>}
       {!stackedColumnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{stackedColumnLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">

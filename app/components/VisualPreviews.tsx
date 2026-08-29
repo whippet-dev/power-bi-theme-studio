@@ -640,7 +640,7 @@ function PreviewShell({
             {titleText}
           </span>
         )}
-        {chrome.subTitle.show && chrome.subTitle.text && (
+        {chrome.subTitle.show && chrome.subTitle.text && !titleInsideVisual && (
           <span
             className="preview-subtitle"
             {...headingAria(chrome.subTitle.heading)}
@@ -844,8 +844,11 @@ export function VisualGallery({
       barChartStyle={barChartStyle}
       palette={palette}
       titleChrome={chromeStyles.bar.title}
+      subtitleChrome={chromeStyles.bar.subTitle}
       titleFallback="Applications by region"
       spaceBelowTitle={chromeStyles.bar.spacing.customizeSpacing ? chromeStyles.bar.spacing.spaceBelowTitle : 0}
+      spaceAboveSubtitle={chromeStyles.bar.spacing.customizeSpacing ? chromeStyles.bar.spacing.spaceAboveSubtitle : 0}
+      spaceBelowSubtitle={chromeStyles.bar.spacing.customizeSpacing ? chromeStyles.bar.spacing.spaceBelowSubTitle : 0}
     />
   );
 
@@ -855,19 +858,22 @@ export function VisualGallery({
       stackedBarChartStyle={stackedBarChartStyle}
       palette={palette}
       titleChrome={chromeStyles.stackedBar.title}
+      subtitleChrome={chromeStyles.stackedBar.subTitle}
       titleFallback="Applications by region"
       spaceBelowTitle={chromeStyles.stackedBar.spacing.customizeSpacing ? chromeStyles.stackedBar.spacing.spaceBelowTitle : 0}
+      spaceAboveSubtitle={chromeStyles.stackedBar.spacing.customizeSpacing ? chromeStyles.stackedBar.spacing.spaceAboveSubtitle : 0}
+      spaceBelowSubtitle={chromeStyles.stackedBar.spacing.customizeSpacing ? chromeStyles.stackedBar.spacing.spaceBelowSubTitle : 0}
     />
   );
 
 
-  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} titleChrome={chromeStyles.column.title} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.column.spacing.customizeSpacing ? chromeStyles.column.spacing.spaceBelowTitle : 0} />;
+  const columnContent = <ColumnChartPreview columnChartStyle={columnChartStyle} palette={palette} titleChrome={chromeStyles.column.title} subtitleChrome={chromeStyles.column.subTitle} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.column.spacing.customizeSpacing ? chromeStyles.column.spacing.spaceBelowTitle : 0} spaceAboveSubtitle={chromeStyles.column.spacing.customizeSpacing ? chromeStyles.column.spacing.spaceAboveSubtitle : 0} spaceBelowSubtitle={chromeStyles.column.spacing.customizeSpacing ? chromeStyles.column.spacing.spaceBelowSubTitle : 0} />;
 
 
-  const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} titleChrome={chromeStyles.stackedColumn.title} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceBelowTitle : 0} />;
+  const stackedColumnContent = <StackedColumnChartPreview stackedColumnChartStyle={stackedColumnChartStyle} palette={palette} titleChrome={chromeStyles.stackedColumn.title} subtitleChrome={chromeStyles.stackedColumn.subTitle} titleFallback="Applications by region" spaceBelowTitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceBelowTitle : 0} spaceAboveSubtitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceAboveSubtitle : 0} spaceBelowSubtitle={chromeStyles.stackedColumn.spacing.customizeSpacing ? chromeStyles.stackedColumn.spacing.spaceBelowSubTitle : 0} />;
 
 
-  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} titleChrome={chromeStyles.line.title} titleFallback="Applications over time" spaceBelowTitle={chromeStyles.line.spacing.customizeSpacing ? chromeStyles.line.spacing.spaceBelowTitle : 0} />;
+  const lineContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} titleChrome={chromeStyles.line.title} subtitleChrome={chromeStyles.line.subTitle} titleFallback="Applications over time" spaceBelowTitle={chromeStyles.line.spacing.customizeSpacing ? chromeStyles.line.spacing.spaceBelowTitle : 0} spaceAboveSubtitle={chromeStyles.line.spacing.customizeSpacing ? chromeStyles.line.spacing.spaceAboveSubtitle : 0} spaceBelowSubtitle={chromeStyles.line.spacing.customizeSpacing ? chromeStyles.line.spacing.spaceBelowSubTitle : 0} />;
   // SmallMultiplesGrid repeats its content into every cell. Keep the current
   // outer-shell title there instead of giving every mini Line its own title.
   const lineSmallMultipleContent = <LineChartPreview lineChartStyle={lineChartStyle} palette={palette} />;

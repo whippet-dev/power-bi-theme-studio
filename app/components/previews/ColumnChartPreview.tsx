@@ -20,14 +20,14 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualTitleBandExtent, visualTitleStyle, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
 
-type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; titleFallback?: string; spaceBelowTitle?: number };
+type Props = { columnChartStyle: ResolvedColumnChartStyle; palette: string[]; titleChrome?: VisualTitleChrome; subtitleChrome?: VisualSubtitleChrome; titleFallback?: string; spaceBelowTitle?: number; spaceAboveSubtitle?: number; spaceBelowSubtitle?: number };
 
-export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, titleFallback = "", spaceBelowTitle = 0 }: Props) {
+export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, subtitleChrome, titleFallback = "", spaceBelowTitle = 0, spaceAboveSubtitle = 0, spaceBelowSubtitle = 0 }: Props) {
   // Same series, same colours and the same band model as the clustered
   // bar chart. This chart is its transpose, so it must not compute its
   // own version of either.
@@ -44,7 +44,9 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
   const columnLegendVertical = legendIsVertical(columnChartStyle.legend.position);
   const legendBand = legendBandExtent(columnChartStyle.legend, cartesianFixture.series.map((s) => s.label));
   const titleBand = visualTitleBandExtent(titleChrome, titleFallback, spaceBelowTitle);
-  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, legendBand]));
+  const subtitleBand = visualSubtitleBandExtent(subtitleChrome, spaceAboveSubtitle, spaceBelowSubtitle);
+  const topChromeBand = authoredChromeExtent([titleBand, subtitleBand]);
+  const authoredInner = authoredInnerBox(COLUMN_CHART_BOX, authoredChromeExtent([titleBand, subtitleBand, legendBand]));
 
   // One layout for this visual instance. Everything geometric below reads
   // from it — gutters, gridlines, columns, labels, reference line — so the
@@ -81,9 +83,10 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, tit
   return (
     <PresentationScale width={COLUMN_CHART_BOX.width}><span
       className={`chart-preview chart-preview--authored${columnLegendVertical ? " chart-preview--legend-side" : ""}${columnLegendAtBottom ? " chart-preview--legend-after" : ""}${legendIsCentered(columnChartStyle.legend.position) ? " chart-preview--legend-center" : ""}`}
-      style={authoredRootStyle({ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }, titleBand, legendBand)}
+      style={authoredRootStyle({ opacity: 1 - columnChartStyle.plotArea.transparency / 100, width: COLUMN_CHART_BOX.width, height: COLUMN_CHART_BOX.height }, topChromeBand, legendBand)}
     >
       {titleBand.height > 0 && <span className="chart-preview__visual-title" {...headingAria(titleChrome?.heading ?? "")} style={visualTitleStyle(titleChrome, titleBand)}>{String(titleChrome?.text ?? "") || titleFallback}</span>}
+      {subtitleBand.height > 0 && <span className="chart-preview__visual-subtitle" {...headingAria(subtitleChrome?.heading ?? "")} style={visualSubtitleStyle(subtitleChrome, subtitleBand, titleChrome?.background)}>{subtitleChrome?.text}</span>}
       {!columnLegendAtBottom && <span className="chart-preview__legend-band" style={legendBandStyle(legendBand)}>{columnLegendNode}</span>}
       <span className="chart-preview__body">
         <span className="chart-preview__body-main">
