@@ -37,6 +37,7 @@ import {
   type VisualSubtitleChrome,
   type VisualTitleChrome,
 } from "./cartesianLayout";
+import { fractionIsOnPlot } from "../../lib/constantLine";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import {
@@ -291,6 +292,12 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, subtitl
     key: string,
   ) => {
     if (!line.show) return null;
+    // Same rule as the shared ConstantLine component: a value the explicit
+    // axis range excludes has nowhere on the plot to be drawn, so the line
+    // and its label are not drawn at all rather than painted over the
+    // furniture. The shade is unaffected -- an out-of-range offset already
+    // collapses it to nothing.
+    const onPlot = fractionIsOnPlot(offsetPercent / 100);
     const stroke = mapLineStyle(line.style);
     const shade = line.shadeShow && (
       <span
@@ -314,6 +321,7 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, subtitl
     return (
       <Fragment key={key}>
         {shade}
+        {onPlot && (
         <span
           className={`chart-preview__constant chart-preview__constant--${orientation}`}
           aria-hidden="true"
@@ -334,7 +342,8 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, subtitl
             opacity: 1 - line.transparency / 100,
           }}
         />
-        {line.dataLabelShow && (
+        )}
+        {line.dataLabelShow && onPlot && (
           <span
             className="chart-preview__constant-label"
             style={{
