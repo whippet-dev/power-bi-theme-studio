@@ -370,6 +370,29 @@ export function authoredChromeExtent(
 }
 
 /**
+ * The visual title and subtitle bands are flex rows -- that is how their text
+ * is centred vertically inside the exact band height that was reserved for
+ * it. Their text is therefore an anonymous flex item, and `text-align` cannot
+ * position a flex item: the resolved alignment reached the element and had no
+ * effect, so every title rendered flush left whatever the theme said.
+ *
+ * The same resolved value has to drive `justify-content` as well. Both are
+ * set, not one: `justify-content` places the text box within the band, and
+ * `text-align` still aligns the lines inside it when the title wraps.
+ */
+function bandJustifyContent(alignment: unknown): string | undefined {
+  if (alignment === undefined) return undefined;
+  switch (String(alignment).toLowerCase()) {
+    case "center":
+      return "center";
+    case "right":
+      return "flex-end";
+    default:
+      return "flex-start";
+  }
+}
+
+/**
  * The rendered visual-title band: exactly the height that was reserved, and
  * the title styling the theme resolved.
  */
@@ -388,6 +411,7 @@ export function visualTitleStyle(
     color: title?.fontColor,
     backgroundColor: title?.background,
     textAlign: title?.alignment === undefined ? undefined : String(title.alignment),
+    justifyContent: bandJustifyContent(title?.alignment),
     fontWeight: title?.bold ? 700 : 400,
     fontStyle: title?.italic ? "italic" : "normal",
     textDecoration: title?.underline ? "underline" : "none",
@@ -416,6 +440,7 @@ export function visualSubtitleStyle(
     marginTop: band.spaceAbove || undefined,
     marginBottom: band.spaceBelow || undefined,
     textAlign: subtitle?.alignment === undefined ? undefined : String(subtitle.alignment),
+    justifyContent: bandJustifyContent(subtitle?.alignment),
     // subTitle has no background property of its own; it inherits Title.
     backgroundColor: titleBackground,
     color: subtitle?.fontColor,
