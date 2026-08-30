@@ -7,6 +7,8 @@ import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorPro
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { hexWithAlpha } from "../lib/colorUtils";
 import { formatValue, mapTextAlign, SmallMultiplesGrid } from "./ChartParts";
+import { FilterPanePreview } from "./GlobalPreviews";
+import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
@@ -72,6 +74,14 @@ type VisualGalleryProps = {
   selected: VisualKind;
   oneToOneHero?: boolean;
   onSelect: (visual: VisualKind) => void;
+  globalOptionsStyle: ResolvedGlobalOptionsStyle;
+  showFilterPane: boolean;
+  /**
+   * Theme Studio's supporting region, rendered between the report page and
+   * the thumbnails. A slot rather than a prop bundle: the gallery owns
+   * *where* supporting content sits and stays ignorant of what it is.
+   */
+  supporting?: ReactNode;
 };
 
 type PreviewShellProps = {
@@ -684,6 +694,9 @@ export function VisualGallery({
   selected,
   oneToOneHero = false,
   onSelect,
+  globalOptionsStyle,
+  showFilterPane,
+  supporting,
 }: VisualGalleryProps) {
   const palette = theme.palette;
   // Power BI's slicer "type" (list/dropdown/between/relative date, ...) is a
@@ -1805,23 +1818,51 @@ export function VisualGallery({
 
   return (
     <div className="visual-canvas">
-      {hero && (
-        <PreviewShell
-          key={hero.id}
-          id={hero.id}
-          label={hero.label}
-          defaultTitle={hero.defaultTitle}
-          variant="hero"
-          selected
-          theme={theme}
-          chrome={hero.chrome}
-          titleInsideVisual={hero.titleInsideVisual}
-          oneToOneHero={oneToOneHero}
-          onSelect={onSelect}
+      {/* The simulated Power BI report page holds the authored visual and
+          nothing else. Wallpaper is the area around the page and the filter
+          pane docks to its right; both are genuine report chrome. The
+          thumbnail gallery below is Theme Studio navigation UI and is
+          deliberately outside this surface -- see
+          PREVIEW_COMPOSITION_DESIGN.md 1.4. */}
+      <div
+        className="report-surface"
+        style={{
+          backgroundColor: hexWithAlpha(globalOptionsStyle.pageWallpaper.color, globalOptionsStyle.pageWallpaper.transparency),
+        }}
+      >
+        <div
+          className="report-page"
+          style={{
+            backgroundColor: hexWithAlpha(
+              globalOptionsStyle.pageBackground.color,
+              globalOptionsStyle.pageBackground.transparency,
+            ),
+            justifyContent: globalOptionsStyle.pageAlignment.verticalAlignment === "Middle" ? "center" : "flex-start",
+          }}
         >
-          {hero.content}
-        </PreviewShell>
-      )}
+          {hero && (
+            <PreviewShell
+              key={hero.id}
+              id={hero.id}
+              label={hero.label}
+              defaultTitle={hero.defaultTitle}
+              variant="hero"
+              selected
+              theme={theme}
+              chrome={hero.chrome}
+              titleInsideVisual={hero.titleInsideVisual}
+              oneToOneHero={oneToOneHero}
+              onSelect={onSelect}
+            >
+              {hero.content}
+            </PreviewShell>
+          )}
+        </div>
+        {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} theme={theme} />}
+      </div>
+
+      {supporting}
+
       {thumbnails.length > 0 && (
         <div className="visual-thumbnails">
           {thumbnails.map((d) => (

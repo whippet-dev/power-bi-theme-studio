@@ -17,7 +17,6 @@ import { resolveCardStyle } from "../lib/cardProperties";
 import { resolveChromeStyle, type ResolvedChromeStyle } from "../lib/chromeProperties";
 import { resolveActionButtonStyle } from "../lib/actionButtonProperties";
 import { resolveBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
-import { hexWithAlpha } from "../lib/colorUtils";
 import { resolveGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { resolveColumnChartStyle } from "../lib/columnChartProperties";
 import { resolveImageStyle } from "../lib/imageProperties";
@@ -33,7 +32,7 @@ import { resolveStackedColumnChartStyle } from "../lib/stackedColumnChartPropert
 import { resolveTableStyle } from "../lib/tableProperties";
 import { resolveTextboxStyle } from "../lib/textboxProperties";
 import { resolveTextClasses, resolveThemeColors } from "../lib/themeGlobalsProperties";
-import { FilterPanePreview, PaletteLegend } from "./GlobalPreviews";
+import { PaletteLegend } from "./GlobalPreviews";
 import { PropertyEditor } from "./PropertyEditor";
 import { VisualGallery } from "./VisualPreviews";
 import { PreviewInspector } from "./PreviewInspector";
@@ -326,64 +325,46 @@ export function ThemeStudio() {
             </div>
           </div>
 
-          {/* The report surface: wallpaper (the area around the page),
-              then the page itself, then the filter pane docked to its
-              right — so page/report-level settings have somewhere to
-              actually show up rather than only existing in the JSON. */}
-          <div
-            className="report-surface"
-            style={{
-              backgroundColor: hexWithAlpha(globalOptionsStyle.pageWallpaper.color, globalOptionsStyle.pageWallpaper.transparency),
-            }}
-          >
-            <div
-              className="report-page"
-              style={{
-                backgroundColor: hexWithAlpha(
-                  globalOptionsStyle.pageBackground.color,
-                  globalOptionsStyle.pageBackground.transparency,
-                ),
-                justifyContent: globalOptionsStyle.pageAlignment.verticalAlignment === "Middle" ? "center" : "flex-start",
-              }}
-            >
-              <VisualGallery
-                theme={resolved}
-                tableStyle={tableStyle}
-                barChartStyle={barChartStyle}
-                columnChartStyle={columnChartStyle}
-                stackedBarChartStyle={stackedBarChartStyle}
-                stackedColumnChartStyle={stackedColumnChartStyle}
-                lineChartStyle={lineChartStyle}
-                cardStyle={cardStyle}
-                slicerStyle={slicerStyle}
-                matrixStyle={matrixStyle}
-                pieChartStyle={pieChartStyle}
-                shapeStyle={shapeStyle}
-                actionButtonStyle={heroActionButtonStyle}
-                bookmarkNavigatorStyle={heroBookmarkNavigatorStyle}
-                pageNavigatorStyle={heroPageNavigatorStyle}
-                textboxStyle={textboxStyle}
-                imageStyle={imageStyle}
-                chromeStyles={chromeStyles}
-                selected={selectedVisual}
-                oneToOneHero={oneToOneHero}
-                onSelect={setSelectedVisual}
-              />
-            </div>
-            {showFilterPane && <FilterPanePreview globalOptions={globalOptionsStyle} theme={resolved} />}
-          </div>
-
-          {/* Theme Studio's own supporting region for the selected visual —
-              a sibling of the report surface, never inside it. Keyed by the
-              selection so its local view state resets with the visual, the
-              way it did when it lived on the (remounting) hero tile. */}
-          <PreviewInspector
-            key={selectedVisual}
+          {/* The canvas composition now lives in VisualGallery, which owns the
+              order: simulated report page (hero only), then Studio supporting
+              content, then the thumbnail gallery. The inspector is passed in
+              as a slot so it can sit between the two without VisualGallery
+              needing to know what supporting content is. Keyed by the
+              selection so its local view state resets with the visual. */}
+          <VisualGallery
+            theme={resolved}
+            tableStyle={tableStyle}
+            barChartStyle={barChartStyle}
+            columnChartStyle={columnChartStyle}
+            stackedBarChartStyle={stackedBarChartStyle}
+            stackedColumnChartStyle={stackedColumnChartStyle}
+            lineChartStyle={lineChartStyle}
+            cardStyle={cardStyle}
+            slicerStyle={slicerStyle}
+            matrixStyle={matrixStyle}
+            pieChartStyle={pieChartStyle}
+            shapeStyle={shapeStyle}
+            actionButtonStyle={heroActionButtonStyle}
+            bookmarkNavigatorStyle={heroBookmarkNavigatorStyle}
+            pageNavigatorStyle={heroPageNavigatorStyle}
+            textboxStyle={textboxStyle}
+            imageStyle={imageStyle}
+            chromeStyles={chromeStyles}
             selected={selectedVisual}
-            label={VISUAL_LABEL[selectedVisual]}
-            chrome={chromeStyles[selectedVisual]}
-            previewInteractionState={previewInteractionState}
-            onPreviewInteractionStateChange={setPreviewInteractionState}
+            oneToOneHero={oneToOneHero}
+            onSelect={setSelectedVisual}
+            globalOptionsStyle={globalOptionsStyle}
+            showFilterPane={showFilterPane}
+            supporting={
+              <PreviewInspector
+                key={selectedVisual}
+                selected={selectedVisual}
+                label={VISUAL_LABEL[selectedVisual]}
+                chrome={chromeStyles[selectedVisual]}
+                previewInteractionState={previewInteractionState}
+                onPreviewInteractionStateChange={setPreviewInteractionState}
+              />
+            }
           />
 
           {showPaletteLegend && <PaletteLegend theme={resolved} colors={themeColors} textClasses={textClasses} />}
