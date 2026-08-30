@@ -13,10 +13,9 @@
  * everything that draws is meant to consume them rather than re-deriving
  * position from CSS.
  *
- * It landed with its tests first (T6) so the geometry could be argued
- * about before any renderer depended on it. Every cartesian preview now
- * consumes it: the column pair in T7, the bar pair in T8 and the line
- * chart in T10 — see RENDERER_IMPLEMENTATION_PLAN.md.
+ * It landed with its tests first so the geometry could be argued about
+ * before any renderer depended on it. Every cartesian preview now consumes
+ * it: both column charts, both bar charts and the line chart.
  *
  * Deliberately pure: no React, no DOM, no CSS, no theme JSON, no module
  * state. Text measurement is injected (see `TextMeasure`) so the default

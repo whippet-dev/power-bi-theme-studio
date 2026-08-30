@@ -42,3 +42,6 @@ yarn-error.log*
 
 # Private/local Power BI themes
 /themes/local/
+
+# Generated QA workbooks (the tests are the durable record)
+/testing/*.xlsx

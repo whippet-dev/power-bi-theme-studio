@@ -4,9 +4,10 @@
  * Power BI gives a cartesian visual several constant-line groups —
  * `referenceLine`, `xAxisReferenceLine`, `y1AxisReferenceLine` — each a
  * line at a fixed position on one axis, optionally with a shaded region on
- * one side of it and a data label. `BAR_CHART_PREVIEW_COVERAGE_PILOT.md`
- * §3.5 found them to be the single largest coverage gap in the app: 57 of
- * 111 bar-chart gap properties.
+ * one side of it and a data label. A property-coverage trace of the whole
+ * 297-property clusteredBarChart registry found these to be the single
+ * largest gap in the app: 57 of the 111 bar-chart properties that should
+ * render and did not.
  *
  * Everything here is a pure function of already-resolved style values and
  * an already-computed `ChartLayout`. No React, no DOM, no theme JSON, no

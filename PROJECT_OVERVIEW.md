@@ -327,5 +327,3 @@ replacement for a complete project theme.
 
 `ARCHITECTURE_REVIEW.md` is an independent architecture assessment; §1–§8 are
 the original findings and §9 tracks what has since been fixed and what remains.
-`CODEX_HANDOVER.md` is the orientation document for a developer taking the
-repository over.
