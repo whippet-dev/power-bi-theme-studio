@@ -877,43 +877,31 @@ button { color: inherit; }
   padding: 14px;
 }
 
-.visual-header {
+/* The visual header specimen, in PreviewInspector. The header is report
+   chrome that appears on hover during consumption, so it is shown there as
+   a static strip rather than drawn inside every preview tile. */
+.header-specimen {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
-  margin: -4px 0 6px;
-  padding: 3px 2px;
-  font-size: 10px;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12px;
   line-height: 1;
 }
 
-.visual-header__icon {
-  opacity: 0.75;
-  /* Real Power BI's header icons all highlight on hover — without this,
-     only the tooltip icon (the one with something to actually show) had
-     any hover feedback at all, so the whole row read as inert and there
-     was no way to tell, short of trial and error, which one of twenty
-     near-identical glyphs was interactive. */
-  border-radius: 3px;
-  padding: 2px 3px;
-  margin: -2px -3px;
+.header-specimen__empty {
+  color: var(--muted);
+  font-size: 10px;
 }
 
-.visual-header__icon:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.visual-header__icon--tooltip {
-  cursor: help;
-}
-
-.visual-header__icon--tooltip:hover,
-.visual-header__icon--tooltip:focus-visible {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.08);
-  outline: none;
+/* Freed from the tile, the header tooltip is a plain block in the
+   inspector rather than a callout floating beside an icon. */
+.preview-header-tooltip--specimen {
+  align-self: flex-start;
+  margin-left: 0;
+  white-space: normal;
 }
 
 .preview-divider {

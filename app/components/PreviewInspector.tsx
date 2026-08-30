@@ -27,6 +27,39 @@ import type { VisualKind } from "./visualCatalog";
  * budget starts counting from here.
  */
 
+/**
+ * Every icon Power BI's visual header can show, in roughly its own
+ * left-to-right order, so toggling any one of them is visible here.
+ *
+ * This lived inside the preview tile until the header moved out here. In a
+ * real report the header appears on hover during consumption -- it is report
+ * chrome, not part of the authored visual -- so a static specimen shows the
+ * same 21 toggles without implying the hero permanently wears a toolbar.
+ */
+const HEADER_ICONS: ReadonlyArray<[keyof ResolvedChromeStyle["visualHeader"], string, string]> = [
+  ["showVisualWarningButton", "⚠", "Warning"],
+  ["showVisualErrorButton", "⊗", "Error"],
+  ["showVisualInformationButton", "ℹ", "Information"],
+  ["showFilterRestatementButton", "▽", "Filter"],
+  ["showDrillRoleSelector", "▾", "Drill on"],
+  ["showDrillUpButton", "↑", "Drill up"],
+  ["showDrillDownExpandButton", "↓", "Expand to next level"],
+  ["showDrillDownLevelButton", "⇊", "Show next level"],
+  ["showDrillToggleButton", "⤓", "Drill down"],
+  ["showPersonalizeVisualButton", "✎", "Personalize"],
+  ["showSeeDataLayoutToggleButton", "▦", "See data"],
+  ["showSmartNarrativeButton", "✦", "Smart narrative"],
+  ["showCopilotSummaryButton", "✨", "Copilot summary"],
+  ["showSetAlertButton", "◔", "Set alert"],
+  ["showFollowVisualButton", "★", "Follow"],
+  ["showPinButton", "⊙", "Pin"],
+  ["showFocusModeButton", "⤢", "Focus mode"],
+  ["showCopyVisualImageButton", "⧉", "Copy"],
+  ["showCommentButton", "☰", "Comment"],
+  ["showTooltipButton", "ⓘ", "Tooltip"],
+  ["showOptionsMenu", "⋯", "More options"],
+];
+
 /** What the inspector needs — and nothing more. No theme, no style bundle. */
 type PreviewInspectorProps = {
   /** The visual the inspector is describing; also its remount key upstream. */
@@ -57,7 +90,7 @@ export function isStatefulPreviewVisual(selected: VisualKind): boolean {
  * place, and a permanent empty card would be the first step the other way.
  */
 export function hasInspectorContent(selected: VisualKind, chrome: ResolvedChromeStyle): boolean {
-  return isStatefulPreviewVisual(selected) || chrome.visualTooltip.show;
+  return isStatefulPreviewVisual(selected) || chrome.visualTooltip.show || chrome.visualHeader.show;
 }
 
 export function PreviewInspector({
@@ -75,9 +108,11 @@ export function PreviewInspector({
 
   const isStateful = isStatefulPreviewVisual(selected);
   const tooltip = chrome.visualTooltip;
+  const headerTooltip = chrome.visualHeaderTooltip;
+  const enabledHeaderIcons = HEADER_ICONS.filter(([key]) => chrome.visualHeader[key]);
   const tooltipIsReportPage = String(tooltip.type) === "Canvas";
 
-  if (!isStateful && !tooltip.show) return null;
+  if (!hasInspectorContent(selected, chrome)) return null;
 
   return (
     <aside className="preview-inspector" aria-label={`${label} preview inspector`}>
@@ -91,6 +126,58 @@ export function PreviewInspector({
           </p>
           <span className="preview-state-selector">
             <StateSelector state={previewInteractionState} onSelect={onPreviewInteractionStateChange} />
+          </span>
+        </section>
+      )}
+
+      {chrome.visualHeader.show && (
+        <section className="preview-inspector__group">
+          <h3 className="preview-inspector__heading">Visual header</h3>
+          <p className="preview-inspector__note">
+            Report chrome shown on hover during consumption, not part of the authored visual — so it is shown here rather than on the hero.
+          </p>
+          <span
+            className="header-specimen"
+            style={{
+              backgroundColor: hexWithAlpha(chrome.visualHeader.background, chrome.visualHeader.transparency),
+              border: `1px solid ${chrome.visualHeader.border}`,
+              color: chrome.visualHeader.foreground,
+            }}
+          >
+            {enabledHeaderIcons.length > 0 ? (
+              enabledHeaderIcons.map(([, glyph, name]) => (
+                <span className="header-specimen__icon" key={name} title={name}>
+                  {glyph}
+                </span>
+              ))
+            ) : (
+              <span className="header-specimen__empty">No header icons enabled</span>
+            )}
+          </span>
+        </section>
+      )}
+
+      {chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && (
+        <section className="preview-inspector__group">
+          <h3 className="preview-inspector__heading">Header tooltip</h3>
+          <p className="preview-inspector__note">
+            The callout behind the header&rsquo;s {"ⓘ"} icon. Shown as a static example.
+          </p>
+          <span
+            className="preview-header-tooltip preview-header-tooltip--specimen"
+            style={{
+              backgroundColor: hexWithAlpha(headerTooltip.themedBackground || headerTooltip.background, headerTooltip.transparency),
+              color: headerTooltip.themedTitleFontColor || headerTooltip.titleFontColor,
+              fontFamily: headerTooltip.fontFamily || undefined,
+              fontSize: themeFontSizeToCssPx(headerTooltip.fontSize),
+              fontWeight: headerTooltip.bold ? 700 : 400,
+              fontStyle: headerTooltip.italic ? "italic" : "normal",
+              textDecoration: headerTooltip.underline ? "underline" : "none",
+            }}
+          >
+            {String(headerTooltip.type) === "Canvas"
+              ? `Report page tooltip${headerTooltip.section ? `: ${headerTooltip.section}` : ""}`
+              : String(headerTooltip.text) || "Header tooltip text"}
           </span>
         </section>
       )}

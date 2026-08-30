@@ -371,7 +371,6 @@ function PreviewShell({
   onSelect,
   children,
 }: PreviewShellProps) {
-  const [showHeaderTooltipPreview, setShowHeaderTooltipPreview] = useState(false);
   const heroWrapRef = useRef<HTMLSpanElement>(null);
   const heroScaleRef = useRef<HTMLSpanElement>(null);
   const [heroFit, setHeroFit] = useState<HeroFit | null>(null);
@@ -500,63 +499,12 @@ function PreviewShell({
   // Power BI — otherwise the visual keeps its own built-in spacing.
   const spacing = chrome.spacing.customizeSpacing ? chrome.spacing : null;
 
-  // Every icon Power BI's visual header can show, in roughly its own
-  // left-to-right order, so toggling any one of them is visible here.
-  const headerIcons: Array<[boolean, string, string]> = [
-    [chrome.visualHeader.showVisualWarningButton, "⚠", "Warning"],
-    [chrome.visualHeader.showVisualErrorButton, "⊗", "Error"],
-    [chrome.visualHeader.showVisualInformationButton, "ℹ", "Information"],
-    [chrome.visualHeader.showFilterRestatementButton, "▽", "Filter"],
-    [chrome.visualHeader.showDrillRoleSelector, "▾", "Drill on"],
-    [chrome.visualHeader.showDrillUpButton, "↑", "Drill up"],
-    [chrome.visualHeader.showDrillDownExpandButton, "↓", "Expand to next level"],
-    [chrome.visualHeader.showDrillDownLevelButton, "⇊", "Show next level"],
-    [chrome.visualHeader.showDrillToggleButton, "⤓", "Drill down"],
-    [chrome.visualHeader.showPersonalizeVisualButton, "✎", "Personalize"],
-    [chrome.visualHeader.showSeeDataLayoutToggleButton, "▦", "See data"],
-    [chrome.visualHeader.showSmartNarrativeButton, "✦", "Smart narrative"],
-    [chrome.visualHeader.showCopilotSummaryButton, "✨", "Copilot summary"],
-    [chrome.visualHeader.showSetAlertButton, "◔", "Set alert"],
-    [chrome.visualHeader.showFollowVisualButton, "★", "Follow"],
-    [chrome.visualHeader.showPinButton, "⊙", "Pin"],
-    [chrome.visualHeader.showFocusModeButton, "⤢", "Focus mode"],
-    [chrome.visualHeader.showCopyVisualImageButton, "⧉", "Copy"],
-    [chrome.visualHeader.showCommentButton, "☰", "Comment"],
-    [chrome.visualHeader.showTooltipButton, "ⓘ", "Tooltip"],
-    [chrome.visualHeader.showOptionsMenu, "⋯", "More options"],
-  ];
-
-  // The data tooltip's specimen and its reveal control moved to
-  // PreviewInspector in T9: a hover-only callout and a Studio toggle are
-  // not report-page content. The visual header's own tooltip below stays,
-  // because it is bound to the header icon inside the visual and is a
-  // hover affordance on real report chrome rather than Studio UI.
-
-  // The visual header's own tooltip — shown next to the header when its
-  // icon is enabled, so visualHeaderTooltip's 13 properties are visible.
-  // Only appears on hover/focus of the ⓘ icon itself, the same way it
-  // only appears on hover in real Power BI — and the same trigger pattern
-  // as the data tooltip's own button, so the two previews read as two
-  // distinct hover targets rather than two unexplained floating boxes.
-  const headerTooltip = chrome.visualHeaderTooltip;
-  const headerTooltipNode = variant === "hero" && chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && showHeaderTooltipPreview && (
-    <span
-      className="preview-header-tooltip"
-      style={{
-        backgroundColor: hexWithAlpha(headerTooltip.themedBackground || headerTooltip.background, headerTooltip.transparency),
-        color: headerTooltip.themedTitleFontColor || headerTooltip.titleFontColor,
-        fontFamily: headerTooltip.fontFamily || undefined,
-        fontSize: themeFontSizeToCssPx(headerTooltip.fontSize),
-        fontWeight: headerTooltip.bold ? 700 : 400,
-        fontStyle: headerTooltip.italic ? "italic" : "normal",
-        textDecoration: headerTooltip.underline ? "underline" : "none",
-      }}
-    >
-      {String(headerTooltip.type) === "Canvas"
-        ? `Report page tooltip${headerTooltip.section ? `: ${headerTooltip.section}` : ""}`
-        : String(headerTooltip.text) || "Header tooltip text"}
-    </span>
-  );
+  // The visual header and its tooltip are not part of the authored visual:
+  // in a real report they appear on hover, during consumption, and they are
+  // report chrome rather than anything the visual itself draws. Both are
+  // rendered as static specimens in PreviewInspector instead, so the hero
+  // stays an honest picture of the authored visual and the icons stop
+  // appearing in all seventeen tiles at once.
 
   // Not a <button>: several previews put their own controls inside the
   // tile (the slicer's mode toggle and expandable dropdown), and nesting
@@ -583,41 +531,6 @@ function PreviewShell({
         <span className="visual-tile__action">{selected ? "Editing" : "Select"}</span>
       </span>
       <span className="visual-frame" style={frameStyle}>
-        {chrome.visualHeader.show && (
-          <span
-            className="visual-header"
-            style={{
-              backgroundColor: hexWithAlpha(chrome.visualHeader.background, chrome.visualHeader.transparency),
-              borderBottom: `1px solid ${chrome.visualHeader.border}`,
-              color: chrome.visualHeader.foreground,
-            }}
-          >
-            {headerIcons
-              .filter(([visible]) => visible)
-              .map(([, glyph, name]) =>
-                name === "Tooltip" ? (
-                  <span
-                    className="visual-header__icon visual-header__icon--tooltip"
-                    key={name}
-                    role="button"
-                    title="Hover to preview the header tooltip"
-                    tabIndex={0}
-                    onMouseEnter={() => setShowHeaderTooltipPreview(true)}
-                    onMouseLeave={() => setShowHeaderTooltipPreview(false)}
-                    onFocus={() => setShowHeaderTooltipPreview(true)}
-                    onBlur={() => setShowHeaderTooltipPreview(false)}
-                  >
-                    {glyph}
-                  </span>
-                ) : (
-                  <span className="visual-header__icon" key={name} title={name} aria-hidden="true">
-                    {glyph}
-                  </span>
-                ),
-              )}
-            {headerTooltipNode}
-          </span>
-        )}
         {chrome.title.show && !titleInsideVisual && (
           <span
             className="preview-title"
