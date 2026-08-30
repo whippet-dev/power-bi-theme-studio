@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-18 · **at commit:** `346035c` · **Scope:** the visual rendering system only. **No code was changed.**
 
-Companion to `ARCHITECTURE_REVIEW.md` (which audits the *property resolution* layer) and `CODEX_HANDOVER.md`. Where that review asked "does the right value reach the renderer?", this one asks "does the renderer do anything honest with it?"
+Companion to `ARCHITECTURE_REVIEW.md`, which audits the *property resolution* layer. Where that review asked "does the right value reach the renderer?", this one asks "does the renderer do anything honest with it?"
 
 ## Method, and what counts as evidence
 
@@ -380,7 +380,7 @@ The one caveat is that the hero's stability is currently *undermined by its own 
 5. **Replace the fixed hero scale with fit-to-container** using the same `outer` rect.
 6. Then, and only then, sample-data declarations and the weak renderers (stacked, pie).
 
-Doing (6) before (2) would add more surface area to the exact problem (2) exists to solve — the same argument `CODEX_HANDOVER.md` §8 makes about the preview-target mapping layer.
+Doing (6) before (2) would add more surface area to the exact problem (2) exists to solve — the same argument that was made against building the preview-target mapping layer before the renderer work beneath it had settled.
 
 ---
 

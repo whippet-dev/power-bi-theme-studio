@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-22 · **Status:** design only, **no code written** · **For:** independent review
 
-Companion to, and deliberately smaller than, `PREVIEW_TARGET_DESIGN.md`. That document answers *which properties affect which element, and how faithfully*. `RENDERER_AUDIT.md` §3.1 answers *where an element goes*. This one answers a third question neither of them asks:
+Companion to, and deliberately smaller than, the preview-target mapping design, which answers *which properties affect which element, and how faithfully*. `RENDERER_AUDIT.md` §3.1 answers *where an element goes*. This one answers a third question neither of them asks:
 
 > **How many rendered things is one visual's preview allowed to be?**
 
@@ -257,7 +257,7 @@ And a **fourth rule** for consumers, alongside §7.1's existing three:
 
 **No — and adding one would be a mistake.** The distinction the brief describes is real, but it is a property of the **surface**, not of the target.
 
-A target is defined in `PREVIEW_TARGET_DESIGN.md` §3.1 as *"a name for a thing a user can point at"* — a semantic element of a visual. `button.fill` is the button's fill whether it is drawn on the page, in a `hover` variant, or nowhere at all today. Tagging the target `main-visual` or `variant` would make the catalogue describe *where the renderer chose to draw it*, which is exactly the layer-2/layer-3 leak the three-layer table in §2 of that document exists to prevent. It would also break the moment a target renders in two places — which is the entire premise here.
+A target is defined by the preview-target mapping design as *"a name for a thing a user can point at"* — a semantic element of a visual. `button.fill` is the button's fill whether it is drawn on the page, in a `hover` variant, or nowhere at all today. Tagging the target `main-visual` or `variant` would make the catalogue describe *where the renderer chose to draw it*, which is exactly the layer-2/layer-3 leak that design's three-layer model exists to prevent. It would also break the moment a target renders in two places — which is the entire premise here.
 
 The distinction lands in three places instead, each already introduced above:
 
