@@ -2,10 +2,9 @@
 
 **Status:** live — appended to as phase 2 tasks land.
 
-Phase 1's plan (`RENDERER_IMPLEMENTATION_PLAN.md`) is a frozen record of what
-was planned at `703ba0f` and what shipped through T10. It deliberately does not
-track phase 2; this does, so that neither document has to claim to be both a
-sealed plan and a running list.
+Phase 1's renderer work was planned as a sealed, ordered sequence of tasks and
+shipped in full; that plan is not kept, having served its purpose. This document
+is the running list for phase 2, appended to as tasks land.
 
 ## Confirmed while building the constant-line foundation (task 1)
 
@@ -14,10 +13,10 @@ renderer's clothes, and mixing them into a geometry task confounds both.
 
 | # | Item | Why it is not a rendering fix |
 |---|---|---|
-| 1 | ~~Clustered Bar/Column need representative multi-series fixtures~~ | **Done** (task 9). Three real series over the same four categories; `clusteredGapSize` implemented as Power BI's band-scale `paddingInner`. See `CARTESIAN_SAMPLE_DATA.md` |
+| 1 | ~~Clustered Bar/Column need representative multi-series fixtures~~ | **Done** (task 9). Three real series over the same four categories; `clusteredGapSize` implemented as Power BI's band-scale `paddingInner` |
 | 2 | ~~Line needs multi-series data too~~ | **Done** (task 9). Three series through one ChartLayout and one pair of scales. `customizeSeries` (`lineStyles.showSeries`) is still unproven and untouched — see row 6 |
 | 3 | Legend placement honours the side only, not start/centre/end | `legendIsVertical`/`legendIsAfterPlot` reduce eight positions to two booleans, so `TopCenter` and `TopRight` render identically. Alignment within the side is unrepresented. **Task 9 sharpened the before-state**: every cartesian legend now carries three real entries, so the missing alignment is visible rather than hidden behind a single synthetic item |
-| 4 | Sample data should satisfy the conditions under which Power BI actually exposes a feature | **Partly done** (task 9) for the cartesian family: legends, clustered spacing, per-series colour, stacked segments and stacked totals now have data that can produce them. The Desktop *field-binding* question behind this row — whether a Legend field and multiple measures are equivalent — was not settled and is recorded UNKNOWN in `CARTESIAN_SAMPLE_DATA.md` §2.5 |
+| 4 | Sample data should satisfy the conditions under which Power BI actually exposes a feature | **Partly done** (task 9) for the cartesian family: legends, clustered spacing, per-series colour, stacked segments and stacked totals now have data that can produce them. The Desktop *field-binding* question behind this row — whether a Legend field and multiple measures are equivalent — was not settled and remains UNKNOWN |
 | 5 | `stackedGapSize` has no rendered effect | Task 9 proved its real behaviour displaces stacked segments along the VALUE axis, and only when `stackedGapExplodes` is on, which this app does not model. It previously had a wrong effect (thinning the whole stack); it now has none. Modelling `stackedGapExplodes` would restore it honestly |
 | 6 | `lineStyles.showSeries` ("Customize series") is unproven | Task 9 deliberately did not invent a visual effect for it. Whether it changes rendering, gates a formatting-pane selector, or persists per-series state is UNKNOWN |
 | 7 | Gap-property fallback and range fidelity | Power BI's defaults are `clusteredGapSize: 0` and `stackedGapSize: 0`, clamped to 75 (100 when overlapping) and 5 (10 when exploding). This app falls back to 10 and declares a 0-50 editor range. Recorded in task 9, not changed — it is fallback fidelity, not sample data |
@@ -30,7 +29,10 @@ renderer's clothes, and mixing them into a geometry task confounds both.
 - `xAxisReferenceLine` and `y1AxisReferenceLine` on all five cartesian charts
   (46 properties). The primitive is built for them; what is missing is a decision
   about what a categorical or date-typed constant-line value means against the
-  current fixtures — see `BAR_CHART_PREVIEW_COVERAGE_PILOT.md` §3.5.
+  current fixtures. The property-coverage trace behind this row is why the
+  primitive was built first: constant lines were the app's single largest
+  coverage gap, 57 of the 111 bar-chart properties that should render and did
+  not.
 - Unbounded numeric properties are edited by a range slider. `NumberControl` has
   no typed-input path, so every numeric property must invent min/max even when the
   schema has none. 51 properties currently share the generator's `-1000..1000`

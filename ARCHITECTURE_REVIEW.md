@@ -493,4 +493,4 @@ Treat the schema as a strong signal, not ground truth: Desktop clearly accepts m
 ### 9.7 Repository hygiene (updates §8)
 
 - **`.claude/`** — `settings.local.json` was found to be covered already by the user's global gitignore. `launch.json` (dev-server config) is committed alongside the handover documentation.
-- **Documentation staleness** — resolved. `README.md` and `PROJECT_OVERVIEW.md` have been rewritten to describe 16 visuals, base themes, theme layering, provenance-aware resolution and round-trip preservation. `CODEX_HANDOVER.md` has been added for an incoming developer.
+- **Documentation staleness** — resolved. `README.md` and `PROJECT_OVERVIEW.md` have been rewritten to describe 16 visuals, base themes, theme layering, provenance-aware resolution and round-trip preservation. An orientation document was also added for an incoming developer.
