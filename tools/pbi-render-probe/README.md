@@ -65,6 +65,25 @@ Get-NetTCPConnection -LocalPort 9222 -State Listen
 
 It should be bound to `127.0.0.1` only.
 
+### Verified against
+
+The mechanism above was confirmed working on this combination. Nothing here is
+a minimum requirement — it is the configuration the probe was actually proven
+on, recorded so a later failure can be compared against a known-good setup.
+
+| | |
+|---|---|
+| Power BI Desktop | **2.157.879.0 (26.08)**, MSI install at `…\Microsoft Power BI Desktop\bin\PBIDesktop.exe` |
+| Store/Appx package | none |
+| WebView2 Runtime | **151.0.4129.101** (Evergreen) |
+| CDP browser string | `Edg/151.0.4129.101`, protocol **1.3**, V8 15.1.23.9 |
+
+Note that unrelated `msedgewebview2.exe` processes (Copilot, Outlook, Search,
+Widgets) are normally running and are not Power BI's. That is why the
+"close Power BI first" point above matters: relaunching an already-running
+instance activates the existing process, which never inherited the variable,
+and the attempt fails for a reason unrelated to whether the mechanism works.
+
 ---
 
 ## Using it

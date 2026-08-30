@@ -10,6 +10,13 @@ representative visuals update immediately, edit real per-visual formatting
 properties (not just a handful of shared tokens), and export the updated JSON
 with everything else preserved untouched.
 
+This is not a colour picker. A real theme file has thousands of properties
+across dozens of visual types, Power BI Desktop gives you no way to author them
+except by hand, and hand-editing a 5,000-line JSON file is miserable and
+error-prone. Theme Studio exposes those properties at their real schema paths,
+shows you roughly what they do, and — critically — gives your file back to you
+intact. No backend, no database, no sign-in, no telemetry.
+
 ## Stack
 
 - React 19 and TypeScript for the editor UI and theme model
@@ -95,7 +102,7 @@ Not every property is reflected in the small mock previews — they all resolve,
 save, and export correctly regardless, but the previews prioritise the
 properties with an obvious visual effect (colours, fonts, show/hide) over deep
 or niche formatting options. See `PROJECT_OVERVIEW.md` for architecture notes
-and `CODEX_HANDOVER.md` if you are picking this repository up.
+if you are picking this repository up.
 
 ## How resolution works
 
