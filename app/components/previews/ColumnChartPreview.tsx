@@ -20,7 +20,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { clusteredSeriesBands } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, valueSpanPercent, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedColumnChartStyle } from "../../lib/columnChartProperties";
@@ -148,8 +148,9 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
                       const band = seriesBands[seriesIndex];
                       const value = series.values[index] ?? 0;
                       const topPct = valueFraction(layout, value * VALUE_SCALE) * 100;
-                      const height = Math.abs(topPct - zeroPct);
-                      const bottom = Math.min(topPct, zeroPct);
+                      // Clamped: an explicit Start/End that excludes this value
+                      // must cut the column at the axis, not paint past it.
+                      const { offset: bottom, size: height } = valueSpanPercent(layout, value * VALUE_SCALE, 0);
                       const fill = seriesColor(palette, seriesIndex, columnChartStyle.dataPoint.fill);
                       const centre = band.offset + band.size / 2;
                       return (
