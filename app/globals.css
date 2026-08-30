@@ -11,16 +11,30 @@
   --font-ui: "Segoe UI Variable", "Segoe UI", Arial, sans-serif;
 
   /* Hero geometry, declared once so CSS and the fit-to-container script in
-     VisualPreviews.tsx cannot drift apart. The tile renders at a fixed
-     pre-scale width and is enlarged by a transform so resolved font sizes
-     (often 8-12px) stay legible; --hero-max-scale is the cap, read back
-     from here by the script rather than duplicated in TypeScript. */
-  /* The Studio tile's pre-scale width. It is the authored frame's width
-     (420px, unchanged) plus the stage padding either side, so introducing
-     the stage did not shrink the authored visual. */
-  --hero-tile-width: 472px;
+     VisualPreviews.tsx cannot drift apart. The tile is enlarged by a
+     transform so resolved font sizes (often 8-12px) stay legible;
+     --hero-max-scale is the cap, read back from here by the script rather
+     than duplicated in TypeScript.
+
+     The authored visual's own width is the root measurement and everything
+     else derives from it. Deriving matters: the tile is the authored frame
+     plus stage padding, and .report-page multiplies by --hero-max-scale to
+     reserve the hero's slot. Reserving the *tile* at full scale magnified
+     the stage padding by 1.5 too, which is 78px of reserved width for 52px
+     of breathing room -- enough to push page + filter pane past anything
+     .report-surface could offer. The stage is fixed breathing room; only
+     the visual scales. */
+  /* One width for every canvas-level sibling: the report surface, the
+     supporting region, the palette legend and the intro all line up.
+     1140 rather than 1100 because the report page now reserves the
+     authored visual at full scale plus its stage, and 1100 left the page
+     and filter pane 8px of headroom -- close enough that any change to
+     either would have brought the scrollbar straight back. */
+  --canvas-max-width: 1140px;
+  --authored-frame-width: 420px;
   --visual-stage-pad: 26px;
   --visual-stage-pad-thumb: 12px;
+  --hero-tile-width: calc(var(--authored-frame-width) + var(--visual-stage-pad) * 2);
   --hero-max-scale: 1.5;
   --report-page-padding: 18px;
 }
@@ -312,7 +326,7 @@ button { color: inherit; }
 }
 
 .canvas-panel__intro {
-  max-width: 1100px;
+  max-width: var(--canvas-max-width);
   margin: 0 auto 26px;
   display: flex;
   align-items: flex-end;
@@ -397,7 +411,7 @@ button { color: inherit; }
    pane docked right. Gives page/report-level theme settings somewhere to
    actually render, instead of only existing in the exported JSON. */
 .report-surface {
-  max-width: 1100px;
+  max-width: var(--canvas-max-width);
   margin: 0 auto;
   display: flex;
   align-items: stretch;
@@ -419,7 +433,8 @@ button { color: inherit; }
      whenever the pane was toggled, which is exactly what a stable
      comparison surface must not do. The surface scrolls instead. */
   min-width: calc(
-    var(--hero-tile-width) * var(--hero-max-scale) + var(--report-page-padding) * 2
+    var(--authored-frame-width) * var(--hero-max-scale) + var(--visual-stage-pad) * 2 +
+      var(--report-page-padding) * 2
   );
   display: flex;
   flex-direction: column;
@@ -588,7 +603,7 @@ button { color: inherit; }
 /* Theme-level colour tokens have no single visual that shows them, so
    this strip draws each as a miniature of what it actually controls. */
 .palette-legend {
-  max-width: 1100px;
+  max-width: var(--canvas-max-width);
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
@@ -3007,7 +3022,7 @@ button { color: inherit; }
    hero rather than to the page. The dashed top edge is the seam: supporting
    content is an aside about the visual above it, not part of it. */
 .preview-inspector {
-  max-width: 1100px;
+  max-width: var(--canvas-max-width);
   margin: 0 auto;
   display: flex;
   flex-wrap: wrap;

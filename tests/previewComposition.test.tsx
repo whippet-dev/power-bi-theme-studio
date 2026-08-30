@@ -101,3 +101,57 @@ test("the header specimen shows the icons the theme enables, and says so", () =>
   assert.match(markup, /header-specimen/);
   assert.match(markup, /Focus mode/);
 });
+
+/**
+ * The report surface must not scroll horizontally in normal fitted mode.
+ *
+ * It did once: .report-page reserves the hero's slot by multiplying a width
+ * by --hero-max-scale, and when the tile width grew to include the stage
+ * padding, that padding got magnified 1.5x too. The reservation plus the
+ * filter pane then exceeded anything .report-surface could offer at its own
+ * max-width, so the scrollbar appeared at every viewport size rather than
+ * only narrow ones.
+ *
+ * The arithmetic, not the rendering, is what regressed, so this checks the
+ * arithmetic. FILTER_PANE_FOOTPRINT is measured rather than declared -- the
+ * pane is content-sized -- so if it changes this test should fail and be
+ * updated deliberately.
+ */
+const FILTER_PANE_FOOTPRINT = 320 + 18; // measured width + margin-left
+
+function cssNumber(name: string): number {
+  const match = cssSource.match(new RegExp(`${name}:\\s*(\\d+(?:\\.\\d+)?)`));
+  assert.ok(match, `${name} is declared`);
+  return Number(match![1]);
+}
+
+test("the report page and filter pane fit the report surface without scrolling", () => {
+  const canvasMax = cssNumber("--canvas-max-width");
+  const frame = cssNumber("--authored-frame-width");
+  const stagePad = cssNumber("--visual-stage-pad");
+  const pagePad = cssNumber("--report-page-padding");
+  const maxScale = cssNumber("--hero-max-scale");
+
+  // .report-surface has 18px padding either side inside its max-width.
+  const availableInsideSurface = canvasMax - 18 * 2;
+  const pageReserved = frame * maxScale + stagePad * 2 + pagePad * 2;
+
+  assert.ok(
+    pageReserved + FILTER_PANE_FOOTPRINT <= availableInsideSurface,
+    `report page reserves ${pageReserved}px + ${FILTER_PANE_FOOTPRINT}px filter pane ` +
+      `= ${pageReserved + FILTER_PANE_FOOTPRINT}px, which must fit ${availableInsideSurface}px`,
+  );
+
+  // The authored visual keeps its pre-scale width; the stage is around it.
+  assert.equal(frame, 420);
+  assert.ok(stagePad >= 20, "the stage keeps room for borders and shadows");
+});
+
+test("the hero slot reserves the authored visual at scale, not the stage padding", () => {
+  // The stage is fixed breathing room. Scaling it is what caused the
+  // overflow, so the reservation must not multiply the tile width.
+  const reservation = cssSource.match(/\.report-page \{[\s\S]*?min-width: calc\(([\s\S]*?)\);/);
+  assert.ok(reservation, ".report-page declares a min-width reservation");
+  assert.match(reservation![1], /--authored-frame-width\) \* var\(--hero-max-scale\)/);
+  assert.doesNotMatch(reservation![1], /--hero-tile-width\) \* var\(--hero-max-scale\)/);
+});
