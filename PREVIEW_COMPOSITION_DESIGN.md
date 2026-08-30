@@ -104,24 +104,30 @@ This is the structural half of the guardrails in §8, stated once here because t
 
 ```
 .report-surface            the simulated Power BI report
-  .report-page             ← ONLY primary surfaces live here
-    hero primary
-    thumbnail primaries
+  .report-page             ← ONLY the authored visual lives here
+    .visual-stage          ← neutral report-page space around it
+      .visual-frame        ← the authored Power BI visual container:
+                             background, border, radius, shadow
   .filter-pane             ← genuine report chrome: inside the report,
                              outside the page
-.preview-inspector         ← NEW region, sibling of .report-surface —
-  variant surfaces           Theme Studio only, not part of the
-  example surfaces           simulated report at all
+.preview-inspector         ← sibling of .report-surface — Theme Studio
+  variant surfaces           only, not part of the simulated report
+  example surfaces           at all
   transient surfaces
+.visual-thumbnails         ← Theme Studio navigation UI, also outside
+                             the simulated report
 ```
 
 Three distinct ownerships, and the boundaries matter more than the nesting:
 
-- **`.report-page` holds actual report-page visual content** — the hero primary and the thumbnail primaries. Nothing else.
+- **`.report-page` holds the authored visual and nothing else.** The thumbnail gallery was originally here too, on the reading that a thumbnail is also report-page content. It is not: thumbnails are how you *navigate* Theme Studio, and keeping them on the page forced supporting content below the entire gallery, since anything outside `.report-surface` necessarily follows all of it. They now sit outside the simulated report, after the supporting region.
+- **The authored visual owns its own formatting.** `.visual-frame` is the visual container — background, border, corner radius and shadow resolve onto it — and `.visual-stage` is neutral page space around it, so those properties can be seen rather than butting against Theme Studio's card edge. The hero drops Studio's card entirely; thumbnails keep theirs, being navigation rather than the subject.
 - **`.filter-pane` is genuine Power BI report chrome.** It belongs inside the simulated `.report-surface`, because a real report has one — but *not* inside `.report-page`, because it is not page content. Its current placement is already correct.
 - **`.preview-inspector` is Theme Studio's own explanatory UI**, a sibling of `.report-surface` and no part of the simulated report. Supporting surfaces render here, visually distinct from report chrome — no wallpaper, no page background, explicitly labelled — so that nothing on screen implies "this is what your report looks like" when it is not.
 
-**This is not the current state, and the drift has already begun.** `VisualGallery` renders inside `.report-page` (`ThemeStudio.tsx:353`), and `PreviewShell`'s hero branch appends the tooltip callout and the interaction-state selector as siblings of the scaled tile (`VisualPreviews.tsx:856–872`). Both therefore sit **inside the simulated page today**. Two ad-hoc supporting surfaces already exist; they are simply in the wrong place and have no name. That is the evidence that the need is real, and the reason to name it now rather than after it has happened four more times.
+**This is now the implemented state.** `VisualGallery` owns the whole composition and renders the report surface, then the supporting region as a slot, then the thumbnail gallery. The visual header and its tooltip — previously drawn inside every tile, with a hover simulation the preview could not honestly provide — are static specimens in the supporting region, joining the data tooltip and the interaction-state selector.
+
+Supporting content is also **contextual rather than permanent**: a specimen appears only while the formatting group it explains is open in the property panel, and the region renders nothing at all otherwise. That is the guardrail against a component gallery, made structural rather than advisory — supporting content cannot accumulate on screen, because nothing shows unless you are editing it.
 
 ---
 

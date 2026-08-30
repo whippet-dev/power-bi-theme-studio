@@ -1396,29 +1396,6 @@ button { color: inherit; }
   border-bottom: none;
 }
 
-/* Reveals the data-tooltip preview on demand rather than always — the
-   box used to float below the tile permanently with nothing explaining
-   what it was. */
-.tooltip-preview-trigger {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.tooltip-preview-trigger:hover,
-.tooltip-preview-trigger:focus-visible {
-  border-color: #c3b6d7;
-  color: var(--ink);
-}
-
 .preview-tooltip {
   align-self: flex-start;
   margin-top: 8px;

@@ -129,7 +129,14 @@ export function ThemeStudio() {
   // the default state: a visual is only ever the hero *or* a thumbnail, so
   // guarding on selection means only the hero picks up the chosen state.
   // The unguarded styles above still go to the property panel unchanged.
+  // Which interaction state the hero RENDERS. Distinct from PropertyEditor's
+  // own `interactionState`, which selects the `$id` entry being edited — see
+  // the note there. Kept separate on purpose.
   const [previewInteractionState, setPreviewInteractionState] = useState<InteractionState>("default");
+  // Mirrors which formatting group the property panel has open, so the
+  // supporting region can show only the specimen that group needs. The
+  // panel still owns the state; this is a read-only copy for the preview.
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const heroActionButtonStyle = useMemo(
     () =>
       selectedVisual === "actionButton"
@@ -363,6 +370,7 @@ export function ThemeStudio() {
                 chrome={chromeStyles[selectedVisual]}
                 previewInteractionState={previewInteractionState}
                 onPreviewInteractionStateChange={setPreviewInteractionState}
+                openGroupId={openGroupId}
               />
             }
           />
@@ -371,6 +379,7 @@ export function ThemeStudio() {
         </section>
 
         <PropertyEditor
+          onOpenGroupChange={setOpenGroupId}
           theme={theme}
           resolved={resolved}
           tableStyle={tableStyle}
