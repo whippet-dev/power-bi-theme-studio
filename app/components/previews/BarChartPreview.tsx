@@ -1,10 +1,9 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
 import {
   CategoryAxisGutter,
+  CartesianDataLabel,
   ChartLegend,
   ConstantLine,
-  DataLabel,
-  labelIsInside,
   labelVisibleAt,
   legendIsAfterPlot,
   legendIsCentered,
@@ -262,20 +261,37 @@ export function BarChartPreview({ barChartStyle, palette, titleChrome, subtitleC
                               />
                             </span>
                           )}
-                          {labelVisibleAt(index, barCategories.length, barChartStyle.labels.labelDensity) && (
-                            <span
-                              className={`bar-item__value${labelIsInside(barChartStyle.labels.labelPosition) ? " bar-item__value--inside" : ""}`}
-                              style={{ left: `${endPct}%`, top: `${band.offset + band.size / 2}%` }}
-                            >
-                              <DataLabel labels={barChartStyle.labels} category={series.label} value={value * VALUE_SCALE} detail={value * 12} />
-                            </span>
-                          )}
                         </span>
                       );
                     })}
                   </span>
                 );
               })}
+              <span className="chart-data-label-layer">
+                {barCategories.flatMap((label, index) => {
+                  if (!labelVisibleAt(index, barCategories.length, barChartStyle.labels.labelDensity)) return [];
+                  const { offset: categoryOffset } = categoryPercent(layout, index, barCategories.length);
+                  const categoryWidth = categoryWidthPercent(layout, barCategories.length);
+                  return cartesianFixture.series.map((series, seriesIndex) => {
+                    const band = seriesBands[seriesIndex];
+                    const value = series.values[index] ?? 0;
+                    return (
+                      <CartesianDataLabel
+                        key={`${label}-${series.key}`}
+                        labels={barChartStyle.labels}
+                        category={series.label}
+                        value={value * VALUE_SCALE}
+                        detail={value * 12}
+                        orientation="horizontal"
+                        startPercent={zeroPct}
+                        endPercent={valueFraction(layout, value * VALUE_SCALE) * 100}
+                        crossPercent={categoryOffset + categoryWidth * (band.offset + band.size / 2) / 100}
+                        series={series.label}
+                      />
+                    );
+                  });
+                })}
+              </span>
 
               {referenceLineAt("front")}
             </span>
