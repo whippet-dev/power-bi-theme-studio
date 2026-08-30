@@ -15,7 +15,12 @@
      pre-scale width and is enlarged by a transform so resolved font sizes
      (often 8-12px) stay legible; --hero-max-scale is the cap, read back
      from here by the script rather than duplicated in TypeScript. */
-  --hero-tile-width: 420px;
+  /* The Studio tile's pre-scale width. It is the authored frame's width
+     (420px, unchanged) plus the stage padding either side, so introducing
+     the stage did not shrink the authored visual. */
+  --hero-tile-width: 472px;
+  --visual-stage-pad: 26px;
+  --visual-stage-pad-thumb: 12px;
   --hero-max-scale: 1.5;
   --report-page-padding: 18px;
 }
@@ -832,7 +837,7 @@ button { color: inherit; }
 }
 
 .visual-tile--hero { width: var(--hero-tile-width); }
-.visual-tile--thumb { width: 200px; }
+.visual-tile--thumb { width: 224px; }
 
 .visual-tile:hover {
   border-color: #c3b6d7;
@@ -863,6 +868,21 @@ button { color: inherit; }
 
 .is-selected .visual-tile__action { color: var(--brand); }
 
+/* Report-page space around the authored visual. Whole-visual formatting -
+   background, border, corner radius, shadow - is owned by .visual-frame
+   below; this is the gap that lets those actually be seen instead of
+   butting straight up against Theme Studio's own card edge. */
+.visual-stage {
+  display: block;
+  padding: var(--visual-stage-pad);
+}
+
+.visual-tile--thumb .visual-stage {
+  padding: var(--visual-stage-pad-thumb);
+}
+
+/* The authored Power BI visual container. Everything inside it is the
+   visual; everything outside it is Theme Studio or the report page. */
 .visual-frame {
   min-height: 250px;
   display: block;
@@ -875,6 +895,25 @@ button { color: inherit; }
 .visual-tile--thumb .visual-frame {
   min-height: 150px;
   padding: 14px;
+}
+
+/* The hero sits on the simulated report page, so it drops Studio's card
+   entirely: no white fill, no border and no label bar competing with the
+   visual's own background and border. The report page shows through the
+   stage instead, which is what a visual on a page actually looks like.
+   Thumbnails keep their cards - they are navigation, not the subject. */
+.visual-tile--hero {
+  border-color: transparent;
+  background: transparent;
+  overflow: visible;
+}
+
+.visual-tile--hero:hover {
+  border-color: transparent;
+}
+
+.visual-tile--hero > .visual-tile__label {
+  display: none;
 }
 
 /* The visual header specimen, in PreviewInspector. The header is report

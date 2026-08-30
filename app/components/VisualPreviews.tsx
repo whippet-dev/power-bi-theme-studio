@@ -540,7 +540,12 @@ function PreviewShell({
         <span>{label}</span>
         <span className="visual-tile__action">{selected ? "Editing" : "Select"}</span>
       </span>
-      <span className="visual-frame" style={frameStyle}>
+      {/* The neutral stage between Theme Studio's tile and the authored
+          visual. It exists so the visual's own background, border, corner
+          radius and shadow have report-page space to sit in, and are not
+          read as -- or clipped by -- Studio's card edge a pixel away. */}
+      <span className="visual-stage">
+        <span className="visual-frame" style={frameStyle}>
         {chrome.title.show && !titleInsideVisual && (
           <span
             className="preview-title"
@@ -628,6 +633,7 @@ function PreviewShell({
             )}
           </span>
         )}
+        </span>
       </span>
     </div>
   );
