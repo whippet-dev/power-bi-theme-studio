@@ -9,6 +9,7 @@ import {
   legendIsCentered,
   legendIsVertical,
   mapLineStyle,
+  CategoryGridlines,
   ScaledGridlines,
   ValueAxisGutter,
   ZoomSliders,
@@ -106,6 +107,11 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
             {/* THE plot rectangle. */}
             <span className="chart-plot" style={{ left: valueGutter, bottom: categoryGutter }}>
               <ScaledGridlines axis={columnChartStyle.valueAxis} layout={layout} />
+              {/* Category gridlines, from the same slot geometry the marks
+                  use. They existed in the shared renderer and only the line
+                  chart drew them, so every category gridline property was
+                  inert here. */}
+              <CategoryGridlines axis={columnChartStyle.categoryAxis} layout={layout} count={barCategories.length} />
 
               <ZoomSliders zoom={columnChartStyle.zoom} categoryOrientation="horizontal" valueOrientation="vertical" />
 

@@ -9,6 +9,7 @@ import {
   legendIsCentered,
   legendIsVertical,
   mapLineStyle,
+  CategoryGridlines,
   ScaledGridlines,
   ValueAxisGutter,
   ZoomSliders,
@@ -147,6 +148,11 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
 
             <span className="chart-plot" style={{ left: categoryGutter, bottom: valueGutter }}>
               <ScaledGridlines axis={stackedBarChartStyle.valueAxis} layout={layout} />
+              {/* Category gridlines, from the same slot geometry the marks
+                  use. They existed in the shared renderer and only the line
+                  chart drew them, so every category gridline property was
+                  inert here. */}
+              <CategoryGridlines axis={stackedBarChartStyle.categoryAxis} layout={layout} count={barCategories.length} />
 
               <ZoomSliders zoom={stackedBarChartStyle.zoom} categoryOrientation="vertical" valueOrientation="horizontal" />
 

@@ -77,6 +77,7 @@ export type AxisStyle = {
   gridlineStyle: string | number;
   gridlineTransparency?: number;
   gridlineDashArray?: string;
+  gridlineDashCap?: string | number;
   // The schema types axis start/end as strings, not numbers.
   start?: string | number;
   end?: string | number;
@@ -743,59 +744,161 @@ export function dataLabelStyle(labels: {
  * rather than separate implementations.
  * ------------------------------------------------------------------------ */
 
-/** Where a tick or gridline sits, as the CSS offset for its orientation. */
+/** Where a tick sits, as the CSS offset for its orientation. */
 function scaledOffset(layout: ChartLayout, value: number): CSSProperties {
   const fraction = `${valueFraction(layout, value) * 100}%`;
-  return layout.orientation === "vertical" ? { bottom: fraction } : { left: fraction };
+  return layout.orientation === 'vertical' ? { bottom: fraction } : { left: fraction };
 }
 
 /**
- * Value-axis gridlines drawn from a computed layout: one per tick, at the
- * coordinate `scale.value` gives that tick. Replaces the inset-and-count
- * arithmetic the legacy `Gridlines` needs.
+ * A gridline dash array, parsed from the theme's literal string.
+ *
+ * The schema documents this as "space-separated values for dash and gap
+ * lengths in pixels, repeating in sequence" -- which is SVG
+ * `stroke-dasharray`, so the property can be honoured exactly rather than
+ * approximated. Commas are accepted too, since SVG allows either and a theme
+ * author may well write one.
+ *
+ * Returns null for anything unusable: an empty string, junk, a negative, or
+ * a series of zeroes that would paint nothing. The caller then falls back to
+ * the named line style, which is what the renderer drew before this property
+ * was representable at all. The theme's own value is never rewritten -- this
+ * only decides what to paint.
+ */
+export function parseGridlineDashArray(value: string | number | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const parts = raw.split(/[\s,]+/).filter(Boolean);
+  if (!parts.length) return null;
+  const numbers: number[] = [];
+  for (const part of parts) {
+    const n = Number(part);
+    if (!Number.isFinite(n) || n < 0) return null;
+    numbers.push(n);
+  }
+  if (!numbers.some((n) => n > 0)) return null;
+  return numbers.join(" ");
+}
+
+/**
+ * The SVG line cap for the theme's dash cap.
+ *
+ * The schema's three values map one-to-one onto `stroke-linecap`: Flat
+ * (`none`) is `butt`, and Round and Square keep their names. Nothing else is
+ * accepted -- an unrecognised value falls back to SVG's own default rather
+ * than being guessed at.
+ */
+export function gridlineLineCap(value: string | number | undefined): "butt" | "round" | "square" {
+  switch (String(value ?? "").toLowerCase()) {
+    case "round":
+      return "round";
+    case "square":
+      return "square";
+    default:
+      return "butt";
+  }
+}
+
+/**
+ * How a NAMED line style is drawn, in the absence of an explicit array.
+ *
+ * A CSS border chooses its own dash lengths and scales them with the border
+ * width; an SVG stroke does neither, so the widths have to be stated. These
+ * multiples reproduce roughly what the CSS renderer drew, which keeps an
+ * existing dashed or dotted theme looking as it did.
+ *
+ * This is NOT `gridlineAutoScale`. That property governs an EXPLICIT dash
+ * array, which is specified in pixels and is left literal here.
+ */
+function namedDashArray(style: "solid" | "dashed" | "dotted", width: number): string | undefined {
+  const unit = Math.max(width, 1);
+  if (style === "dashed") return `${unit * 3} ${unit * 2}`;
+  if (style === "dotted") return `${unit} ${unit * 2}`;
+  return undefined;
+}
+
+/** Everything a gridline stroke needs, resolved once for a whole set. */
+function gridlineStroke(axis: AxisStyle) {
+  const width = axis.gridlineThickness;
+  const explicit = parseGridlineDashArray(axis.gridlineDashArray);
+  const named = mapLineStyle(axis.gridlineStyle);
+  return {
+    width,
+    color: hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0),
+    // An explicit dash array wins over the named style, as elsewhere.
+    dashArray: explicit ?? namedDashArray(named, width),
+    lineCap: gridlineLineCap(axis.gridlineDashCap),
+  };
+}
+
+/**
+ * The shared gridline layer: real strokes, plot-local.
+ *
+ * Gridlines used to be spans drawn with one CSS border each, which can
+ * express colour, width, transparency and a named style, and nothing else.
+ * `gridlineDashArray` collapsed to "dashed" whatever it said, and
+ * `gridlineDashCap` has no CSS equivalent at all.
+ *
+ * An SVG layer sized to the plot fixes that with no geometry change. The
+ * lines sit at the same percentages the spans used, so ticks, axes and the
+ * plot rectangle are untouched; percentage coordinates mean no viewBox and
+ * no scaling, so a stroke width and a dash length are both plain pixels. It
+ * is the plot's first child, so marks, labels and reference lines paint over
+ * it exactly as before, and it takes no pointer events.
+ */
+function GridlineLayer({
+  axis,
+  offsets,
+  direction,
+}: {
+  axis: AxisStyle;
+  /** Percentage along the plot each line sits at. */
+  offsets: number[];
+  /** The direction each line is DRAWN in. */
+  direction: "horizontal" | "vertical";
+}): ReactNode {
+  if (!offsets.length) return null;
+  const { width, color, dashArray, lineCap } = gridlineStroke(axis);
+  if (width <= 0) return null;
+
+  return (
+    <svg className="chart-gridline-layer" aria-hidden="true" focusable="false">
+      {offsets.map((offset, index) => {
+        const position = `${offset}%`;
+        const ends =
+          direction === "horizontal"
+            ? { x1: "0%", x2: "100%", y1: position, y2: position }
+            : { x1: position, x2: position, y1: "0%", y2: "100%" };
+        return (
+          <line
+            key={index}
+            {...ends}
+            stroke={color}
+            strokeWidth={width}
+            strokeDasharray={dashArray}
+            strokeLinecap={lineCap}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * Value-axis gridlines: one per tick, at the coordinate `scale.value` gives
+ * that tick.
  */
 export function ScaledGridlines({ axis, layout }: { axis: AxisStyle; layout: ChartLayout }): ReactNode {
   if (!axis.gridlineShow) return null;
-  // An explicit dash array wins over the named style, as elsewhere.
-  const dashed = String(axis.gridlineDashArray ?? "") !== "";
-  const style = dashed ? "dashed" : mapLineStyle(axis.gridlineStyle);
-  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
   const vertical = layout.orientation === "vertical";
-
-  return (
-    <>
-      {layout.scale.ticks.map((tick, index) => (
-        <span
-          className="chart-gridline"
-          key={index}
-          aria-hidden="true"
-          // Declaration order is deliberate: span-the-plot first, then the
-          // scaled offset, then the border. It has no rendering effect, but
-          // keeping it stable makes a byte-level before/after diff of the
-          // migrated charts meaningful rather than noisy.
-          style={
-            vertical
-              ? {
-                  left: 0,
-                  right: 0,
-                  ...scaledOffset(layout, tick),
-                  borderTopWidth: axis.gridlineThickness,
-                  borderTopStyle: style,
-                  borderTopColor: color,
-                }
-              : {
-                  top: 0,
-                  bottom: 0,
-                  ...scaledOffset(layout, tick),
-                  borderLeftWidth: axis.gridlineThickness,
-                  borderLeftStyle: style,
-                  borderLeftColor: color,
-                }
-          }
-        />
-      ))}
-    </>
-  );
+  // The same fractions the CSS offsets used. A vertical chart's value axis
+  // runs bottom-up and SVG's y runs top-down, so the fraction is flipped for
+  // it -- the only place the two coordinate systems differ.
+  const offsets = layout.scale.ticks.map((tick) => {
+    const fraction = valueFraction(layout, tick) * 100;
+    return vertical ? 100 - fraction : fraction;
+  });
+  return <GridlineLayer axis={axis} offsets={offsets} direction={vertical ? "horizontal" : "vertical"} />;
 }
 
 /**
@@ -921,15 +1024,12 @@ export function CategoryAxisGutter({
 }
 
 /**
- * Category-axis gridlines, one per category, drawn at the centre of each
- * category's slot — the same coordinate a line chart plots its point at and
- * a column chart centres its bar on.
+ * Category-axis gridlines: one per category, through the centre of its slot.
  *
- * The previous line chart drew these with the legacy `Gridlines` and a
- * `count` of `points - 1`, producing an evenly spaced sequence that
- * happened to coincide with its point positions. Deriving both from
- * `scale.category` instead means they cannot drift, and that category
- * inversion moves the gridlines with the points.
+ * Uses `categoryPercent`, the same slot geometry the marks and the category
+ * labels use, so a gridline cannot drift from the category it belongs to. A
+ * column chart's categories run left to right, so its gridlines are vertical;
+ * a bar chart's run top to bottom, so they rotate with the axis.
  */
 export function CategoryGridlines({
   axis,
@@ -941,45 +1041,12 @@ export function CategoryGridlines({
   count: number;
 }): ReactNode {
   if (!axis.gridlineShow || count <= 0) return null;
-  const dashed = String(axis.gridlineDashArray ?? "") !== "";
-  const style = dashed ? "dashed" : mapLineStyle(axis.gridlineStyle);
-  const color = hexWithAlpha(axis.gridlineColor, axis.gridlineTransparency ?? 0);
   const vertical = layout.orientation === "vertical";
-
-  return (
-    <>
-      {Array.from({ length: count }, (_, index) => {
-        const slot = categoryPercent(layout, index, count);
-        const centre = `${slot.offset + slot.size / 2}%`;
-        return (
-          <span
-            className="chart-gridline"
-            key={index}
-            aria-hidden="true"
-            style={
-              vertical
-                ? {
-                    top: 0,
-                    bottom: 0,
-                    left: centre,
-                    borderLeftWidth: axis.gridlineThickness,
-                    borderLeftStyle: style,
-                    borderLeftColor: color,
-                  }
-                : {
-                    left: 0,
-                    right: 0,
-                    top: centre,
-                    borderTopWidth: axis.gridlineThickness,
-                    borderTopStyle: style,
-                    borderTopColor: color,
-                  }
-            }
-          />
-        );
-      })}
-    </>
-  );
+  const offsets = Array.from({ length: count }, (_, index) => {
+    const slot = categoryPercent(layout, index, count);
+    return slot.offset + slot.size / 2;
+  });
+  return <GridlineLayer axis={axis} offsets={offsets} direction={vertical ? "vertical" : "horizontal"} />;
 }
 
 // ---------------------------------------------------------------------------

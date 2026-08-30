@@ -31,26 +31,32 @@ function declarations(selector: string): string {
   return ruleBody(selector).replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-test("a gridline cannot paint an edge it does not own", () => {
-  const decl = declarations(".chart-gridline");
+test("a gridline layer paints strokes and nothing else", () => {
+  // This replaces a rule about CSS border edges. Gridlines used to be spans
+  // drawn with one border each, and the hazard was the edge a gridline did
+  // NOT own: styled but given no width or colour, it fell back to `medium`
+  // in currentColor and mitred diagonally against the owned edge, putting a
+  // black triangular wedge at every gridline end.
+  //
+  // Strokes make that structurally impossible -- an SVG line has no edges to
+  // leave unowned -- so what is worth pinning now is that the layer stays a
+  // pure paint surface: no borders or backgrounds of its own, and no
+  // geometry that could move the plot.
+  const decl = declarations(".chart-gridline-layer");
 
-  // A vertical gridline draws with its left border and a horizontal one with
-  // its top, and each renderer sets that edge's width, style and colour
-  // inline. Declaring a style for BOTH edges here is what produced the black
-  // triangular wedges: the unowned edge was styled but never given a width or
-  // a colour, so it fell back to `medium` in currentColor and mitred
-  // diagonally against the owned edge across the zero-width box.
-  assert.doesNotMatch(decl, /border-left-style\s*:/, "the shared rule must not style the left edge");
-  assert.doesNotMatch(decl, /border-top-style\s*:/, "the shared rule must not style the top edge");
+  assert.doesNotMatch(decl, /border(?!-)/, "the layer must not paint a border of its own");
+  assert.doesNotMatch(decl, /background/, "the layer must not paint a fill");
 
-  // Not merely unstyled — unable to paint. Zero width is what makes an
-  // unowned edge structurally incapable of showing up, whatever a browser's
-  // defaults happen to be.
-  assert.match(decl, /border\s*:\s*0\b/, "every edge must start at zero width");
+  // It fills the plot exactly, so it cannot introduce geometry.
+  assert.match(decl, /position\s*:\s*absolute/);
+  assert.match(decl, /inset\s*:\s*0/);
 
-  // And nothing may reintroduce a width the renderer did not ask for.
-  const widths = decl.match(/border(?:-(?:left|top|right|bottom))?-width\s*:[^;]*/g) ?? [];
-  assert.deepEqual(widths, [], "widths belong to the renderer, not to the shared rule");
+  // Gridlines were inert spans; the layer must not start intercepting input.
+  assert.match(decl, /pointer-events\s*:\s*none/, "the layer must stay non-interactive");
+
+  // A stroke sitting exactly on the plot edge must not be sliced in half by
+  // its own container -- this is a paint layer, not a clipping one.
+  assert.match(decl, /overflow\s*:\s*visible/, "the layer must not clip its strokes");
 });
 
 test("cartesian marks are square, in every bar and column family", () => {
