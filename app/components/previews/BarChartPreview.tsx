@@ -38,7 +38,7 @@ import {
 } from "./cartesianLayout";
 import { headingAria } from "../../lib/headingAria";
 import { PresentationScale } from "./PresentationScale";
-import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction, valueSpanPercent } from "./cartesianLayout";
 import type { ResolvedBarChartStyle } from "../../lib/barChartProperties";
 
 type Props = {
@@ -222,8 +222,9 @@ export function BarChartPreview({ barChartStyle, palette, titleChrome, subtitleC
                       const band = seriesBands[seriesIndex];
                       const value = series.values[index] ?? 0;
                       const endPct = valueFraction(layout, value * VALUE_SCALE) * 100;
-                      const width = Math.abs(endPct - zeroPct);
-                      const left = Math.min(endPct, zeroPct);
+                      // Clamped: see ColumnChartPreview -- an out-of-range value
+                      // is cut at the axis rather than painted over the furniture.
+                      const { offset: left, size: width } = valueSpanPercent(layout, value * VALUE_SCALE, 0);
                       const fill = seriesColor(palette, seriesIndex, barChartStyle.dataPoint.fill);
                       return (
                         <span key={series.key}>

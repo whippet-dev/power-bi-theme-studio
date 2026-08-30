@@ -37,7 +37,7 @@ import {
 } from "./cartesianLayout";
 import { headingAria } from "../../lib/headingAria";
 import { PresentationScale } from "./PresentationScale";
-import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction } from "./cartesianLayout";
+import { BAR_CHART_BOX, categoryPercent, categoryWidthPercent, computePreviewCartesianLayout, valueFraction, valueSpanPercent } from "./cartesianLayout";
 import type { ResolvedStackedBarChartStyle } from "../../lib/stackedBarChartProperties";
 
 type Props = {
@@ -178,16 +178,20 @@ export function StackedBarChartPreview({ stackedBarChartStyle, palette, titleChr
                 return (
                   <span className="bar-item" key={label} style={{ top: `${top}%`, height: `${height}%` }}>
                     {segments.map((segment, seriesIndex) => {
-                      const startPct = valueFraction(layout, segment.start * VALUE_SCALE) * 100;
-                      const stopPct = valueFraction(layout, segment.end * VALUE_SCALE) * 100;
+                      // Clamped per segment -- see StackedColumnChartPreview.
+                      const { offset: segLeft, size: segWidth } = valueSpanPercent(
+                        layout,
+                        segment.start * VALUE_SCALE,
+                        segment.end * VALUE_SCALE,
+                      );
                       const series = cartesianFixture.series[seriesIndex];
                       return (
                         <span
                           key={series.key}
                           className="bar-item__fill"
                           style={{
-                            left: `${Math.min(startPct, stopPct)}%`,
-                            width: `${Math.abs(stopPct - startPct)}%`,
+                            left: `${segLeft}%`,
+                            width: `${segWidth}%`,
                             // The stack fills its category band. Power BI's
                             // stack thickness is `categoryBandScale.bandwidth()`
                             // over a single band, so it is the whole slot;

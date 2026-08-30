@@ -23,7 +23,7 @@ import {
   seriesColor,
 } from "../../lib/previewSampleData";
 import { stackSegments } from "../../lib/seriesBands";
-import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
+import { authoredChromeExtent, authoredInnerBox, authoredRootStyle, categoryPercent, categoryWidthPercent, COLUMN_CHART_BOX, COLUMN_PLOT_INSETS, computePreviewCartesianLayout, legendBandExtent, legendBandStyle, valueFraction, valueSpanPercent, visualSubtitleBandExtent, visualSubtitleStyle, visualTitleBandExtent, visualTitleStyle, type VisualSubtitleChrome, type VisualTitleChrome } from "./cartesianLayout";
 import { PresentationScale } from "./PresentationScale";
 import { headingAria } from "../../lib/headingAria";
 import type { ResolvedStackedColumnChartStyle } from "../../lib/stackedColumnChartProperties";
@@ -140,16 +140,21 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
                       </span>
                     )}
                     {segments.map((segment, seriesIndex) => {
-                      const startPct = valueFraction(layout, segment.start * VALUE_SCALE) * 100;
-                      const stopPct = valueFraction(layout, segment.end * VALUE_SCALE) * 100;
+                      // Clamped per segment, so a stack crossing an explicit
+                      // Start/End is cut at the axis like a clustered column.
+                      const { offset: segBottom, size: segHeight } = valueSpanPercent(
+                        layout,
+                        segment.start * VALUE_SCALE,
+                        segment.end * VALUE_SCALE,
+                      );
                       const series = cartesianFixture.series[seriesIndex];
                       return (
                     <span
                       key={series.key}
                       className="column-item__fill"
                       style={{
-                        bottom: `${Math.min(startPct, stopPct)}%`,
-                        height: `${Math.abs(stopPct - startPct)}%`,
+                        bottom: `${segBottom}%`,
+                        height: `${segHeight}%`,
                         // Full category band: Power BI's stack thickness is
                         // a single-band `categoryBandScale.bandwidth()`.
                         // `stackedGapSize` displaces segments along the

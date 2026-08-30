@@ -231,6 +231,39 @@ export function valueFraction(layout: ChartLayout, value: number): number {
 }
 
 /**
+ * A rectangular mark's span along the value axis, as plot percentages,
+ * clamped so it cannot paint outside the plot.
+ *
+ * `valueFraction` is deliberately unclamped: gridlines, tick labels and
+ * reference lines all need to know where a value *would* be, including
+ * off the plot. A rectangular mark is different. Its rect is derived from
+ * two fractions, and when an explicit axis Start or End excludes part of
+ * the data one of them lands outside 0..1 -- so the mark was painted
+ * outside the plot, over the category axis below or the legend and title
+ * above. Measured with Start=30000: every column overflowing the plot by
+ * 314.5px; with End=5000: 1719.3px above it.
+ *
+ * Clamping both ends first, and only then taking the span, is what makes
+ * the mark show exactly the part of itself that is inside the range: a bar
+ * whose baseline is below an explicit Start is cut at the axis, and a bar
+ * entirely outside the range has zero extent and disappears. That is what
+ * Power BI draws, and it keeps containment in the geometry rather than
+ * relying on clipping -- which would also cut off the data labels that
+ * legitimately sit just outside the plot edge (an OutsideEnd label
+ * measures 11.6px above it).
+ */
+export function valueSpanPercent(
+  layout: ChartLayout,
+  from: number,
+  to: number,
+): { offset: number; size: number } {
+  const clamp = (fraction: number) => Math.max(0, Math.min(1, fraction));
+  const a = clamp(valueFraction(layout, from));
+  const b = clamp(valueFraction(layout, to));
+  return { offset: Math.min(a, b) * 100, size: Math.abs(a - b) * 100 };
+}
+
+/**
  * The centre of a category's slot, in the layout's own coordinate space.
  *
  * A line chart plots one point per category rather than filling the slot,
