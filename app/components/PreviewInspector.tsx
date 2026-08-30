@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
 import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
 import type { InteractionState } from "../lib/properties";
-import { StateSelector } from "./PropertyEditor";
+import { CHROME_ID_PREFIX, StateSelector } from "./PropertyEditor";
 import type { VisualKind } from "./visualCatalog";
 
 /**
@@ -70,6 +70,8 @@ type PreviewInspectorProps = {
   /** Owned by ThemeStudio (T5). The selector reports changes back up. */
   previewInteractionState: InteractionState;
   onPreviewInteractionStateChange: (state: InteractionState) => void;
+  /** The formatting group open in the property panel, or null for the list. */
+  openGroupId: string | null;
 };
 
 /** The three visuals whose styling genuinely varies per interaction state. */
@@ -89,8 +91,40 @@ export function isStatefulPreviewVisual(selected: VisualKind): boolean {
  * component gallery is partly that supporting content has to earn its
  * place, and a permanent empty card would be the first step the other way.
  */
-export function hasInspectorContent(selected: VisualKind, chrome: ResolvedChromeStyle): boolean {
-  return isStatefulPreviewVisual(selected) || chrome.visualTooltip.show || chrome.visualHeader.show;
+const VISUAL_HEADER_GROUP = `${CHROME_ID_PREFIX}visualHeader`;
+const HEADER_TOOLTIP_GROUP = `${CHROME_ID_PREFIX}visualHeaderTooltip`;
+const DATA_TOOLTIP_GROUP = `${CHROME_ID_PREFIX}visualTooltip`;
+
+/**
+ * Which specimen, if any, the open formatting group needs.
+ *
+ * Supporting content is contextual rather than permanent: a specimen earns
+ * its place by being the thing you are currently editing. With no group
+ * open, or a group that renders honestly on the hero, there is nothing to
+ * support and the whole region goes away.
+ *
+ * Interaction states are keyed to the visual's own groups rather than a
+ * property name, because every one of a button's groups is state-varying.
+ */
+function inspectorSpecimen(
+  selected: VisualKind,
+  chrome: ResolvedChromeStyle,
+  openGroupId: string | null,
+): "visualHeader" | "headerTooltip" | "dataTooltip" | "interactionState" | null {
+  if (!openGroupId) return null;
+  if (openGroupId === VISUAL_HEADER_GROUP && chrome.visualHeader.show) return "visualHeader";
+  if (openGroupId === HEADER_TOOLTIP_GROUP && chrome.visualHeader.show) return "headerTooltip";
+  if (openGroupId === DATA_TOOLTIP_GROUP && chrome.visualTooltip.show) return "dataTooltip";
+  if (isStatefulPreviewVisual(selected) && openGroupId.startsWith(`${selected}:`)) return "interactionState";
+  return null;
+}
+
+export function hasInspectorContent(
+  selected: VisualKind,
+  chrome: ResolvedChromeStyle,
+  openGroupId: string | null,
+): boolean {
+  return inspectorSpecimen(selected, chrome, openGroupId) !== null;
 }
 
 export function PreviewInspector({
@@ -99,26 +133,21 @@ export function PreviewInspector({
   chrome,
   previewInteractionState,
   onPreviewInteractionStateChange,
+  openGroupId,
 }: PreviewInspectorProps): ReactNode {
-  // The specimen is revealed on demand rather than always, exactly as the
-  // trigger below the hero did before. Local to the inspector because it is
-  // Studio view state, not theme state — the T5 invariant is about
-  // interaction state and style resolution, which stay in ThemeStudio.
-  const [showTooltipPreview, setShowTooltipPreview] = useState(false);
-
-  const isStateful = isStatefulPreviewVisual(selected);
+  const specimen = inspectorSpecimen(selected, chrome, openGroupId);
   const tooltip = chrome.visualTooltip;
   const headerTooltip = chrome.visualHeaderTooltip;
   const enabledHeaderIcons = HEADER_ICONS.filter(([key]) => chrome.visualHeader[key]);
   const tooltipIsReportPage = String(tooltip.type) === "Canvas";
 
-  if (!hasInspectorContent(selected, chrome)) return null;
+  if (!specimen) return null;
 
   return (
     <aside className="preview-inspector" aria-label={`${label} preview inspector`}>
       <span className="preview-inspector__eyebrow">Inspector — {label}</span>
 
-      {isStateful && (
+      {specimen === "interactionState" && (
         <section className="preview-inspector__group">
           <h3 className="preview-inspector__heading">Interaction state</h3>
           <p className="preview-inspector__note">
@@ -130,7 +159,7 @@ export function PreviewInspector({
         </section>
       )}
 
-      {chrome.visualHeader.show && (
+      {specimen === "visualHeader" && (
         <section className="preview-inspector__group">
           <h3 className="preview-inspector__heading">Visual header</h3>
           <p className="preview-inspector__note">
@@ -157,7 +186,7 @@ export function PreviewInspector({
         </section>
       )}
 
-      {chrome.visualHeader.show && chrome.visualHeader.showTooltipButton && (
+      {specimen === "headerTooltip" && (
         <section className="preview-inspector__group">
           <h3 className="preview-inspector__heading">Header tooltip</h3>
           <p className="preview-inspector__note">
@@ -182,22 +211,13 @@ export function PreviewInspector({
         </section>
       )}
 
-      {tooltip.show && (
+      {specimen === "dataTooltip" && (
         <section className="preview-inspector__group">
           <h3 className="preview-inspector__heading">Data tooltip</h3>
           <p className="preview-inspector__note">
             Only visible on hover in a real report, so it is shown here as a static example.
           </p>
-          <button
-            type="button"
-            className="tooltip-preview-trigger"
-            onClick={() => setShowTooltipPreview((value) => !value)}
-            aria-expanded={showTooltipPreview}
-          >
-            {showTooltipPreview ? "Hide" : "Show"} tooltip preview
-          </button>
-          {showTooltipPreview && (
-            <span
+          <span
               className="preview-tooltip"
               style={{
                 backgroundColor: hexWithAlpha(tooltip.themedBackground || tooltip.background, tooltip.transparency),
@@ -253,7 +273,6 @@ export function PreviewInspector({
                 </>
               )}
             </span>
-          )}
         </section>
       )}
     </aside>

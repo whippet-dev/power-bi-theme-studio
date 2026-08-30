@@ -64,6 +64,12 @@ type PropertyValue = string | number | boolean;
 type Tab = "theme" | "visual" | "global";
 
 type PropertyEditorProps = {
+  /**
+   * Reports which formatting group is open, so the preview's supporting
+   * region can show only the specimen that group needs. The editor keeps
+   * owning the state -- this just mirrors it upward.
+   */
+  onOpenGroupChange?: (groupId: string | null) => void;
   theme: PowerBITheme;
   resolved: ResolvedTheme;
   tableStyle: ResolvedTableStyle;
@@ -733,7 +739,7 @@ const THEME_IDENTITY_ID = "identity";
 const SHARED_COLOURS_ID = "sharedColours";
 const DATA_PALETTE_ID = "dataPalette";
 const TYPOGRAPHY_ID = "typography";
-const CHROME_ID_PREFIX = "chrome:";
+export const CHROME_ID_PREFIX = "chrome:";
 const TABLE_ID_PREFIX = "table:";
 const BAR_CHART_ID_PREFIX = "bar:";
 const COLUMN_CHART_ID_PREFIX = "column:";
@@ -780,13 +786,21 @@ export function PropertyEditor({
   selected,
   onChange,
   onReset,
+  onOpenGroupChange,
 }: PropertyEditorProps) {
   const [tab, setTab] = useState<Tab>("visual");
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const scrollContainer = useRef<HTMLDivElement>(null);
-  // Which interaction state is being edited, for the visuals whose groups
+  // Which interaction state is being EDITED, for the visuals whose groups
   // are keyed by `$id` (buttons and navigators). Not theme data — it
   // selects which array entry the controls read and write.
+  //
+  // Deliberately distinct from ThemeStudio's `previewInteractionState`,
+  // which selects the state the hero RENDERS. Editing `hover` while the
+  // preview shows `default` is legitimate: the panel edits one entry at a
+  // time, the preview shows one state at a time, and they answer different
+  // questions. Merging them would make picking a state to edit silently
+  // restyle the hero.
   const [interactionState, setInteractionState] = useState<InteractionState>("default");
 
   // A group open in one tab/visual rarely makes sense after switching to
@@ -798,6 +812,12 @@ export function PropertyEditor({
     setTrackedContext({ tab, selected });
     setOpenGroupId(null);
   }
+
+  // One place to report the open group upward: the two reset paths and the
+  // list's onOpen all land here, so no call site can forget.
+  useEffect(() => {
+    onOpenGroupChange?.(openGroupId);
+  }, [openGroupId, onOpenGroupChange]);
 
   useEffect(() => {
     if (!openGroupId) return;
