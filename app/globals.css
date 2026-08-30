@@ -41,11 +41,18 @@ button { color: inherit; }
 .studio-shell { min-height: 100vh; }
 
 .build-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 10px 22px;
-  text-align: right;
   color: #b3adbb;
-  font-family: Consolas, monospace;
   font-size: 10px;
+}
+
+/* The build hash stays monospaced; the attribution reads as prose. */
+.build-footer span:last-child {
+  font-family: Consolas, monospace;
 }
 
 .topbar {
@@ -80,27 +87,13 @@ button { color: inherit; }
   font-size: 13px;
 }
 
+/* The swatch-stack mark. The SVG carries its own fills so the same three
+   tones can be reused verbatim in public/favicon.svg. */
 .brand__mark {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px;
-  border-radius: 7px;
-  background: var(--yellow);
+  width: 28px;
+  height: 28px;
+  flex: none;
 }
-
-.brand__mark span {
-  width: 4px;
-  border-radius: 2px 2px 0 0;
-  background: #2b2533;
-}
-
-.brand__mark span:nth-child(1) { height: 8px; }
-.brand__mark span:nth-child(2) { height: 13px; }
-.brand__mark span:nth-child(3) { height: 17px; }
 
 .topbar__actions {
   display: flex;
