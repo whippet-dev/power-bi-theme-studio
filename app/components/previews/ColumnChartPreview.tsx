@@ -1,8 +1,8 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
 import {
   CategoryAxisGutter,
+  CartesianDataLabel,
   ChartLegend,
-  DataLabel,
   labelVisibleAt,
   legendIsAfterPlot,
   legendIsCentered,
@@ -154,11 +154,6 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
                       const centre = band.offset + band.size / 2;
                       return (
                         <span key={series.key}>
-                    {labelVisibleAt(index, barCategories.length, columnChartStyle.labels.labelDensity) && (
-                      <span className="column-item__value" style={{ bottom: `${topPct}%`, left: `${centre}%` }}>
-                        <DataLabel labels={columnChartStyle.labels} category={series.label} value={value * VALUE_SCALE} detail={value * 12} />
-                      </span>
-                    )}
                     <span
                       className="column-item__fill"
                       style={{
@@ -194,6 +189,32 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
                   </span>
                 );
               })}
+              <span className="chart-data-label-layer">
+                {barCategories.flatMap((label, index) => {
+                  if (!labelVisibleAt(index, barCategories.length, columnChartStyle.labels.labelDensity)) return [];
+                  const { offset: categoryOffset } = categoryPercent(layout, index, barCategories.length);
+                  const categoryWidth = categoryWidthPercent(layout, barCategories.length);
+                  return cartesianFixture.series.map((series, seriesIndex) => {
+                    const band = seriesBands[seriesIndex];
+                    const value = series.values[index] ?? 0;
+                    const endPercent = valueFraction(layout, value * VALUE_SCALE) * 100;
+                    return (
+                      <CartesianDataLabel
+                        key={`${label}-${series.key}`}
+                        labels={columnChartStyle.labels}
+                        category={series.label}
+                        value={value * VALUE_SCALE}
+                        detail={value * 12}
+                        orientation="vertical"
+                        startPercent={zeroPct}
+                        endPercent={endPercent}
+                        crossPercent={categoryOffset + categoryWidth * (band.offset + band.size / 2) / 100}
+                        series={series.label}
+                      />
+                    );
+                  });
+                })}
+              </span>
             </span>
 
             <CategoryAxisGutter

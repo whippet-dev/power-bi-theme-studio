@@ -1193,12 +1193,32 @@ button { color: inherit; }
   align-items: baseline;
   gap: 4px;
   line-height: 1.25;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-label--stacked {
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
+}
+
+/* Only data labels are clipped by this plot-sized layer. Line paths and
+   markers keep their existing overflow behaviour, while label text cannot
+   escape into axis gutters or authored chrome. */
+.chart-data-label-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.chart-data-label-anchor {
+  position: absolute;
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .bar-item__value--inside {

@@ -4,8 +4,8 @@ import { themeFontSizeToCssPx } from "../../lib/fontUnits";
 import {
   CategoryAxisGutter,
   CategoryGridlines,
+  CartesianDataLabel,
   ChartLegend,
-  DataLabel,
   formatValue,
   labelVisibleAt,
   legendIsAfterPlot,
@@ -675,24 +675,31 @@ export function LineChartPreview({ lineChartStyle, palette, titleChrome, subtitl
                   }}
                 />
               )}
-              {/* One label per point, thinned by label density like Power BI.
-                  Anchored to the same point geometry as the path and markers. */}
-              {linePointValues.map((_, index) =>
-                labelVisibleAt(index, pointCount, lineChartStyle.labels.labelDensity) ? (
-                  <span
-                    key={index}
-                    className="line-preview__label"
-                    style={{ left: `${pointPercent(index).left}%`, top: `${pointPercent(index).top}%` }}
-                  >
-                    <DataLabel
-                      labels={lineChartStyle.labels}
-                      category={lineCategoryLabels[index] ?? ""}
-                      value={linePointValues[index] * 1000}
-                      detail={linePointValues[index] * 8}
-                    />
-                  </span>
-                ) : null,
-              )}
+              {/* Labels use every rendered series and the exact same point
+                  coordinates as its path and markers. The plot-sized layer
+                  contains text without changing SVG/marker overflow. */}
+              <span className="chart-data-label-layer">
+                {lineFixture.series.flatMap((series, seriesIndex) =>
+                  series.values.map((value, index) => {
+                    if (!labelVisibleAt(index, pointCount, lineChartStyle.labels.labelDensity)) return null;
+                    const point = seriesPercents[seriesIndex][index];
+                    return (
+                      <CartesianDataLabel
+                        key={`${series.key}-${index}`}
+                        labels={lineChartStyle.labels}
+                        category={series.label}
+                        value={value * VALUE_SCALE}
+                        detail={value * 8}
+                        orientation="point"
+                        startPercent={point.top}
+                        endPercent={point.top}
+                        crossPercent={point.left}
+                        series={series.label}
+                      />
+                    );
+                  }),
+                )}
+              </span>
             </span>
             {/* Labels sit on the same category slots the points are centred in,
                 so inverting the category axis moves both together. */}

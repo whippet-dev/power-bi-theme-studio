@@ -1,9 +1,11 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
 import {
   CategoryAxisGutter,
+  CartesianDataLabel,
   ChartLegend,
   dataLabelStyle,
   formatValue,
+  labelVisibleAt,
   legendIsAfterPlot,
   legendIsCentered,
   legendIsVertical,
@@ -183,6 +185,30 @@ export function StackedColumnChartPreview({ stackedColumnChartStyle, palette, ti
                   </span>
                 );
               })}
+              <span className="chart-data-label-layer">
+                {barCategories.flatMap((label, index) => {
+                  if (!labelVisibleAt(index, barCategories.length, stackedColumnChartStyle.labels.labelDensity)) return [];
+                  const { offset: categoryOffset } = categoryPercent(layout, index, barCategories.length);
+                  const categoryWidth = categoryWidthPercent(layout, barCategories.length);
+                  return stackSegments(categoryValues(cartesianFixture, index)).map((segment, seriesIndex) => {
+                    const series = cartesianFixture.series[seriesIndex];
+                    return (
+                      <CartesianDataLabel
+                        key={`${label}-${series.key}`}
+                        labels={stackedColumnChartStyle.labels}
+                        category={series.label}
+                        value={segment.value * VALUE_SCALE}
+                        detail={segment.value * 12}
+                        orientation="vertical"
+                        startPercent={valueFraction(layout, segment.start * VALUE_SCALE) * 100}
+                        endPercent={valueFraction(layout, segment.end * VALUE_SCALE) * 100}
+                        crossPercent={categoryOffset + categoryWidth / 2}
+                        series={series.label}
+                      />
+                    );
+                  });
+                })}
+              </span>
             </span>
 
             <CategoryAxisGutter
