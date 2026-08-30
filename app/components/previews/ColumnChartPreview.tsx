@@ -1,4 +1,5 @@
 import { hexWithAlpha } from "../../lib/colorUtils";
+import { fractionIsOnPlot } from "../../lib/constantLine";
 import {
   CategoryAxisGutter,
   CartesianDataLabel,
@@ -79,6 +80,9 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
   // column and the error indicator measure from this, so the baseline is
   // the zero gridline by construction rather than by coincidence.
   const zeroPct = valueFraction(layout, 0) * 100;
+  // The reference line's own position, and whether it is visible at all.
+  const referenceLineFraction = valueFraction(layout, columnChartStyle.referenceLine.value);
+  const referenceLineOnPlot = fractionIsOnPlot(referenceLineFraction);
 
   return (
     <PresentationScale width={COLUMN_CHART_BOX.width}><span
@@ -110,12 +114,17 @@ export function ColumnChartPreview({ columnChartStyle, palette, titleChrome, sub
                   all. It now honours the resolved value, which by default is
                   0 and therefore sits on the baseline — see the T7 report on
                   the registry's -1000..1000 range against a dataMax of 82000. */}
-              {columnChartStyle.referenceLine.show && (
+              {/* Only when the value is actually on the plot. An explicit
+                  Start/End can put a reference line off-scale, and this one
+                  is drawn by hand rather than through the shared
+                  ConstantLine component, so it did not inherit that
+                  component's on-plot guard and painted over the axis. */}
+              {columnChartStyle.referenceLine.show && referenceLineOnPlot && (
                 <span
                   className="column-preview__reference-line"
                   aria-hidden="true"
                   style={{
-                    bottom: `${valueFraction(layout, columnChartStyle.referenceLine.value) * 100}%`,
+                    bottom: `${referenceLineFraction * 100}%`,
                     borderTopWidth: columnChartStyle.referenceLine.width,
                     borderTopColor: columnChartStyle.referenceLine.lineColor,
                     borderTopStyle: mapLineStyle(columnChartStyle.referenceLine.style),

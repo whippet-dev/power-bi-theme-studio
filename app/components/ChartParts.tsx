@@ -464,16 +464,41 @@ export function CartesianDataLabel({
   series,
 }: CartesianDataLabelProps): ReactNode {
   if (!labels.show) return null;
-  const placement = cartesianDataLabelPlacement(labels.labelPosition, orientation, endPercent);
+
+  // Containment, matching the marks. An explicit axis Start/End can put a
+  // mark wholly outside the displayed range -- it then has zero extent and
+  // is invisible, but its label was still anchored from the original
+  // unclamped value and rendered far outside the plot. Measured at
+  // Start=30000: ten of twelve labels outside, up to 217.7px below it.
+  //
+  // Two cases, one rule. A mark with no part of itself in range has no
+  // label: there is nothing on screen for the label to belong to. A mark
+  // that is partly in range keeps its label, anchored to the part that is
+  // visible, so an end label follows the mark's visible end rather than a
+  // point off the plot.
+  //
+  // Deliberately a containment rule and nothing more. The span is only
+  // clamped, never re-ordered or re-placed, so InsideEnd/OutsideEnd
+  // semantics are untouched wherever the mark is normally visible -- in
+  // auto range both ends are already within 0..100 and every value here is
+  // the value it was before.
+  const spanLow = Math.min(startPercent, endPercent);
+  const spanHigh = Math.max(startPercent, endPercent);
+  if (spanHigh < -1e-9 || spanLow > 100 + 1e-9) return null;
+  const clamp = (percent: number) => Math.max(0, Math.min(100, percent));
+  const visibleStart = clamp(startPercent);
+  const visibleEnd = clamp(endPercent);
+
+  const placement = cartesianDataLabelPlacement(labels.labelPosition, orientation, visibleEnd);
   const anchorPercent = placement.anchor === "start"
-    ? startPercent
+    ? visibleStart
     : placement.anchor === "center"
-      ? (startPercent + endPercent) / 2
-      : endPercent;
+      ? (visibleStart + visibleEnd) / 2
+      : visibleEnd;
   const style: CSSProperties = orientation === "horizontal"
     ? { left: `${anchorPercent}%`, top: `${crossPercent}%`, transform: placement.transform }
     : orientation === "point"
-      ? { left: `${crossPercent}%`, top: `${endPercent}%`, transform: placement.transform }
+      ? { left: `${crossPercent}%`, top: `${visibleEnd}%`, transform: placement.transform }
       : { left: `${crossPercent}%`, bottom: `${anchorPercent}%`, transform: placement.transform };
 
   return (

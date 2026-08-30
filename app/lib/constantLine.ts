@@ -102,6 +102,25 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
  * degrades continuously as the value is dragged off-scale instead of
  * vanishing at the edge.
  */
+/**
+ * Whether a value's fraction lands on the plot at all.
+ *
+ * The rule for "this line has somewhere to be drawn", shared so every
+ * caller agrees. A small tolerance keeps a line sitting exactly on an edge
+ * on the plot — a reference line at 0 against a 0-based axis is ordinary,
+ * not a boundary case.
+ *
+ * `valueFraction` stays unclamped on purpose: furniture needs to know where
+ * a value WOULD be. This is the separate question of whether it is visible,
+ * and it is the one a renderer must ask before painting a line, because an
+ * out-of-range reference line otherwise paints over the axis below or the
+ * title above. Measured at Start=30000 with the line below it: bottom
+ * -145%, 302.8px below the plot.
+ */
+export function fractionIsOnPlot(fraction: number): boolean {
+  return Number.isFinite(fraction) && fraction >= -1e-9 && fraction <= 1 + 1e-9;
+}
+
 export function constantLineGeometry(
   line: ConstantLineStyle,
   layout: ChartLayout,
@@ -111,9 +130,7 @@ export function constantLineGeometry(
   const value = Number(line.value);
   const finite = Number.isFinite(value);
   const fraction = finite ? valueFraction(layout, value) : 0;
-  // A small tolerance so a line sitting exactly on an edge still counts as
-  // on the plot — a reference line at 0 against a 0-based axis is ordinary.
-  const onPlot = finite && fraction >= -1e-9 && fraction <= 1 + 1e-9;
+  const onPlot = finite && fractionIsOnPlot(fraction);
 
   return { fraction, onPlot, shade: constantLineShade(line, layout, valueAxis, dataMax) };
 }
