@@ -231,12 +231,16 @@ export function ThemeStudio() {
     <main className="studio-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand__mark" aria-hidden="true">
-            <span /><span /><span />
-          </span>
-          <span>
-            <strong>Power BI</strong>
-            <small>Theme Studio</small>
+          {/* A stack of theme swatches — this project's own mark. Deliberately
+              shares no geometry with any Power BI or Microsoft icon. */}
+          <svg className="brand__mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <rect x="2" y="2" width="16" height="16" rx="4" fill="#6B4DAB" />
+            <rect x="8" y="8" width="16" height="16" rx="4" fill="#9B7FE0" />
+            <rect x="14" y="14" width="16" height="16" rx="4" fill="#DED1FA" />
+          </svg>
+          <span title="Theme Studio is an unofficial community project. It is not affiliated with, endorsed by, or supported by Microsoft.">
+            <strong>Theme Studio</strong>
+            <small>for Power BI</small>
           </span>
         </div>
 
@@ -415,6 +419,9 @@ export function ThemeStudio() {
       </div>
 
       <footer className="build-footer">
+        <span>
+          An unofficial community project by Whippet Dev. Not affiliated with Microsoft.
+        </span>
         <span>build {__COMMIT_HASH__}</span>
       </footer>
     </main>

@@ -1,4 +1,9 @@
-# Power BI Theme Studio
+# Theme Studio for Power BI
+
+> **An unofficial community project.** Theme Studio is not affiliated with,
+> endorsed by, or supported by Microsoft. "Power BI" is a trademark of
+> Microsoft Corporation and is used here only to describe the theme file
+> format this tool reads and writes.
 
 A local, client-side editor for Power BI JSON theme files. Import a theme, see
 representative visuals update immediately, edit real per-visual formatting
