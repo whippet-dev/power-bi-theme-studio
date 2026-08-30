@@ -3110,6 +3110,22 @@ button { color: inherit; }
   overflow: hidden;
 }
 
+/* The band becomes a flex row for authored top/bottom legends (below), which
+   made the legend a flex item at its default `flex: 0 1 auto` -- it
+   shrink-wrapped to its content, so ChartLegend's own justify-content had no
+   free space to distribute and TopCenter, TopRight, BottomCenter and
+   BottomRight all rendered flush left, indistinguishable from the default.
+   Measured: a 555px band holding a 258.7px legend.
+
+   Letting the legend grow to the band is the whole fix; the alignment logic
+   was already correct. Side legends are excluded rather than merely inert:
+   they own their band's width through legendExtent, and this must not become
+   a second opinion about it. */
+.chart-preview__legend-band > .chart-legend:not(.chart-legend--vertical) {
+  flex-grow: 1;
+  min-width: 0;
+}
+
 /* Classic 2026 paints a horizontal legend title inline with its entries.
    The existing authored band still owns its title-line allowance, preserving
    fixed plot geometry; only the shared 4px visual-title-to-legend gap is
