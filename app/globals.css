@@ -2980,20 +2980,27 @@ button { color: inherit; }
 
 
 /* Theme Studio's supporting region for the selected visual. Deliberately
-   subordinate to the hero: no card chrome, no wallpaper, no second canvas
-   treatment — it must never read as another report page. It sits outside
-   .report-surface, and because it is a sibling rather than a child, the
-   hero's reserved bounds cannot change when it appears, disappears or
-   grows (PREVIEW_COMPOSITION_DESIGN.md G1/G2). */
+   subordinate to the hero: no wallpaper and no second canvas treatment — it
+   must never read as another report page. It sits directly below
+   .report-surface and above the thumbnail gallery, and because it is a
+   sibling rather than a child, the hero's reserved bounds cannot change
+   when it appears, disappears or grows
+   (PREVIEW_COMPOSITION_DESIGN.md G1/G2).
+
+   Aligned to the report surface's width so it reads as attached to the
+   hero rather than to the page. The dashed top edge is the seam: supporting
+   content is an aside about the visual above it, not part of it. */
 .preview-inspector {
   max-width: 1100px;
-  margin: 18px auto 0;
+  margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px 28px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  padding: 14px 18px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: #fbfafc;
 }
 
 .preview-inspector__eyebrow {
