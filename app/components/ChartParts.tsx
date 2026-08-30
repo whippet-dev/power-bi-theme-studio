@@ -336,6 +336,9 @@ export function DataLabel({
 
   const stacked = !/inline|horizontal/i.test(String(labels.labelContentLayout));
   const vertical = /vertical|rotate/i.test(String(labels.labelOrientation));
+  const alignment = /left|right|center/i.test(String(labels.horizontalAlignment ?? ""))
+    ? String(labels.horizontalAlignment).toLowerCase()
+    : "left";
 
   return (
     <span
@@ -347,30 +350,140 @@ export function DataLabel({
           : undefined,
         padding: labels.enableBackground ? "1px 4px" : undefined,
         borderRadius: labels.enableBackground ? 3 : undefined,
-        maxWidth: labels.labelContainerMaxWidth || undefined,
+        // The registry exposes Power BI's `labelContainerMaxWidth`, but the
+        // repository contains no evidence for its unit or for what the
+        // generated fallback `1` means. Passing it straight to CSS as
+        // `max-width: 1px` made every enabled label a clipped sliver.
+        // Preserve the resolved literal for editing/export, but leave it
+        // unapplied until a native conversion is established.
         // "Overflow text" lets a label spill past its own container
         // instead of being clipped when it doesn't fit.
         overflow: labels.labelOverflow ? "visible" : "hidden",
         textOverflow: labels.labelOverflow ? "clip" : "ellipsis",
-        opacity: 1 - (labels.transparency ?? 0) / 100,
-        textAlign: /left|right|center/i.test(String(labels.horizontalAlignment ?? ""))
-          ? (String(labels.horizontalAlignment).toLowerCase() as CSSProperties["textAlign"])
+        textAlign: alignment as CSSProperties["textAlign"],
+        alignItems: stacked
+          ? alignment === "center"
+            ? "center"
+            : alignment === "right"
+              ? "flex-end"
+              : "flex-start"
           : undefined,
         whiteSpace: labels.wordWrap ? "normal" : "nowrap",
         writingMode: vertical ? "vertical-rl" : undefined,
       }}
     >
       {showTitle && (
-        <span style={labelPartStyle({ ...labels, color: labels.titleColor, fontFamily: labels.titleFontFamily, fontSize: labels.titleFontSize, bold: labels.titleBold, italic: labels.titleItalic, underline: labels.titleUnderline, transparency: labels.titleTransparency })}>
+        <span className="chart-label__title" style={labelPartStyle({ ...labels, color: labels.titleColor, fontFamily: labels.titleFontFamily, fontSize: labels.titleFontSize, bold: labels.titleBold, italic: labels.titleItalic, underline: labels.titleUnderline, transparency: labels.titleTransparency })}>
           {category}
         </span>
       )}
-      {showValue && <span>{formatValue(value, labels.labelDisplayUnits, labels.labelPrecision)}</span>}
+      {showValue && <span className="chart-label__value">{formatValue(value, labels.labelDisplayUnits, labels.labelPrecision)}</span>}
       {showDetail && (
-        <span style={labelPartStyle({ ...labels, color: labels.detailColor, fontFamily: labels.detailFontFamily, fontSize: labels.detailFontSize, bold: labels.detailBold, italic: labels.detailItalic, underline: labels.detailUnderline, transparency: labels.detailTransparency })}>
+        <span className="chart-label__detail" style={labelPartStyle({ ...labels, color: labels.detailColor, fontFamily: labels.detailFontFamily, fontSize: labels.detailFontSize, bold: labels.detailBold, italic: labels.detailItalic, underline: labels.detailUnderline, transparency: labels.detailTransparency })}>
           {formatValue(detail as number, labels.detailLabelDisplayUnits, labels.detailLabelPrecision)}
         </span>
       )}
+    </span>
+  );
+}
+
+export type CartesianDataLabelOrientation = "vertical" | "horizontal" | "point";
+
+type CartesianDataLabelPlacement = {
+  anchor: "start" | "center" | "end";
+  transform: string;
+  placement: "outside" | "inside-end" | "inside-center" | "inside-base" | "under";
+};
+
+/** Shared basic placement without collision or automatic fallback guesses. */
+export function cartesianDataLabelPlacement(
+  position: string | number,
+  orientation: CartesianDataLabelOrientation,
+  endPercent?: number,
+): CartesianDataLabelPlacement {
+  let value = String(position).toLowerCase();
+  // `Auto` is a fit decision, not a fixed synonym for OutsideEnd. This is
+  // intentionally a conservative preview rule rather than a claim about
+  // Power BI's collision engine: flip only at the far value edge, where an
+  // outside label would otherwise be clipped by the plot boundary.
+  if (value === "auto" && endPercent !== undefined) {
+    if (orientation === "point") value = endPercent < 15 ? "under" : "above";
+    else value = endPercent > 85 ? "insideend" : "outsideend";
+  }
+  const insideCenter = value.includes("center");
+  const insideBase = value.includes("base");
+  const insideEnd = value.includes("inside") && !insideCenter && !insideBase;
+  const under = value === "under" || value === "below";
+  const anchor = insideBase ? "start" : insideCenter ? "center" : "end";
+
+  if (orientation === "horizontal") {
+    if (insideCenter) return { anchor, placement: "inside-center", transform: "translate(-50%, -50%)" };
+    if (insideBase) return { anchor, placement: "inside-base", transform: "translate(4px, -50%)" };
+    if (insideEnd) return { anchor, placement: "inside-end", transform: "translate(calc(-100% - 4px), -50%)" };
+    if (under) return { anchor, placement: "under", transform: "translate(4px, 4px)" };
+    return { anchor, placement: "outside", transform: "translate(4px, -50%)" };
+  }
+
+  if (orientation === "point") {
+    if (insideCenter) return { anchor, placement: "inside-center", transform: "translate(-50%, -50%)" };
+    if (under || insideEnd) return { anchor, placement: under ? "under" : "inside-end", transform: "translate(-50%, 4px)" };
+    return { anchor, placement: insideBase ? "inside-base" : "outside", transform: "translate(-50%, calc(-100% - 2px))" };
+  }
+
+  if (insideCenter) return { anchor, placement: "inside-center", transform: "translate(-50%, 50%)" };
+  if (insideBase) return { anchor, placement: "inside-base", transform: "translate(-50%, 0)" };
+  if (insideEnd || under) return { anchor, placement: insideEnd ? "inside-end" : "under", transform: "translate(-50%, calc(100% + 2px))" };
+  return { anchor, placement: "outside", transform: "translate(-50%, -2px)" };
+}
+
+type CartesianDataLabelProps = {
+  labels: DataLabelStyle;
+  category: string;
+  value: number;
+  detail?: number;
+  orientation: CartesianDataLabelOrientation;
+  /** Percentage measured from the value-axis origin (bottom/left). */
+  startPercent: number;
+  /** Percentage measured from the value-axis origin, or CSS top for points. */
+  endPercent: number;
+  /** Percentage along the category axis (left for vertical/point, top for horizontal). */
+  crossPercent: number;
+  series?: string;
+};
+
+/** A contained, plot-local label anchor shared by every cartesian family. */
+export function CartesianDataLabel({
+  labels,
+  category,
+  value,
+  detail,
+  orientation,
+  startPercent,
+  endPercent,
+  crossPercent,
+  series,
+}: CartesianDataLabelProps): ReactNode {
+  if (!labels.show) return null;
+  const placement = cartesianDataLabelPlacement(labels.labelPosition, orientation, endPercent);
+  const anchorPercent = placement.anchor === "start"
+    ? startPercent
+    : placement.anchor === "center"
+      ? (startPercent + endPercent) / 2
+      : endPercent;
+  const style: CSSProperties = orientation === "horizontal"
+    ? { left: `${anchorPercent}%`, top: `${crossPercent}%`, transform: placement.transform }
+    : orientation === "point"
+      ? { left: `${crossPercent}%`, top: `${endPercent}%`, transform: placement.transform }
+      : { left: `${crossPercent}%`, bottom: `${anchorPercent}%`, transform: placement.transform };
+
+  return (
+    <span
+      className={`chart-data-label-anchor chart-data-label-anchor--${orientation}`}
+      data-label-placement={placement.placement}
+      data-label-series={series}
+      style={style}
+    >
+      <DataLabel labels={labels} category={category} value={value} detail={detail} />
     </span>
   );
 }
