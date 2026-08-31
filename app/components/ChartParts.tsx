@@ -93,6 +93,53 @@ export function mapLineStyle(value: string | number): "solid" | "dashed" | "dott
   return "solid";
 }
 
+/**
+ * Horizontal placement for a flex box whose content is a bare text node.
+ *
+ * `text-align` cannot position an anonymous flex item -- the text inside a
+ * `display: flex` box with no element child of its own. Only
+ * `justify-content` can, along the box's main axis. Every one of these
+ * boxes is a default row, so main is horizontal.
+ *
+ * Emit this ALONGSIDE `mapTextAlign` rather than instead of it: this places
+ * the text block, and `text-align` still aligns the lines within it once the
+ * text wraps to more than one line.
+ */
+export function mapJustifyContent(value: string | number): "flex-start" | "center" | "flex-end" | undefined {
+  switch (String(value).toLowerCase()) {
+    case "left":
+      return "flex-start";
+    case "center":
+      return "center";
+    case "right":
+      return "flex-end";
+    default:
+      return undefined; // "Auto" -- leave the container's own default alone.
+  }
+}
+
+/**
+ * Vertical placement for the same box: the cross axis of a row flex
+ * container, which is `align-items`.
+ *
+ * A box only has somewhere to put its text if it is taller than one line,
+ * so a caller wiring this up has to give the box height as well -- see
+ * `.shape-tile__text`.
+ */
+export function mapAlignItems(value: string | number): "flex-start" | "center" | "flex-end" | undefined {
+  switch (String(value).toLowerCase()) {
+    case "top":
+      return "flex-start";
+    case "middle":
+    case "center":
+      return "center";
+    case "bottom":
+      return "flex-end";
+    default:
+      return undefined;
+  }
+}
+
 export function mapTextAlign(value: string | number): CSSProperties["textAlign"] | undefined {
   const normalized = String(value).toLowerCase();
   if (normalized === "left" || normalized === "center" || normalized === "right") {
