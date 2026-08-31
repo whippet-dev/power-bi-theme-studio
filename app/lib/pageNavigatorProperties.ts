@@ -9,7 +9,7 @@ import {
   resolvePropertyValue,
   } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
-import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
+import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore, type ShapeFamilyDefaults } from "./shapeFamilyProperties";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -154,6 +154,33 @@ export type ResolvedPageNavigatorStyle = ResolvedShapeFamilyCore & {
 };
 
 /** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
+
+/**
+ * Measured natively on a Page Navigator under the current default base theme:
+ * text ON, Segoe UI 10, bold, left-aligned and vertically middle, no padding;
+ * fill on; border on at 1px and full opacity; no shadow, no glow.
+ *
+ * The pressed and selected states differ from the default only by colour, so
+ * nothing per-state is encoded -- see ShapeFamilyDefaults.perState.
+ */
+const PAGE_NAVIGATOR_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
+  fill: { show: true },
+  outline: { show: true, weight: 1, transparency: 0 },
+  shadow: { show: false },
+  glow: { show: false },
+  text: {
+    show: true,
+    fontSize: 10,
+    bold: true,
+    horizontalAlignment: "left",
+    verticalAlignment: "middle",
+    topMargin: 0,
+    bottomMargin: 0,
+    leftMargin: 0,
+    rightMargin: 0,
+  },
+};
+
 export function resolvePageNavigatorStyle(
   theme: ThemeSource,
   base: ResolvedTheme,
@@ -164,7 +191,7 @@ export function resolvePageNavigatorStyle(
   const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
     accentBarStateful ? forStateId(definition, state) : definition;
   return {
-    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
+    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state, PAGE_NAVIGATOR_CAPABILITY_DEFAULTS),
     accentBar: {
       show: resolvePropertyValue(theme, at(p.accentBar.show), false),
       color: resolvePropertyValue(theme, at(p.accentBar.color), base.tableAccent),
@@ -175,14 +202,15 @@ export function resolvePageNavigatorStyle(
     pages: {
       showPage: resolvePropertyValue(theme, p.pages.showPage, true),
       showByDefault: resolvePropertyValue(theme, p.pages.showByDefault, true),
-      showHiddenPages: resolvePropertyValue(theme, p.pages.showHiddenPages, false),
+      // Measured: hidden pages ARE shown by default; tooltip pages are not.
+      showHiddenPages: resolvePropertyValue(theme, p.pages.showHiddenPages, true),
       showTooltipPages: resolvePropertyValue(theme, p.pages.showTooltipPages, false),
     },
     layout: {
       orientation: resolvePropertyValue(theme, p.layout.orientation, 2),
       columnCount: resolvePropertyValue(theme, p.layout.columnCount, 1),
       rowCount: resolvePropertyValue(theme, p.layout.rowCount, 1),
-      cellPadding: resolvePropertyValue(theme, p.layout.cellPadding, 4),
+      cellPadding: resolvePropertyValue(theme, p.layout.cellPadding, 5),
     },
   };
 }

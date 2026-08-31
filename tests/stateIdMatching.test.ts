@@ -102,8 +102,11 @@ test("resolving one state never inherits a sibling property from a different $id
   // `show` is set only on base's *default* entry. Asking for "selected"
   // must not pick it up — that is the precise cross-contamination this
   // whole test file exists to prevent.
+  // The Action Button's capability default for fill.show is false, so the
+  // base entry sets TRUE here: the two must differ, or this test could not
+  // tell a correct fallback apart from a leak across $ids.
   const base = buttonFill([
-    { $id: "default", fillColor: colorOf("#B0B0B0"), show: false },
+    { $id: "default", fillColor: colorOf("#B0B0B0"), show: true },
     { $id: "selected", fillColor: colorOf("#D0D0D0") },
   ]);
   const custom = buttonFill([{ $id: "selected", fillColor: colorOf("#FF00FF") }]);
@@ -111,9 +114,13 @@ test("resolving one state never inherits a sibling property from a different $id
 
   const selected = resolveActionButtonStyle(source, RESOLVED, "selected");
   assert.equal(selected.fill.fillColor, "#FF00FF");
-  assert.equal(selected.fill.show, true, "must fall back to the coded default, NOT base default's show:false");
+  assert.equal(
+    selected.fill.show,
+    false,
+    "must fall back to the Action Button's capability default, NOT base default's show:true",
+  );
 
-  assert.equal(resolveActionButtonStyle(source, RESOLVED, "default").fill.show, false, "default keeps its own show");
+  assert.equal(resolveActionButtonStyle(source, RESOLVED, "default").fill.show, true, "default keeps its own show");
 });
 
 test("an untagged entry carries group-wide settings and stands in for any state", () => {

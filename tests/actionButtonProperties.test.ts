@@ -27,9 +27,17 @@ test("resolveActionButtonStyle falls back to sensible defaults when there is no 
   const base = resolveTheme(STARTER_THEME);
   const style = resolveActionButtonStyle(STARTER_THEME, base);
 
-  assert.equal(style.fill.show, true);
+  // Native capability defaults for an Action Button: fill OFF, border on
+  // at 3px, text off, icon on and Blank with Custom placement.
+  assert.equal(style.fill.show, false);
+  assert.equal(style.outline.show, true);
+  assert.equal(style.outline.weight, 3);
+  assert.equal(style.text.show, false);
   assert.equal(style.icon.show, true);
   assert.equal(style.icon.shapeType, "blank");
+  assert.equal(style.icon.placement, "custom");
+  assert.equal(style.icon.lineWeight, 3);
+  assert.equal(style.icon.topMargin, 4);
 });
 
 test("resolveActionButtonStyle prefers a visualStyles.actionButton override over defaults", () => {

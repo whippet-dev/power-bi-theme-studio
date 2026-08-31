@@ -10,7 +10,7 @@ import {
     textProp,
 } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
-import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
+import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore, type ShapeFamilyDefaults } from "./shapeFamilyProperties";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -149,6 +149,23 @@ export type ResolvedBookmarkNavigatorStyle = ResolvedShapeFamilyCore & {
 };
 
 /** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
+
+/**
+ * Measured natively on a Bookmark Navigator under the current default base
+ * theme: text ON, Segoe UI 10, bold; border on at 1px; no shadow, no glow.
+ *
+ * Text alignment was not established for this visual, so it is deliberately
+ * absent and keeps the resolver's generic value rather than borrowing the
+ * Page Navigator's measured left alignment. Selected differs by colour only.
+ */
+const BOOKMARK_NAVIGATOR_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
+  fill: { show: true },
+  outline: { show: true, weight: 1 },
+  shadow: { show: false },
+  glow: { show: false },
+  text: { show: true, fontSize: 10, bold: true },
+};
+
 export function resolveBookmarkNavigatorStyle(
   theme: ThemeSource,
   base: ResolvedTheme,
@@ -159,7 +176,7 @@ export function resolveBookmarkNavigatorStyle(
   const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
     accentBarStateful ? forStateId(definition, state) : definition;
   return {
-    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
+    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state, BOOKMARK_NAVIGATOR_CAPABILITY_DEFAULTS),
     accentBar: {
       show: resolvePropertyValue(theme, at(p.accentBar.show), false),
       color: resolvePropertyValue(theme, at(p.accentBar.color), base.tableAccent),
@@ -176,7 +193,7 @@ export function resolveBookmarkNavigatorStyle(
       orientation: resolvePropertyValue(theme, p.layout.orientation, 2),
       columnCount: resolvePropertyValue(theme, p.layout.columnCount, 1),
       rowCount: resolvePropertyValue(theme, p.layout.rowCount, 1),
-      cellPadding: resolvePropertyValue(theme, p.layout.cellPadding, 4),
+      cellPadding: resolvePropertyValue(theme, p.layout.cellPadding, 5),
     },
   };
 }

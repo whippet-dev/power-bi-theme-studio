@@ -9,7 +9,7 @@ import {
   resolvePropertyValue,
   } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
-import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore } from "./shapeFamilyProperties";
+import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore, type ShapeFamilyDefaults } from "./shapeFamilyProperties";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -199,6 +199,22 @@ export type ResolvedActionButtonStyle = ResolvedShapeFamilyCore & {
  * (STATEFUL_GROUPS.actionButton includes it), unlike the other shape-family
  * visuals.
  */
+
+/**
+ * Measured natively on an Action Button under the current default base theme,
+ * across Default / On hover / On press: fill OFF, border ON at 3px and full
+ * opacity, text off with Segoe UI 10 latent, no shadow, no glow.
+ *
+ * Disabled differs only in colour treatment, which is not encoded here.
+ */
+const ACTION_BUTTON_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
+  fill: { show: false },
+  outline: { show: true, weight: 3, transparency: 0 },
+  shadow: { show: false },
+  glow: { show: false },
+  text: { show: false, fontSize: 10 },
+};
+
 export function resolveActionButtonStyle(
   theme: ThemeSource,
   base: ResolvedTheme,
@@ -209,21 +225,22 @@ export function resolveActionButtonStyle(
   const at = <T extends PropertyValueType>(definition: PropertyDefinition<T>): PropertyLookup<T> =>
     iconStateful ? forStateId(definition, state) : definition;
   return {
-    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state),
+    ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state, ACTION_BUTTON_CAPABILITY_DEFAULTS),
     icon: {
       show: resolvePropertyValue(theme, at(p.icon.show), true),
       shapeType: resolvePropertyValue(theme, at(p.icon.shapeType), "blank"),
-      placement: resolvePropertyValue(theme, at(p.icon.placement), "left"),
+      // Measured: Custom placement, 3px line weight, 4px padding all round.
+      placement: resolvePropertyValue(theme, at(p.icon.placement), "custom"),
       iconSize: resolvePropertyValue(theme, at(p.icon.iconSize), 20),
       lineColor: resolvePropertyValue(theme, at(p.icon.lineColor), base.foreground),
-      lineWeight: resolvePropertyValue(theme, at(p.icon.lineWeight), 2),
+      lineWeight: resolvePropertyValue(theme, at(p.icon.lineWeight), 3),
       lineTransparency: resolvePropertyValue(theme, at(p.icon.lineTransparency), 0),
       horizontalAlignment: resolvePropertyValue(theme, at(p.icon.horizontalAlignment), "center"),
       verticalAlignment: resolvePropertyValue(theme, at(p.icon.verticalAlignment), "middle"),
-      topMargin: resolvePropertyValue(theme, at(p.icon.topMargin), 0),
-      bottomMargin: resolvePropertyValue(theme, at(p.icon.bottomMargin), 0),
-      leftMargin: resolvePropertyValue(theme, at(p.icon.leftMargin), 0),
-      rightMargin: resolvePropertyValue(theme, at(p.icon.rightMargin), 0),
+      topMargin: resolvePropertyValue(theme, at(p.icon.topMargin), 4),
+      bottomMargin: resolvePropertyValue(theme, at(p.icon.bottomMargin), 4),
+      leftMargin: resolvePropertyValue(theme, at(p.icon.leftMargin), 4),
+      rightMargin: resolvePropertyValue(theme, at(p.icon.rightMargin), 4),
     },
   };
 }
