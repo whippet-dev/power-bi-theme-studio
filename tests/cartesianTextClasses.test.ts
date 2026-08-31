@@ -8,6 +8,7 @@ import { resolveLineChartStyle } from "../app/lib/lineChartProperties";
 import { themeLayers } from "../app/lib/properties";
 import { resolveStackedBarChartStyle } from "../app/lib/stackedBarChartProperties";
 import { resolveStackedColumnChartStyle } from "../app/lib/stackedColumnChartProperties";
+import { NATIVE_CHROME_FONT_SIZE } from "../app/lib/textClasses";
 import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 /**
@@ -100,16 +101,18 @@ for (const entry of CARTESIAN) {
       assert.notEqual(family, "", `${label} still falls back to an empty family`);
     }
 
-    // And the values are the ones Classic's text classes actually specify.
-    // Both axis labels are small classes: native Classic 2026 renders both at
-    // 12px = 9pt at every tested size, against a declared label of 10pt.
-    assert.equal(s.categoryAxis.fontSize, 9, "smallLightLabel, label x 0.9");
+    // Families come from the text classes; the chrome sizes do not. Axis
+    // values, axis titles and legend text are all held at the native 9,
+    // measured in Desktop across two themes that moved `label` and `title`
+    // in opposite directions without moving any of these three.
+    assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
     assert.equal(s.categoryAxis.fontFamily, "Segoe UI");
-    assert.equal(s.valueAxis.fontSize, 9, "smallLightLabel, label x 0.9");
-    assert.equal(s.categoryAxis.titleFontSize, 12, "title");
-    assert.equal(s.categoryAxis.titleFontFamily, "DIN");
-    assert.equal(s.legend.fontSize, 10);
-    assert.equal(s.labels.fontSize, 9);
+    assert.equal(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+    assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE);
+    assert.equal(s.categoryAxis.titleFontFamily, "DIN", "family still inherits");
+    assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE);
+    // Data labels are NOT chrome: they still scale with the label class.
+    assert.equal(s.labels.fontSize, 9, "label 10 x 0.9");
     // The light classes carry the neutral colour, not the foreground.
     assert.equal(s.categoryAxis.labelColor, "#605E5C");
     assert.equal(s.valueAxis.labelColor, "#605E5C");
@@ -138,8 +141,8 @@ for (const entry of CARTESIAN) {
     assert.equal(s.categoryAxis.titleFontSize, 10.5, "Fluent declares the axis title too");
 
     // Where Fluent declares nothing, the custom text class does supply it.
-    assert.equal(s.legend.fontSize, 14, "no explicit Fluent legend font");
-    assert.equal(s.legend.fontFamily, "Comic Sans MS");
+    assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE, "chrome size is native");
+    assert.equal(s.legend.fontFamily, "Comic Sans MS", "but the family is the custom class");
     assert.equal(s.labels.fontSize, 12.6, "smallLightLabel: label 14 x 0.9");
     assert.equal(s.labels.color, "#AA00AA");
   });
@@ -159,19 +162,21 @@ for (const entry of CARTESIAN) {
     const s = styleOf(entry, custom, "classic2026");
     assert.equal(s.categoryAxis.fontSize, 31, "the explicit value");
     // Its neighbour, which nothing declares, still comes from the text class.
-    assert.equal(s.legend.fontSize, 14, "LOUD's label size via lightLabel");
-    assert.equal(s.categoryAxis.titleFontSize, 22, "LOUD's title class");
+    assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE, "chrome, not LOUD's label 14");
+    assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE, "chrome, not LOUD's title 22");
   });
 
   test(`${entry.name}: a custom text class reaches the visual where no visualStyles value exists`, () => {
     const s = styleOf(entry, LOUD, "classic2026");
-    assert.equal(s.categoryAxis.fontFamily, "Comic Sans MS");
-    // 14 x 0.9: the custom class still reaches the visual, through the small
-    // variant both axis labels now take.
-    assert.equal(s.categoryAxis.fontSize, 12.6, "smallLightLabel");
-    assert.equal(s.valueAxis.fontSize, 12.6, "smallLightLabel");
-    assert.equal(s.categoryAxis.titleFontFamily, "Courier New", "title class");
-    assert.equal(s.categoryAxis.titleFontSize, 22);
+    // The sharpest statement of independent channels: one custom theme, and
+    // on the SAME property the family follows the class while the size does
+    // not. If family and size were one decision, these four could not hold
+    // together.
+    assert.equal(s.categoryAxis.fontFamily, "Comic Sans MS", "label family");
+    assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE, "but not label 14 x 0.9");
+    assert.equal(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+    assert.equal(s.categoryAxis.titleFontFamily, "Courier New", "title family");
+    assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE, "but not title 22");
     assert.equal(s.labels.color, "#AA00AA", "smallLightLabel is a light class");
     assert.notEqual(s.labels.color, "#123456", "not the first data colour");
   });
@@ -195,24 +200,59 @@ test("resolving every cartesian visual leaves the theme untouched", () => {
 // Genuine per-visual differences
 // ---------------------------------------------------------------------------
 
-test("the unproven roles keep their old fallbacks in every cartesian registry", () => {
-  // Discipline check. Nothing here has an established Power BI text role, so
-  // migrating it would be a guess dressed as fidelity — see PHASE_2_BACKLOG.
+test("the data-label parts share one typography source", () => {
+  // The Format pane shows Title, Value and Detail with identical font,
+  // size and colour on every cartesian visual measured, whether the parts
+  // are enabled or not. They were previously three separate fallbacks, two
+  // of them a literal 6 in an unnamed family.
   for (const entry of CARTESIAN) {
-    const s = styleOf(entry, EMPTY, "classic2026") as never as {
-      labels: { titleFontSize: number; titleFontFamily: string; detailFontSize: number };
-      error: { labelFontSize: number; labelFontFamily: string };
-      subheader: { fontSize: number; fontFamily: string };
+    const s = styleOf(entry, LOUD, "classic2026") as never as {
+      labels: {
+        fontSize: number; fontFamily: string; color: string;
+        titleFontSize: number; titleFontFamily: string; titleColor: string;
+        detailFontSize: number; detailFontFamily: string; detailColor: string;
+      };
     };
-    assert.equal(s.labels.titleFontSize, 6, `${entry.name}: data-label title is not a proven role`);
-    assert.equal(s.labels.titleFontFamily, "", `${entry.name}: same`);
-    assert.equal(s.labels.detailFontSize, 6, `${entry.name}: detail labels are not a proven role`);
-    assert.equal(s.error.labelFontSize, 6, `${entry.name}: error-bar labels are not a proven role`);
-    assert.equal(s.subheader.fontSize, 6, `${entry.name}: small-multiple headers are not a proven role`);
+    const { labels: l } = s;
+    assert.equal(l.titleFontSize, l.fontSize, `${entry.name}: title size follows Value`);
+    assert.equal(l.detailFontSize, l.fontSize, `${entry.name}: detail size follows Value`);
+    assert.equal(l.titleFontFamily, l.fontFamily, `${entry.name}: title family follows Value`);
+    assert.equal(l.detailFontFamily, l.fontFamily, `${entry.name}: detail family follows Value`);
+    assert.equal(l.titleColor, l.color, `${entry.name}: title colour follows Value`);
+    assert.equal(l.detailColor, l.color, `${entry.name}: detail colour follows Value`);
+    // And the shared value is the label class scaled, not a literal.
+    assert.equal(l.fontSize, 12.6, `${entry.name}: label 14 x 0.9`);
+    assert.notEqual(l.titleFontSize, 6, `${entry.name}: no literal 6`);
+    assert.notEqual(l.titleFontFamily, "", `${entry.name}: no empty family`);
   }
 });
 
-test("Line's secondary axis has proven native defaults while series labels remain alone", () => {
+test("small-multiple titles take the title class unscaled", () => {
+  // The one surface measured that inherits the title class's own size
+  // rather than scaling it, which is what distinguishes it from the visual
+  // title (x 7/6) and from the axis titles (held at the native constant).
+  for (const entry of CARTESIAN) {
+    const s = styleOf(entry, LOUD, "classic2026") as never as {
+      subheader: { fontSize: number; fontFamily: string; fontColor: string };
+    };
+    assert.equal(s.subheader.fontSize, 22, `${entry.name}: LOUD's title class, unscaled`);
+    assert.equal(s.subheader.fontFamily, "Courier New", `${entry.name}: title family`);
+    assert.equal(s.subheader.fontColor, "#333333", `${entry.name}: title colour`);
+  }
+});
+
+test("error-bar labels remain unproven and keep their old fallback", () => {
+  // Discipline check. The fingerprint sweep never reached error bars, so
+  // migrating them would be a guess dressed as fidelity.
+  for (const entry of CARTESIAN) {
+    const s = styleOf(entry, EMPTY, "classic2026") as never as {
+      error: { labelFontSize: number; labelFontFamily: string };
+    };
+    assert.equal(s.error.labelFontSize, 6, `${entry.name}: error-bar labels are not a proven role`);
+  }
+});
+
+test("Line's secondary axis mirrors the primary, and series labels are now a role", () => {
   // With a secondary measure bound, Desktop exposes independent Segoe UI 9pt
   // Values and DIN 12pt Title defaults. Series labels still have no proven role.
   const src = themeLayers(EMPTY, getBaseTheme("classic2026"));
@@ -221,15 +261,19 @@ test("Line's secondary axis has proven native defaults while series labels remai
   assert.equal(s.y2Axis.secFontFamily, s.valueAxis.fontFamily);
   assert.equal(s.y2Axis.secTitleFontSize, s.valueAxis.titleFontSize);
   assert.equal(s.y2Axis.secTitleFontFamily, s.valueAxis.titleFontFamily);
-  assert.equal(s.seriesLabels.textSize, 6);
-  assert.equal(s.seriesLabels.seriesFontFamily, "");
+  // Series labels ARE now a proven role: label x 0.9, like data labels.
+  assert.equal(s.seriesLabels.textSize, s.labels.fontSize, "series labels share the data-label role");
+  assert.notEqual(s.seriesLabels.seriesFontFamily, "");
 });
 
-test("the stacked charts' total labels are left alone too", () => {
+test("the stacked charts' total labels share the data-label role", () => {
   for (const entry of [CARTESIAN[1], CARTESIAN[3]]) {
-    const s = styleOf(entry, EMPTY, "classic2026") as never as { totals: { fontSize: number; fontFamily: string } };
-    assert.equal(s.totals.fontSize, 6, `${entry.name}: totals are not a proven role`);
-    assert.equal(s.totals.fontFamily, "");
+    const s = styleOf(entry, EMPTY, "classic2026") as never as {
+      totals: { fontSize: number; fontFamily: string };
+      labels: { fontSize: number };
+    };
+    assert.equal(s.totals.fontSize, s.labels.fontSize, `${entry.name}: totals share the data-label role`);
+    assert.notEqual(s.totals.fontFamily, "");
   }
 });
 

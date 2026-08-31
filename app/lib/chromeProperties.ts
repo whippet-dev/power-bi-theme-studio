@@ -10,6 +10,7 @@ import {
   textProp,
   type VisualSchemaKey,
 } from "./properties";
+import { CAPABILITY_COLOR, nativeToken } from "./nativeTokens";
 import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
@@ -1277,6 +1278,7 @@ export function resolveChromeStyle(
 ): ResolvedChromeStyle {
   const p = CHROME_PROPERTIES;
   const visualTitleText = resolveTextRole(theme, "visualTitle");
+  const subtitleText = resolveTextRole(theme, "subtitle");
   const titleFamilyEntry = resolveChromeEntry(
     theme,
     activeVisual,
@@ -1325,9 +1327,9 @@ export function resolveChromeStyle(
       text: resolveChromeValue(theme, activeVisual, p.subTitle.text, ""),
       alignment: resolveChromeValue(theme, activeVisual, p.subTitle.alignment, "left"),
       heading: resolveChromeValue(theme, activeVisual, p.subTitle.heading, "Normal"),
-      fontColor: resolveChromeValue(theme, activeVisual, p.subTitle.fontColor, base.muted),
-      fontFamily: resolveChromeValue(theme, activeVisual, p.subTitle.fontFamily, base.fontFamily),
-      fontSize: resolveChromeValue(theme, activeVisual, p.subTitle.fontSize, 10),
+      fontColor: resolveChromeValue(theme, activeVisual, p.subTitle.fontColor, subtitleText.color),
+      fontFamily: resolveChromeValue(theme, activeVisual, p.subTitle.fontFamily, subtitleText.fontFamily),
+      fontSize: resolveChromeValue(theme, activeVisual, p.subTitle.fontSize, subtitleText.fontSize),
       bold: resolveChromeValue(theme, activeVisual, p.subTitle.bold, false),
       italic: resolveChromeValue(theme, activeVisual, p.subTitle.italic, false),
       underline: resolveChromeValue(theme, activeVisual, p.subTitle.underline, false),
@@ -1340,18 +1342,18 @@ export function resolveChromeStyle(
       // outspace/background (see globalOptionsProperties.ts). Canvas
       // objects (see isCanvasObject above) override this back to false.
       show: resolveChromeValue(theme, activeVisual, p.background.show, !isCanvasObject),
-      color: resolveChromeValue(theme, activeVisual, p.background.color, base.background),
+      color: resolveChromeValue(theme, activeVisual, p.background.color, CAPABILITY_COLOR.visualBackground),
       transparency: resolveChromeValue(theme, activeVisual, p.background.transparency, 0),
     },
     border: {
       show: resolveChromeValue(theme, activeVisual, p.border.show, false),
-      color: resolveChromeValue(theme, activeVisual, p.border.color, "#E3E3E3"),
+      color: resolveChromeValue(theme, activeVisual, p.border.color, CAPABILITY_COLOR.visualBorder),
       width: resolveChromeValue(theme, activeVisual, p.border.width, 1),
       radius: resolveChromeValue(theme, activeVisual, p.border.radius, 0),
     },
       divider: {
       show: resolveChromeValue(theme, activeVisual, p.divider.show, false),
-      color: resolveChromeValue(theme, activeVisual, p.divider.color, "#E3E3E3"),
+      color: resolveChromeValue(theme, activeVisual, p.divider.color, nativeToken(theme, "foregroundNeutralSecondary")),
       // A divider that's switched on but 0px wide is invisible — same
       // class of bug as the compound `*Width` fallbacks that defaulted to
       // 0. Any "thickness of a thing that is otherwise on" needs a

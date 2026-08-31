@@ -11,6 +11,8 @@ import {
 } from "./properties";
 import { effectiveFontFamily } from "./fontFamilies";
 import { CATEGORY_INNER_PADDING_DEFAULT } from "./seriesBands";
+import { CARTESIAN_NATIVE } from "./cartesianNativeDefaults";
+import { nativeToken } from "./nativeTokens";
 import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
@@ -787,6 +789,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
   const valueAxisLabelText = resolveTextRole(theme, "valueAxisLabel");
   const valueAxisTitleText = resolveTextRole(theme, "valueAxisTitle");
   const legendText = resolveTextRole(theme, "legendText");
+  const smallMultipleTitleText = resolveTextRole(theme, "smallMultipleTitle");
   const dataLabelText = resolveTextRole(theme, "dataLabel");
   const referenceLineLabelText = resolveTextRole(theme, "referenceLineLabel");
   /**
@@ -805,7 +808,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
   return {
     usesSmallMultiples: isGroupSetBy(theme, "clusteredBarChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
-      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, "#E3E3E3"),
+      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, nativeToken(theme, "foregroundNeutralSecondary")),
       borderColorMatchFill: resolvePropertyValue(theme, p.dataPoint.borderColorMatchFill, false),
       borderShow: resolvePropertyValue(theme, p.dataPoint.borderShow, false),
       borderSize: resolvePropertyValue(theme, p.dataPoint.borderSize, 1),
@@ -825,7 +828,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       fontFamilyCss: catLabelFamily.css,
       fontSize: resolvePropertyValue(theme, p.categoryAxis.fontSize, categoryAxisLabelText.fontSize),
       gridlineAutoScale: resolvePropertyValue(theme, p.categoryAxis.gridlineAutoScale, false),
-      gridlineColor: resolvePropertyValue(theme, p.categoryAxis.gridlineColor, "#E3E3E3"),
+      gridlineColor: resolvePropertyValue(theme, p.categoryAxis.gridlineColor, nativeToken(theme, "secondaryBackground")),
       gridlineDashArray: resolvePropertyValue(theme, p.categoryAxis.gridlineDashArray, ""),
       gridlineDashCap: resolvePropertyValue(theme, p.categoryAxis.gridlineDashCap, "none"),
       gridlineShow: resolvePropertyValue(theme, p.categoryAxis.gridlineShow, false),
@@ -864,13 +867,13 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       fontFamilyCss: valLabelFamily.css,
       fontSize: resolvePropertyValue(theme, p.valueAxis.fontSize, valueAxisLabelText.fontSize),
       gridlineAutoScale: resolvePropertyValue(theme, p.valueAxis.gridlineAutoScale, false),
-      gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
+      gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, nativeToken(theme, "secondaryBackground")),
       gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
       gridlineDashCap: resolvePropertyValue(theme, p.valueAxis.gridlineDashCap, "none"),
       // Power BI draws value-axis gridlines on a new visual by default,
       // so a preview that hides them does not match an unstyled chart.
       gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, true),
-      gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, "solid"),
+      gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, CARTESIAN_NATIVE.gridline.style),
       gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
       invertAxis: resolvePropertyValue(theme, p.valueAxis.invertAxis, false),
@@ -921,11 +924,11 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       // task's job, not this one's.
       color: resolvePropertyValue(theme, p.labels.color, dataLabelText.color),
       detailBold: resolvePropertyValue(theme, p.labels.detailBold, false),
-      detailColor: resolvePropertyValue(theme, p.labels.detailColor, base.palette[0] ?? base.foreground),
+      detailColor: resolvePropertyValue(theme, p.labels.detailColor, dataLabelText.color),
       detailContentType: resolvePropertyValue(theme, p.labels.detailContentType, "Percent of total"),
       detailCustomFormatString: resolvePropertyValue(theme, p.labels.detailCustomFormatString, ""),
-      detailFontFamily: resolvePropertyValue(theme, p.labels.detailFontFamily, ""),
-      detailFontSize: resolvePropertyValue(theme, p.labels.detailFontSize, 6),
+      detailFontFamily: resolvePropertyValue(theme, p.labels.detailFontFamily, dataLabelText.fontFamily),
+      detailFontSize: resolvePropertyValue(theme, p.labels.detailFontSize, dataLabelText.fontSize),
       detailFormatString: resolvePropertyValue(theme, p.labels.detailFormatString, ""),
       detailItalic: resolvePropertyValue(theme, p.labels.detailItalic, false),
       detailLabelDisplayUnits: resolvePropertyValue(theme, p.labels.detailLabelDisplayUnits, 0),
@@ -962,11 +965,11 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       showDynamicLabels: resolvePropertyValue(theme, p.labels.showDynamicLabels, false),
       showSeries: resolvePropertyValue(theme, p.labels.showSeries, false),
       titleBold: resolvePropertyValue(theme, p.labels.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.labels.titleColor, base.foreground),
+      titleColor: resolvePropertyValue(theme, p.labels.titleColor, dataLabelText.color),
       titleContentType: resolvePropertyValue(theme, p.labels.titleContentType, "Series name"),
       titleCustomFormatString: resolvePropertyValue(theme, p.labels.titleCustomFormatString, ""),
-      titleFontFamily: resolvePropertyValue(theme, p.labels.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.labels.titleFontSize, 6),
+      titleFontFamily: resolvePropertyValue(theme, p.labels.titleFontFamily, dataLabelText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.labels.titleFontSize, dataLabelText.fontSize),
       titleFormatString: resolvePropertyValue(theme, p.labels.titleFormatString, ""),
       titleItalic: resolvePropertyValue(theme, p.labels.titleItalic, false),
       titleLabelDisplayUnits: resolvePropertyValue(theme, p.labels.titleLabelDisplayUnits, 0),
@@ -1117,7 +1120,7 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
       columnCount: resolvePropertyValue(theme, p.smallMultiplesLayout.columnCount, 2),
       columnPaddingInner: resolvePropertyValue(theme, p.smallMultiplesLayout.columnPaddingInner, 10),
       columnPaddingOuter: resolvePropertyValue(theme, p.smallMultiplesLayout.columnPaddingOuter, 10),
-      gridLineColor: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineColor, "#E3E3E3"),
+      gridLineColor: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineColor, nativeToken(theme, "foreground")),
       gridLineShow: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineShow, false),
       gridLineStyle: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineStyle, "solid"),
       gridLineTransparency: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineTransparency, 0),
@@ -1133,9 +1136,9 @@ export function resolveBarChartStyle(theme: ThemeSource, base: ResolvedTheme): R
     subheader: {
       alignment: resolvePropertyValue(theme, p.subheader.alignment, "left"),
       bold: resolvePropertyValue(theme, p.subheader.bold, false),
-      fontColor: resolvePropertyValue(theme, p.subheader.fontColor, base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.subheader.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.subheader.fontSize, 6),
+      fontColor: resolvePropertyValue(theme, p.subheader.fontColor, smallMultipleTitleText.color),
+      fontFamily: resolvePropertyValue(theme, p.subheader.fontFamily, smallMultipleTitleText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.subheader.fontSize, smallMultipleTitleText.fontSize),
       italic: resolvePropertyValue(theme, p.subheader.italic, false),
       position: resolvePropertyValue(theme, p.subheader.position, "top"),
       show: resolvePropertyValue(theme, p.subheader.show, false),

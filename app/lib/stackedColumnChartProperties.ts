@@ -11,6 +11,8 @@ import {
 } from "./properties";
 import { effectiveFontFamily } from "./fontFamilies";
 import { CATEGORY_INNER_PADDING_DEFAULT } from "./seriesBands";
+import { CARTESIAN_NATIVE } from "./cartesianNativeDefaults";
+import { nativeToken } from "./nativeTokens";
 import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
@@ -752,6 +754,8 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
   const categoryAxisTitleText = resolveTextRole(theme, "categoryAxisTitle");
   const dataLabelText = resolveTextRole(theme, "dataLabel");
   const legendText = resolveTextRole(theme, "legendText");
+  const smallMultipleTitleText = resolveTextRole(theme, "smallMultipleTitle");
+  const totalLabelText = resolveTextRole(theme, "totalLabel");
   const referenceLineLabelText = resolveTextRole(theme, "referenceLineLabel");
   const valueAxisLabelText = resolveTextRole(theme, "valueAxisLabel");
   const valueAxisTitleText = resolveTextRole(theme, "valueAxisTitle");
@@ -771,7 +775,7 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
   return {
     usesSmallMultiples: isGroupSetBy(theme, "columnChart", "smallMultiplesLayout", "custom"),
     dataPoint: {
-      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, "#E3E3E3"),
+      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, nativeToken(theme, "foregroundNeutralSecondary")),
       borderColorMatchFill: resolvePropertyValue(theme, p.dataPoint.borderColorMatchFill, false),
       borderOutlineOnly: resolvePropertyValue(theme, p.dataPoint.borderOutlineOnly, false),
       borderShow: resolvePropertyValue(theme, p.dataPoint.borderShow, false),
@@ -806,7 +810,7 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       switchAxisPosition: resolvePropertyValue(theme, p.categoryAxis.switchAxisPosition, false),
       underline: resolvePropertyValue(theme, p.categoryAxis.underline, false),
       gridlineAutoScale: resolvePropertyValue(theme, p.categoryAxis.gridlineAutoScale, false),
-      gridlineColor: resolvePropertyValue(theme, p.categoryAxis.gridlineColor, "#E3E3E3"),
+      gridlineColor: resolvePropertyValue(theme, p.categoryAxis.gridlineColor, nativeToken(theme, "secondaryBackground")),
       gridlineDashArray: resolvePropertyValue(theme, p.categoryAxis.gridlineDashArray, ""),
       gridlineDashCap: resolvePropertyValue(theme, p.categoryAxis.gridlineDashCap, "none"),
       gridlineShow: resolvePropertyValue(theme, p.categoryAxis.gridlineShow, false),
@@ -844,13 +848,13 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       switchAxisPosition: resolvePropertyValue(theme, p.valueAxis.switchAxisPosition, false),
       underline: resolvePropertyValue(theme, p.valueAxis.underline, false),
       gridlineAutoScale: resolvePropertyValue(theme, p.valueAxis.gridlineAutoScale, false),
-      gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, "#E3E3E3"),
+      gridlineColor: resolvePropertyValue(theme, p.valueAxis.gridlineColor, nativeToken(theme, "secondaryBackground")),
       gridlineDashArray: resolvePropertyValue(theme, p.valueAxis.gridlineDashArray, ""),
       gridlineDashCap: resolvePropertyValue(theme, p.valueAxis.gridlineDashCap, "none"),
       // Power BI draws value-axis gridlines on a new visual by default,
       // so a preview that hides them does not match an unstyled chart.
       gridlineShow: resolvePropertyValue(theme, p.valueAxis.gridlineShow, true),
-      gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, "solid"),
+      gridlineStyle: resolvePropertyValue(theme, p.valueAxis.gridlineStyle, CARTESIAN_NATIVE.gridline.style),
       gridlineThickness: resolvePropertyValue(theme, p.valueAxis.gridlineThickness, 1),
       gridlineTransparency: resolvePropertyValue(theme, p.valueAxis.gridlineTransparency, 0),
       titleBold: resolvePropertyValue(theme, p.valueAxis.titleBold, false),
@@ -916,11 +920,11 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       valueFormatString: resolvePropertyValue(theme, p.labels.valueFormatString, ""),
       wordWrap: resolvePropertyValue(theme, p.labels.wordWrap, false),
       detailBold: resolvePropertyValue(theme, p.labels.detailBold, false),
-      detailColor: resolvePropertyValue(theme, p.labels.detailColor, base.palette[0] ?? base.foreground),
+      detailColor: resolvePropertyValue(theme, p.labels.detailColor, dataLabelText.color),
       detailContentType: resolvePropertyValue(theme, p.labels.detailContentType, "Percent of total"),
       detailCustomFormatString: resolvePropertyValue(theme, p.labels.detailCustomFormatString, ""),
-      detailFontFamily: resolvePropertyValue(theme, p.labels.detailFontFamily, ""),
-      detailFontSize: resolvePropertyValue(theme, p.labels.detailFontSize, 6),
+      detailFontFamily: resolvePropertyValue(theme, p.labels.detailFontFamily, dataLabelText.fontFamily),
+      detailFontSize: resolvePropertyValue(theme, p.labels.detailFontSize, dataLabelText.fontSize),
       detailFormatString: resolvePropertyValue(theme, p.labels.detailFormatString, ""),
       detailItalic: resolvePropertyValue(theme, p.labels.detailItalic, false),
       detailLabelDisplayUnits: resolvePropertyValue(theme, p.labels.detailLabelDisplayUnits, 0),
@@ -929,11 +933,11 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       detailTransparency: resolvePropertyValue(theme, p.labels.detailTransparency, 0),
       detailUnderline: resolvePropertyValue(theme, p.labels.detailUnderline, false),
       titleBold: resolvePropertyValue(theme, p.labels.titleBold, false),
-      titleColor: resolvePropertyValue(theme, p.labels.titleColor, base.foreground),
+      titleColor: resolvePropertyValue(theme, p.labels.titleColor, dataLabelText.color),
       titleContentType: resolvePropertyValue(theme, p.labels.titleContentType, "Series name"),
       titleCustomFormatString: resolvePropertyValue(theme, p.labels.titleCustomFormatString, ""),
-      titleFontFamily: resolvePropertyValue(theme, p.labels.titleFontFamily, ""),
-      titleFontSize: resolvePropertyValue(theme, p.labels.titleFontSize, 6),
+      titleFontFamily: resolvePropertyValue(theme, p.labels.titleFontFamily, dataLabelText.fontFamily),
+      titleFontSize: resolvePropertyValue(theme, p.labels.titleFontSize, dataLabelText.fontSize),
       titleFormatString: resolvePropertyValue(theme, p.labels.titleFormatString, ""),
       titleItalic: resolvePropertyValue(theme, p.labels.titleItalic, false),
       titleLabelDisplayUnits: resolvePropertyValue(theme, p.labels.titleLabelDisplayUnits, 0),
@@ -998,9 +1002,9 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
     totals: {
       show: resolvePropertyValue(theme, p.totals.show, false),
       bold: resolvePropertyValue(theme, p.totals.bold, false),
-      color: resolvePropertyValue(theme, p.totals.color, base.palette[0] ?? base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.totals.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.totals.fontSize, 6),
+      color: resolvePropertyValue(theme, p.totals.color, totalLabelText.color),
+      fontFamily: resolvePropertyValue(theme, p.totals.fontFamily, totalLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.totals.fontSize, totalLabelText.fontSize),
       italic: resolvePropertyValue(theme, p.totals.italic, false),
       labelDisplayUnits: resolvePropertyValue(theme, p.totals.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.totals.labelPrecision, 0),
@@ -1084,7 +1088,7 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       rowPaddingOuter: resolvePropertyValue(theme, p.smallMultiplesLayout.rowPaddingOuter, 10),
       backgroundColor: resolvePropertyValue(theme, p.smallMultiplesLayout.backgroundColor, base.background),
       backgroundTransparency: resolvePropertyValue(theme, p.smallMultiplesLayout.backgroundTransparency, 0),
-      gridLineColor: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineColor, "#E3E3E3"),
+      gridLineColor: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineColor, nativeToken(theme, "foreground")),
       gridLineShow: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineShow, false),
       gridLineStyle: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineStyle, "solid"),
       gridLineTransparency: resolvePropertyValue(theme, p.smallMultiplesLayout.gridLineTransparency, 0),
@@ -1097,9 +1101,9 @@ export function resolveStackedColumnChartStyle(theme: ThemeSource, base: Resolve
       show: resolvePropertyValue(theme, p.subheader.show, false),
       alignment: resolvePropertyValue(theme, p.subheader.alignment, "left"),
       bold: resolvePropertyValue(theme, p.subheader.bold, false),
-      fontColor: resolvePropertyValue(theme, p.subheader.fontColor, base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.subheader.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.subheader.fontSize, 6),
+      fontColor: resolvePropertyValue(theme, p.subheader.fontColor, smallMultipleTitleText.color),
+      fontFamily: resolvePropertyValue(theme, p.subheader.fontFamily, smallMultipleTitleText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.subheader.fontSize, smallMultipleTitleText.fontSize),
       italic: resolvePropertyValue(theme, p.subheader.italic, false),
       position: resolvePropertyValue(theme, p.subheader.position, "top"),
       titleWrap: resolvePropertyValue(theme, p.subheader.titleWrap, false),

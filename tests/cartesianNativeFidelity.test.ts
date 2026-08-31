@@ -7,6 +7,7 @@ import { resolveStackedBarChartStyle } from "../app/lib/stackedBarChartPropertie
 import { resolveStackedColumnChartStyle } from "../app/lib/stackedColumnChartProperties";
 import { getBaseTheme, type BaseThemeId } from "../app/lib/baseThemes";
 import { themeLayers } from "../app/lib/properties";
+import { NATIVE_CHROME_FONT_SIZE } from "../app/lib/textClasses";
 import { themeFontSizeToCssPx } from "../app/lib/fontUnits";
 import { CATEGORY_INNER_PADDING_DEFAULT, clusteredSeriesBands } from "../app/lib/seriesBands";
 import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
@@ -58,23 +59,27 @@ test("NATIVE: both axis labels match, as they do natively", () => {
   assert.equal(s.categoryAxis.fontSize, s.valueAxis.fontSize);
 });
 
-test("NATIVE: the legend keeps the unscaled label class", () => {
-  // The same sweep measured the legend at 13.333px = 10pt. If the category
-  // fix had been applied to the primary class instead of the role, this
-  // would have moved with it.
+test("NATIVE: the chart chrome holds one size whatever the classes say", () => {
+  // Axis values, axis titles and legend text all read 9 in Desktop's own
+  // font-size control under an imported theme setting label 13 / title 19,
+  // and read 9 again under label 20 / title 30. Two points, no movement,
+  // so none of the three consults a text class for its size.
   const s = styleOf(EMPTY, "classic2026");
-  assert.equal(s.legend.fontSize, 10);
-  assert.equal(themeFontSizeToCssPx(s.legend.fontSize), 13.333333333333332);
+  assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.valueAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(themeFontSizeToCssPx(NATIVE_CHROME_FONT_SIZE), 12);
 });
 
-test("NATIVE: axis titles keep the title class", () => {
-  // Measured at 16px = 12pt on the same visuals.
+test("NATIVE: axis titles keep the title class family, but not its size", () => {
+  // The clearest single statement of independent channels. Both come from
+  // the same class; only one of them actually arrives.
   const s = styleOf(EMPTY, "classic2026");
-  assert.equal(s.categoryAxis.titleFontSize, 12);
-  assert.equal(s.valueAxis.titleFontSize, 12);
-  assert.equal(s.categoryAxis.titleFontFamily, "DIN");
+  assert.equal(s.categoryAxis.titleFontFamily, "DIN", "family inherits");
   assert.equal(s.valueAxis.titleFontFamily, "DIN");
-  assert.equal(themeFontSizeToCssPx(s.categoryAxis.titleFontSize), 16);
+  assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE, "size does not");
 });
 
 test("Classic 2026 cartesian legends show their native title by default", () => {
@@ -108,7 +113,7 @@ test("Line Y2 keeps independent defaults when Y1 is customized", () => {
   assert.equal(independent.y2Axis.secFontSize, 9);
   assert.equal(independent.y2Axis.secLabelColor, "#605E5C");
   assert.equal(independent.y2Axis.secTitleFontFamily, "DIN");
-  assert.equal(independent.y2Axis.secTitleFontSize, 12);
+  assert.equal(independent.y2Axis.secTitleFontSize, NATIVE_CHROME_FONT_SIZE);
 
   const y2Theme = updateThemeValue(
     y1Theme,
@@ -157,16 +162,28 @@ test("Classic 2018 resolves from its own declared classes, not from Classic 2026
   assert.notEqual(themeFontSizeToCssPx(s.categoryAxis.fontSize), 10.666666666666666);
 });
 
-test("a custom theme's own label class still drives the derivation", () => {
+test("a custom label class drives the data labels, and not the axis", () => {
   const custom: PowerBITheme = {
     name: "custom",
     textClasses: { label: { fontSize: 20, fontFace: "Arial", color: "#000000" } },
   } as PowerBITheme;
-  // 20 x 0.9 - and this is the case the native experiment actually tested:
-  // with the report theme's primary text at 20pt, Power BI's own category
-  // axis control reads 18 and it renders 24px. This assertion is the same
-  // number, reached the same way.
-  assert.equal(styleOf(custom, "classic2026").categoryAxis.fontSize, 18);
+  const s = styleOf(custom, "classic2026");
+
+  // 20 x 0.9. The scaling rule is real and still drives every data-region
+  // surface — it is only the chart chrome that ignores it.
+  assert.equal(s.labels.fontSize, 18, "label 20 x 0.9");
+
+  // A recorded contradiction, deliberately not smoothed over. An earlier
+  // experiment (POWER_BI_CARTESIAN_DIFFERENTIAL.md 5.15) reported the
+  // category axis moving to 18 under a 20pt primary, which is what this
+  // test used to assert. Re-measuring with an imported theme that sets
+  // textClasses.label directly, at two sizes, the axis does not move at
+  // all. The likeliest reconciliation is that 5.15 raised Desktop's global
+  // theme text size rather than the class — a different input — but that
+  // is a hypothesis. What this app produces is an imported theme, so the
+  // imported-theme behaviour is the one modelled.
+  assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE, "the axis does not follow label");
+  assert.equal(s.categoryAxis.fontFamily, "Arial", "though the family still does");
 });
 
 // ---------------------------------------------------------------------------
