@@ -88,46 +88,59 @@ export const CAPABILITY_COLOR = {
  * Two different things are easy to conflate here, and conflating them is
  * how a theme ends up exporting values its author never chose:
  *
- * **A — the native default.** What Power BI's own Format pane reports as
- * the property's value when nothing has set it. For everything listed
- * below, that is *absent*. There is no colour to inherit, no token behind
- * it, and nothing for a theme to round-trip.
+ * **A — the native default.** What Power BI's own Format pane reports when
+ * nothing has set the property. For everything listed below that is
+ * *absent*: no colour, no token behind it, nothing for a theme to
+ * round-trip. This is the part the fingerprint sweep actually measured.
  *
- * **B — the effective rendering fallback.** What the preview paints when
- * the property is absent. A renderer cannot draw "nothing", so it needs a
- * colour, and Power BI itself picks one at draw time — the series palette
- * entry for a line stroke and its shade area, the visual's own background
- * behind a label. That choice is a *rendering* decision.
+ * **B — what Theme Studio paints anyway.** The preview cannot draw
+ * "nothing", so each resolver supplies a colour. Those choices are recorded
+ * below as `studioPaints`, and they are **Theme Studio's**, not measured
+ * Power BI behaviour. The sweep read the Format pane; it never established
+ * what the renderer substitutes at draw time for an absent colour. Where a
+ * choice does have evidence behind it, `evidence` says so; where it does
+ * not, it says that too.
  *
- * The registries resolve B, because the preview has to paint something.
- * They must never be read as asserting A. The distinction is visible in
+ * Keeping B out of A is the whole point. The distinction lives in
  * provenance rather than in the value: `resolvePropertyEntry` reports
  * `source: "fallback"` and `isSet: false` for every property here, which is
- * what keeps the editor showing it as unset and keeps the exporter from
- * materialising it. `PROPERTIES_WITHOUT_NATIVE_DEFAULT` records which
- * properties are in that position and what each one falls back to, so the
- * two can be checked against each other rather than assumed.
+ * what keeps the editor showing it unset and the exporter from writing it.
+ *
+ * Nothing here should be "corrected" to match a guess about Power BI's
+ * renderer. If the draw-time fallback is ever measured, that is the point
+ * at which `studioPaints` becomes a claim rather than a description.
  */
 export const PROPERTIES_WITHOUT_NATIVE_DEFAULT = [
   {
     property: "lineStyles.strokeColor",
-    /** What the renderer paints instead, and why that is not a default. */
-    renderFallback: "the series' palette entry, which Power BI also picks at draw time",
+    studioPaints: "dataColors[0]",
+    evidence:
+      "unmeasured: Power BI colours series from the palette generally, but the sweep " +
+      "did not read what it substitutes for an absent stroke colour",
   },
   {
     property: "lineStyles.areaColor",
-    renderFallback: "the series' stroke colour, per `shadeAreaMatchStrokeColor` being on",
+    studioPaints: "dataColors[0]",
+    evidence:
+      "partial: shadeAreaMatchStrokeColor was measured ON, so the shade area follows " +
+      "the stroke — but the stroke's own draw-time colour is itself unmeasured",
   },
   {
     property: "labels.backgroundColor",
-    renderFallback: "the visual background, so an enabled label plate is visible",
+    studioPaints: "the `background` token",
+    evidence:
+      "unmeasured. Note this is NOT the visual container background, which is the " +
+      "capability constant in CAPABILITY_COLOR — under a theme that sets `background` " +
+      "the two differ",
   },
   {
     property: "totals.backgroundColor",
-    renderFallback: "the visual background, as for data labels",
+    studioPaints: "the `background` token",
+    evidence: "unmeasured, as for data labels",
   },
   {
     property: "title.backgroundColor",
-    renderFallback: "the visual background, so the title plate is visible",
+    studioPaints: "the `background` token",
+    evidence: "unmeasured, as for data labels",
   },
 ] as const;

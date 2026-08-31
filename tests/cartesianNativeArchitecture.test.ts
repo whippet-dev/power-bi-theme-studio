@@ -273,22 +273,24 @@ test("a property with no native default resolves as unset, whatever it paints", 
     assert.equal(entry.isSet, false, `${label}: and it must not read as configured`);
   }
 
-  // Every property named in the table is one the sweep measured as empty,
-  // and each records what the renderer paints instead — so the two can be
-  // checked against each other rather than assumed.
+  // Every row names a property the sweep measured as empty, says what
+  // Theme Studio paints instead, and states what evidence that choice has.
+  // The third field exists so an unmeasured render fallback cannot quietly
+  // read as if it were measured.
   assert.ok(PROPERTIES_WITHOUT_NATIVE_DEFAULT.length > 0);
   for (const row of PROPERTIES_WITHOUT_NATIVE_DEFAULT) {
     assert.ok(row.property.includes("."), `${row.property} names a property path`);
-    assert.ok(row.renderFallback.length > 0, `${row.property} states its render fallback`);
+    assert.ok(row.studioPaints.length > 0, `${row.property} says what Studio paints`);
+    assert.ok(row.evidence.length > 0, `${row.property} states its evidence`);
   }
 });
 
-test("the rendering fallback is a real colour, and is not mistaken for a default", () => {
+test("what Theme Studio paints is a real colour, and is not a claimed default", () => {
   // The other half. B must still produce something paintable — a line with
   // no stroke colour would be invisible — while A stays absent.
   const line = styled(resolveLineChartStyle);
   assert.match(line.lineStyles.strokeColor, /^#[0-9A-Fa-f]{6}$/, "the preview can paint it");
-  assert.equal(line.lineStyles.strokeColor, "#00E660", "from the series palette, at draw time");
+  assert.equal(line.lineStyles.strokeColor, "#00E660", "Studio's choice: dataColors[0]");
 
   // And that painted value is NOT claimed as a theme default: the same
   // property still resolves as unset.
@@ -296,8 +298,32 @@ test("the rendering fallback is a real colour, and is not mistaken for a default
   assert.equal(entry.isSet, false);
 
   // Shade area follows the stroke rather than carrying its own colour,
-  // which is what `matchStrokeColor` defaulting on encodes.
+  // which is what `matchStrokeColor` defaulting on encodes — the one part
+  // of this that the sweep did measure.
   assert.equal(line.lineStyles.areaMatchStrokeColor, true);
+});
+
+test("a label background is not the visual container background", () => {
+  // These were once described as the same thing. They are not: the visual
+  // container is a capability constant that no token reaches, while the
+  // label plate falls through to the `background` token. Under a theme that
+  // sets `background` they diverge, which is why the description of what
+  // Studio paints has to name the token rather than say "the background".
+  const s = src();
+  const chrome = resolveChromeStyle(s, "clusteredBarChart", resolveTheme(s.roots));
+  const column = styled(resolveColumnChartStyle);
+
+  assert.equal(chrome.background.color, CAPABILITY_COLOR.visualBackground, "#FFFFFF");
+  assert.equal(column.labels.backgroundColor, nativeToken(s, "background"), "#00E643");
+  assert.notEqual(
+    column.labels.backgroundColor,
+    chrome.background.color,
+    "the fingerprint theme separates them, so the two cannot be conflated",
+  );
+
+  // Neither is a native default: Power BI shows the label background empty.
+  const entry = resolvePropertyEntry(s, COLUMN_CHART_PROPERTIES.labels.backgroundColor, "#000000");
+  assert.equal(entry.isSet, false);
 });
 
 test("an explicitly set colour is distinguishable from the rendering fallback", () => {
