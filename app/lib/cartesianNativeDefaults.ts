@@ -2,7 +2,7 @@
  * Power BI's native defaults for the cartesian visuals, and the small set of
  * exceptions that are genuinely per-visual.
  *
- * Measured by reading Power BI Desktop's own Format pane across seven
+ * Measured by reading Power BI Desktop's own Format pane across six
  * visuals — clustered column, stacked column, clustered bar, stacked bar,
  * 100% stacked bar, line — keyed on the pane's internal property paths
  * rather than on visible labels, under a diagnostic theme that fingerprints

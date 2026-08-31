@@ -82,19 +82,52 @@ export const CAPABILITY_COLOR = {
 } as const;
 
 /**
- * Properties measured as having **no default value at all** — the Format
- * pane shows them empty, not as a colour.
+ * Properties the Format pane shows **empty**: Power BI has no default value
+ * for them at all.
  *
- * Kept as a named export rather than a comment because the distinction is
- * load-bearing: substituting black, white or a token for one of these
- * asserts a default Power BI does not have, and the resulting theme would
- * export a value the user never chose. Callers resolve these to `undefined`
- * and let the renderer decide what to draw.
+ * Two different things are easy to conflate here, and conflating them is
+ * how a theme ends up exporting values its author never chose:
+ *
+ * **A — the native default.** What Power BI's own Format pane reports as
+ * the property's value when nothing has set it. For everything listed
+ * below, that is *absent*. There is no colour to inherit, no token behind
+ * it, and nothing for a theme to round-trip.
+ *
+ * **B — the effective rendering fallback.** What the preview paints when
+ * the property is absent. A renderer cannot draw "nothing", so it needs a
+ * colour, and Power BI itself picks one at draw time — the series palette
+ * entry for a line stroke and its shade area, the visual's own background
+ * behind a label. That choice is a *rendering* decision.
+ *
+ * The registries resolve B, because the preview has to paint something.
+ * They must never be read as asserting A. The distinction is visible in
+ * provenance rather than in the value: `resolvePropertyEntry` reports
+ * `source: "fallback"` and `isSet: false` for every property here, which is
+ * what keeps the editor showing it as unset and keeps the exporter from
+ * materialising it. `PROPERTIES_WITHOUT_NATIVE_DEFAULT` records which
+ * properties are in that position and what each one falls back to, so the
+ * two can be checked against each other rather than assumed.
  */
-export const NO_NATIVE_DEFAULT = [
-  "lines.strokeColor",
-  "shadeArea.shadeAreaColor",
-  "labels.background.backgroundColor",
-  "totals.background.backgroundColor",
-  "title.text.backgroundColor",
+export const PROPERTIES_WITHOUT_NATIVE_DEFAULT = [
+  {
+    property: "lineStyles.strokeColor",
+    /** What the renderer paints instead, and why that is not a default. */
+    renderFallback: "the series' palette entry, which Power BI also picks at draw time",
+  },
+  {
+    property: "lineStyles.areaColor",
+    renderFallback: "the series' stroke colour, per `shadeAreaMatchStrokeColor` being on",
+  },
+  {
+    property: "labels.backgroundColor",
+    renderFallback: "the visual background, so an enabled label plate is visible",
+  },
+  {
+    property: "totals.backgroundColor",
+    renderFallback: "the visual background, as for data labels",
+  },
+  {
+    property: "title.backgroundColor",
+    renderFallback: "the visual background, so the title plate is visible",
+  },
 ] as const;

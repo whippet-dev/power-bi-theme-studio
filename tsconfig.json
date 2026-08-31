@@ -21,5 +21,6 @@
     "**/*.tsx",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "_comment_exclude": "work/ and tools/*/output/ are gitignored local scratch space. They are not production sources, and typechecking them lets a throwaway script break `npm run build` and therefore `npm test`.",
+  "exclude": ["node_modules", "work", "tools/**/output", "dist"]
 }

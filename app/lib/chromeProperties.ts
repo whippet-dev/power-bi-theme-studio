@@ -1279,6 +1279,16 @@ export function resolveChromeStyle(
   const p = CHROME_PROPERTIES;
   const visualTitleText = resolveTextRole(theme, "visualTitle");
   const subtitleText = resolveTextRole(theme, "subtitle");
+  /**
+   * Tooltip body text, measured on the General tab's Tooltips card: the
+   * `label` family at the class's own size, coloured from `foreground`
+   * rather than from the label class.
+   *
+   * The header tooltip (`visualHeaderTooltip`, the small "i" affordance in
+   * the visual header) is a DIFFERENT card and was not measured, so it
+   * deliberately keeps its existing fallbacks below.
+   */
+  const tooltipText = resolveTextRole(theme, "tooltipText");
   const titleFamilyEntry = resolveChromeEntry(
     theme,
     activeVisual,
@@ -1309,7 +1319,7 @@ export function resolveChromeStyle(
       show: resolveChromeValue(theme, activeVisual, p.title.show, true),
       text: resolveChromeValue(theme, activeVisual, p.title.text, ""),
       alignment: resolveChromeValue(theme, activeVisual, p.title.alignment, "left"),
-      heading: resolveChromeValue(theme, activeVisual, p.title.heading, "Normal"),
+      heading: resolveChromeValue(theme, activeVisual, p.title.heading, "Heading3"),
       background: resolveChromeValue(theme, activeVisual, p.title.background, base.background),
       fontColor: resolveChromeValue(theme, activeVisual, p.title.fontColor, visualTitleText.color),
       fontFamily: titleFamilyEntry.value,
@@ -1326,7 +1336,7 @@ export function resolveChromeStyle(
       show: resolveChromeValue(theme, activeVisual, p.subTitle.show, false),
       text: resolveChromeValue(theme, activeVisual, p.subTitle.text, ""),
       alignment: resolveChromeValue(theme, activeVisual, p.subTitle.alignment, "left"),
-      heading: resolveChromeValue(theme, activeVisual, p.subTitle.heading, "Normal"),
+      heading: resolveChromeValue(theme, activeVisual, p.subTitle.heading, "Heading4"),
       fontColor: resolveChromeValue(theme, activeVisual, p.subTitle.fontColor, subtitleText.color),
       fontFamily: resolveChromeValue(theme, activeVisual, p.subTitle.fontFamily, subtitleText.fontFamily),
       fontSize: resolveChromeValue(theme, activeVisual, p.subTitle.fontSize, subtitleText.fontSize),
@@ -1470,21 +1480,21 @@ export function resolveChromeStyle(
       bold: resolveChromeValue(theme, activeVisual, p.visualTooltip.bold, false),
       italic: resolveChromeValue(theme, activeVisual, p.visualTooltip.italic, false),
       underline: resolveChromeValue(theme, activeVisual, p.visualTooltip.underline, false),
-      fontFamily: resolveChromeValue(theme, activeVisual, p.visualTooltip.fontFamily, base.fontFamily),
-      fontSize: resolveChromeValue(theme, activeVisual, p.visualTooltip.fontSize, 10),
-      titleFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.titleFontColor, base.foreground),
+      fontFamily: resolveChromeValue(theme, activeVisual, p.visualTooltip.fontFamily, tooltipText.fontFamily),
+      fontSize: resolveChromeValue(theme, activeVisual, p.visualTooltip.fontSize, tooltipText.fontSize),
+      titleFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.titleFontColor, tooltipText.color),
       themedTitleFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.themedTitleFontColor, base.foreground),
-      valueFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.valueFontColor, base.foreground),
+      valueFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.valueFontColor, tooltipText.color),
       themedValueFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.themedValueFontColor, base.foreground),
-      actionFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.actionFontColor, base.foreground),
-      background: resolveChromeValue(theme, activeVisual, p.visualTooltip.background, base.background),
+      actionFontColor: resolveChromeValue(theme, activeVisual, p.visualTooltip.actionFontColor, tooltipText.color),
+      background: resolveChromeValue(theme, activeVisual, p.visualTooltip.background, nativeToken(theme, "background")),
       themedBackground: resolveChromeValue(theme, activeVisual, p.visualTooltip.themedBackground, base.background),
       transparency: resolveChromeValue(theme, activeVisual, p.visualTooltip.transparency, 0),
-      showActionsInTooltips: resolveChromeValue(theme, activeVisual, p.visualTooltip.showActionsInTooltips, false),
+      showActionsInTooltips: resolveChromeValue(theme, activeVisual, p.visualTooltip.showActionsInTooltips, true),
       showChartSpecificTooltips: resolveChromeValue(theme, activeVisual, p.visualTooltip.showChartSpecificTooltips, true),
       showSentenceFormat: resolveChromeValue(theme, activeVisual, p.visualTooltip.showSentenceFormat, false),
       showTooltipFieldsOnly: resolveChromeValue(theme, activeVisual, p.visualTooltip.showTooltipFieldsOnly, false),
-      showValuesInBold: resolveChromeValue(theme, activeVisual, p.visualTooltip.showValuesInBold, false),
+      showValuesInBold: resolveChromeValue(theme, activeVisual, p.visualTooltip.showValuesInBold, true),
       sentenceTemplate: resolveChromeValue(theme, activeVisual, p.visualTooltip.sentenceTemplate, ""),
       section: resolveChromeValue(theme, activeVisual, p.visualTooltip.section, ""),
     },
