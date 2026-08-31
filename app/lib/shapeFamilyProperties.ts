@@ -634,16 +634,77 @@ const SHAPE_PARAM_DEFAULTS: Record<string, string | number> = {
  * Shape doesn't, and `groupSupportsStates` returning false for it means
  * `at()` is a no-op there — passing a non-"default" state has no effect.
  */
+/**
+ * A visual's CAPABILITY defaults: what Power BI itself renders when neither
+ * the report theme nor the selected base theme says anything.
+ *
+ * These four visuals share a schema shape, and the resolver used to share one
+ * set of fallback literals with it. That is structurally wrong: the schema is
+ * shared, the effective defaults are not. Measured natively, a Rectangle
+ * shows its fill and hides its text, while an Action Button hides its fill
+ * and shows a 3px border; a navigator shows bold text where neither of the
+ * others shows any.
+ *
+ * Only what has actually been measured belongs here. Anything omitted keeps
+ * the resolver's generic literal, so a gap reads as "not established yet"
+ * rather than as a claim. Colours are deliberately absent -- see the PR.
+ *
+ * Precedence is unchanged and comes for free: these are passed as the
+ * `fallback` argument to `resolvePropertyValue`, which already tries the
+ * custom theme, then the base theme, and only then the fallback. So an
+ * imported value still wins, a base-theme value still wins over a capability
+ * default, and Fluent 2's explicit per-state entries still resolve normally.
+ */
+export type ShapeFamilyDefaultValues = {
+  fill?: { show?: boolean; transparency?: number };
+  outline?: { show?: boolean; weight?: number; transparency?: number };
+  shadow?: { show?: boolean };
+  glow?: { show?: boolean };
+  text?: {
+    show?: boolean;
+    fontSize?: number;
+    bold?: boolean;
+    horizontalAlignment?: string;
+    verticalAlignment?: string;
+    topMargin?: number;
+    bottomMargin?: number;
+    leftMargin?: number;
+    rightMargin?: number;
+  };
+};
+
+export type ShapeFamilyDefaults = ShapeFamilyDefaultValues & {
+  /**
+   * Per-state capability defaults, applied over the visual-wide ones above.
+   *
+   * Empty for every visual today, deliberately: every per-state difference
+   * measured so far (a pressed navigator's grey fill, a selected one's black
+   * fill and white text, a disabled button's dimmed treatment) is a COLOUR,
+   * and colours are not encoded here. The mechanism exists because the
+   * stateful visuals need somewhere for such a default to go the moment one
+   * is established that is not a colour.
+   */
+  perState?: Partial<Record<InteractionState, ShapeFamilyDefaultValues>>;
+};
+
 export function resolveShapeFamilyCore(
   theme: ThemeSource,
   core: ShapeFamilyCore,
   baseForeground: string,
   baseFontFamily: string,
   state: InteractionState = "default",
+  defaults: ShapeFamilyDefaults = {},
 ): ResolvedShapeFamilyCore {
   const visual = core.fill.fillColor.visual;
   const at = <T extends PropertyValueType>(group: string, definition: PropertyDefinition<T>): PropertyLookup<T> =>
     groupSupportsStates(visual, group) ? forStateId(definition, state) : definition;
+
+  // Capability default for one property: the per-state one if this visual
+  // has one for the state being resolved, else the visual-wide one, else the
+  // generic literal that applied before any of this existed.
+  const stateDefaults = defaults.perState?.[state];
+  const cap = <T>(perState: T | undefined, perVisual: T | undefined, generic: T): T =>
+    perState ?? perVisual ?? generic;
 
   const shape: Record<string, string | number> = {};
   for (const [key, definition] of Object.entries(core.shape)) {
@@ -661,18 +722,18 @@ export function resolveShapeFamilyCore(
 
   return {
     fill: {
-      show: resolvePropertyValue(theme, at("fill", core.fill.show), true),
+      show: resolvePropertyValue(theme, at("fill", core.fill.show), cap(stateDefaults?.fill?.show, defaults.fill?.show, true)),
       fillColor: resolvePropertyValue(theme, at("fill", core.fill.fillColor), "#005EA5"),
-      transparency: resolvePropertyValue(theme, at("fill", core.fill.transparency), 0),
+      transparency: resolvePropertyValue(theme, at("fill", core.fill.transparency), cap(stateDefaults?.fill?.transparency, defaults.fill?.transparency, 0)),
     },
     outline: {
-      show: resolvePropertyValue(theme, at("outline", core.outline.show), false),
+      show: resolvePropertyValue(theme, at("outline", core.outline.show), cap(stateDefaults?.outline?.show, defaults.outline?.show, false)),
       lineColor: resolvePropertyValue(theme, at("outline", core.outline.lineColor), "#E3E3E3"),
-      weight: resolvePropertyValue(theme, at("outline", core.outline.weight), 1),
-      transparency: resolvePropertyValue(theme, at("outline", core.outline.transparency), 0),
+      weight: resolvePropertyValue(theme, at("outline", core.outline.weight), cap(stateDefaults?.outline?.weight, defaults.outline?.weight, 1)),
+      transparency: resolvePropertyValue(theme, at("outline", core.outline.transparency), cap(stateDefaults?.outline?.transparency, defaults.outline?.transparency, 0)),
     },
     shadow: {
-      show: resolvePropertyValue(theme, at("shadow", core.shadow.show), false),
+      show: resolvePropertyValue(theme, at("shadow", core.shadow.show), cap(stateDefaults?.shadow?.show, defaults.shadow?.show, false)),
       shadowPositionPreset: resolvePropertyValue(theme, at("shadow", core.shadow.shadowPositionPreset), "bottomRight"),
       angle: resolvePropertyValue(theme, at("shadow", core.shadow.angle), 45),
       color: resolvePropertyValue(theme, at("shadow", core.shadow.color), "#000000"),
@@ -681,7 +742,7 @@ export function resolveShapeFamilyCore(
       shadowBlur: resolvePropertyValue(theme, at("shadow", core.shadow.shadowBlur), 5),
     },
     glow: {
-      show: resolvePropertyValue(theme, at("glow", core.glow.show), false),
+      show: resolvePropertyValue(theme, at("glow", core.glow.show), cap(stateDefaults?.glow?.show, defaults.glow?.show, false)),
       color: resolvePropertyValue(theme, at("glow", core.glow.color), "#FFFFFF"),
       transparency: resolvePropertyValue(theme, at("glow", core.glow.transparency), 60),
       shadowBlur: resolvePropertyValue(theme, at("glow", core.glow.shadowBlur), 5),
@@ -693,20 +754,20 @@ export function resolveShapeFamilyCore(
     },
     shape,
     text: {
-      show: resolvePropertyValue(theme, at("text", core.text.show), true),
+      show: resolvePropertyValue(theme, at("text", core.text.show), cap(stateDefaults?.text?.show, defaults.text?.show, true)),
       text: resolvePropertyValue(theme, at("text", core.text.text), ""),
       fontColor: resolvePropertyValue(theme, at("text", core.text.fontColor), baseForeground),
       fontFamily: resolvePropertyValue(theme, at("text", core.text.fontFamily), baseFontFamily),
-      fontSize: resolvePropertyValue(theme, at("text", core.text.fontSize), 10),
-      bold: resolvePropertyValue(theme, at("text", core.text.bold), false),
+      fontSize: resolvePropertyValue(theme, at("text", core.text.fontSize), cap(stateDefaults?.text?.fontSize, defaults.text?.fontSize, 10)),
+      bold: resolvePropertyValue(theme, at("text", core.text.bold), cap(stateDefaults?.text?.bold, defaults.text?.bold, false)),
       italic: resolvePropertyValue(theme, at("text", core.text.italic), false),
       underline: resolvePropertyValue(theme, at("text", core.text.underline), false),
-      horizontalAlignment: resolvePropertyValue(theme, at("text", core.text.horizontalAlignment), "center"),
-      verticalAlignment: resolvePropertyValue(theme, at("text", core.text.verticalAlignment), "middle"),
-      topMargin: resolvePropertyValue(theme, at("text", core.text.topMargin), 0),
-      bottomMargin: resolvePropertyValue(theme, at("text", core.text.bottomMargin), 0),
-      leftMargin: resolvePropertyValue(theme, at("text", core.text.leftMargin), 0),
-      rightMargin: resolvePropertyValue(theme, at("text", core.text.rightMargin), 0),
+      horizontalAlignment: resolvePropertyValue(theme, at("text", core.text.horizontalAlignment), cap(stateDefaults?.text?.horizontalAlignment, defaults.text?.horizontalAlignment, "center")),
+      verticalAlignment: resolvePropertyValue(theme, at("text", core.text.verticalAlignment), cap(stateDefaults?.text?.verticalAlignment, defaults.text?.verticalAlignment, "middle")),
+      topMargin: resolvePropertyValue(theme, at("text", core.text.topMargin), cap(stateDefaults?.text?.topMargin, defaults.text?.topMargin, 0)),
+      bottomMargin: resolvePropertyValue(theme, at("text", core.text.bottomMargin), cap(stateDefaults?.text?.bottomMargin, defaults.text?.bottomMargin, 0)),
+      leftMargin: resolvePropertyValue(theme, at("text", core.text.leftMargin), cap(stateDefaults?.text?.leftMargin, defaults.text?.leftMargin, 0)),
+      rightMargin: resolvePropertyValue(theme, at("text", core.text.rightMargin), cap(stateDefaults?.text?.rightMargin, defaults.text?.rightMargin, 0)),
     },
   };
 }

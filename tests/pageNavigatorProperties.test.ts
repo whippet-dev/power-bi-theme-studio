@@ -27,8 +27,13 @@ test("resolvePageNavigatorStyle falls back to sensible defaults when there is no
   const base = resolveTheme(STARTER_THEME);
   const style = resolvePageNavigatorStyle(STARTER_THEME, base);
 
+  // Measured natively: hidden pages ARE shown by default.
   assert.equal(style.pages.showPage, true);
-  assert.equal(style.pages.showHiddenPages, false);
+  assert.equal(style.pages.showHiddenPages, true);
+  assert.equal(style.layout.cellPadding, 5);
+  // And a navigator shows bold text where a Shape or Button shows none.
+  assert.equal(style.text.show, true);
+  assert.equal(style.text.bold, true);
 });
 
 test("resolvePageNavigatorStyle prefers a visualStyles.pageNavigator override over defaults", () => {

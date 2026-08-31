@@ -28,8 +28,13 @@ test("resolveShapeStyle falls back to sensible defaults when there is no overrid
   const base = resolveTheme(STARTER_THEME);
   const style = resolveShapeStyle(STARTER_THEME, base);
 
+  // Native capability defaults for a Rectangle: fill on AND border on.
   assert.equal(style.fill.show, true);
-  assert.equal(style.outline.show, false);
+  assert.equal(style.outline.show, true);
+  assert.equal(style.outline.weight, 1);
+  // Text is off, with its latent typography still resolved behind it.
+  assert.equal(style.text.show, false);
+  assert.equal(style.text.fontSize, 10);
   assert.equal(style.text.fontColor, base.foreground);
   assert.equal(style.shape.tileShape, "rectangle");
 });
