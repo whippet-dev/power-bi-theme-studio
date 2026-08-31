@@ -136,12 +136,23 @@ export type ResolvedTextClass = {
  * | data / total / series label | label | label x 0.9 | foregroundNeutralSecondary |
  * | axis values, legend | label | **fixed 9** | foregroundNeutralSecondary |
  *
- * `fixedFontSize` and `color` are *derivation* defaults, not overrides. A
- * theme that declares the class explicitly still wins, exactly as it does
- * for every other field — see `resolveTextRole`.
+ * The two overrides do NOT behave the same way, and the difference is
+ * evidential rather than stylistic:
+ *
+ * - `fixedFontSize` wins over the class outright, including over a class a
+ *   theme declared explicitly. The axis title renders at 9 under themes
+ *   declaring `title` at 19 and at 30, so Power BI is not reading the class
+ *   for this size at all.
+ * - `color` yields to an explicitly declared class. Nothing measured shows
+ *   a declared class colour being ignored, so the role only supplies one
+ *   where the class was left to derive.
+ *
+ * Neither weakens theme precedence where it applies: an explicit
+ * `visualStyles` value is resolved by the registries before either of these
+ * is reached. See `resolveTextRole`.
  */
 export type TextRoleSpec = {
-  /** Supplies the family and weight, and the declaration that can override. */
+  /** Supplies the family and weight, and — for colour — the declaration that can override. */
   class: TextClassName;
   /**
    * A size Power BI holds constant regardless of the text class.
@@ -501,9 +512,14 @@ const isDeclared = (source: TextClassSource): boolean =>
  *
  * The class supplies all three to begin with, and the role's spec then
  * replaces the size and colour where Power BI does not take them from the
- * class — but only where the class was left to derive. An explicit
- * declaration at either theme layer still wins, so this narrows what the
- * class system is claimed to control without weakening theme precedence.
+ * class. The two replacements differ in how far they go — the fixed size
+ * wins outright, the token colour yields to a declared class — for the
+ * reasons given on `TextRoleSpec` and restated at each branch below.
+ *
+ * Either way an explicit `visualStyles` value still wins: the registries
+ * resolve that first and only fall through to this when no theme layer
+ * spoke. This narrows what the text-class system is claimed to control
+ * without weakening theme precedence.
  */
 export function resolveTextRole(source: ThemeSource, role: TextRole): ResolvedTextClass {
   const spec: TextRoleSpec = TEXT_ROLE_SPEC[role];
