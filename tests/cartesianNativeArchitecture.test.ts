@@ -22,14 +22,14 @@ import {
   stackingFeatures,
 } from "../app/lib/cartesianNativeDefaults";
 import { resolveChromeStyle } from "../app/lib/chromeProperties";
-import { resolveColumnChartStyle } from "../app/lib/columnChartProperties";
-import { resolveLineChartStyle } from "../app/lib/lineChartProperties";
-import { CAPABILITY_COLOR, nativeDataColor, nativeToken } from "../app/lib/nativeTokens";
-import { themeLayers } from "../app/lib/properties";
+import { COLUMN_CHART_PROPERTIES, resolveColumnChartStyle } from "../app/lib/columnChartProperties";
+import { LINE_CHART_PROPERTIES, resolveLineChartStyle } from "../app/lib/lineChartProperties";
+import { CAPABILITY_COLOR, PROPERTIES_WITHOUT_NATIVE_DEFAULT, nativeDataColor, nativeToken } from "../app/lib/nativeTokens";
+import { resolvePropertyEntry, themeLayers, type ThemeSource } from "../app/lib/properties";
 import { resolveStackedBarChartStyle } from "../app/lib/stackedBarChartProperties";
 import { resolveStackedColumnChartStyle } from "../app/lib/stackedColumnChartProperties";
 import { NATIVE_CHROME_FONT_SIZE, TEXT_ROLE_SPEC, resolveTextRole } from "../app/lib/textClasses";
-import { resolveTheme, type PowerBITheme } from "../app/lib/theme";
+import { resolveTheme, type PowerBITheme, type ResolvedTheme } from "../app/lib/theme";
 
 /**
  * A theme in the shape of the diagnostic one: every token a different hue,
@@ -64,20 +64,35 @@ const FINGERPRINT_LARGE: PowerBITheme = {
 };
 
 const src = (theme: PowerBITheme = FINGERPRINT) => themeLayers(theme, getBaseTheme("classic2026"));
-const styled = <T>(resolve: (s: ReturnType<typeof src>, t: ReturnType<typeof resolveTheme>) => T, theme?: PowerBITheme): T => {
+
+/**
+ * Each registry returns its own style shape, so the resolver is taken as a
+ * bare two-argument function and the caller states the fields it reads.
+ * Narrowing to one registry's return type would make the shared-default
+ * loops below impossible to write.
+ */
+type Resolver<T> = (source: ThemeSource, base: ResolvedTheme) => T;
+const styled = <T>(resolve: Resolver<T>, theme?: PowerBITheme): T => {
   const s = src(theme);
   return resolve(s, resolveTheme(s.roots));
 };
 
-/** The visuals drawing a rectangular mark, which is the set that has a mark border. */
-const RECTANGULAR = [
+/**
+ * The visuals drawing a rectangular mark, which is the set that has a mark
+ * border. Typed against the widened resolver so the loops below can hold
+ * five different style shapes; each test states the fields it reads.
+ */
+const RECTANGULAR: ReadonlyArray<{ name: string; resolve: Resolver<unknown> }> = [
   { name: "Clustered Bar", resolve: resolveBarChartStyle },
   { name: "Stacked Bar", resolve: resolveStackedBarChartStyle },
   { name: "Clustered Column", resolve: resolveColumnChartStyle },
   { name: "Stacked Column", resolve: resolveStackedColumnChartStyle },
-] as const;
+];
 
-const CARTESIAN = [...RECTANGULAR, { name: "Line", resolve: resolveLineChartStyle }] as const;
+const CARTESIAN: ReadonlyArray<{ name: string; resolve: Resolver<unknown> }> = [
+  ...RECTANGULAR,
+  { name: "Line", resolve: resolveLineChartStyle },
+];
 
 // ---------------------------------------------------------------------------
 // 1. The three typography channels resolve independently
@@ -240,32 +255,105 @@ test("token accessors fall back to Power BI's values, not to invented ones", () 
 // 4. "No default" is preserved as distinct from a colour literal
 // ---------------------------------------------------------------------------
 
-test("properties with no native default are never silently given black", () => {
-  const line = styled(resolveLineChartStyle);
-  const column = styled(resolveColumnChartStyle) as never as {
-    labels: { backgroundColor: string };
-  };
+test("a property with no native default resolves as unset, whatever it paints", () => {
+  // The distinction that matters is provenance, not colour. Each of these
+  // has NO native default (A), but the preview still has to paint something
+  // (B). Asserting only "not black" would pass even if the resolver had
+  // invented a default, so the real check is that no layer set it: the
+  // value arrives as a fallback, and `isSet` stays false. That is what
+  // keeps the editor showing it unset and the exporter from writing it.
   const s = src();
-  const chrome = resolveChromeStyle(s, "clusteredBarChart", resolveTheme(s.roots));
-
-  // These four were measured as empty in the Format pane. Substituting a
-  // literal would assert a default Power BI does not have; substituting
-  // black in particular was the old behaviour and is what this guards.
-  for (const [label, value] of [
-    ["line stroke", line.lineStyles.strokeColor],
-    ["shade area", line.lineStyles.areaColor],
-    ["data-label background", column.labels.backgroundColor],
-    ["visual title background", chrome.title.backgroundColor],
+  for (const [label, definition] of [
+    ["line stroke", LINE_CHART_PROPERTIES.lineStyles.strokeColor],
+    ["shade area", LINE_CHART_PROPERTIES.lineStyles.areaColor],
+    ["data-label background", COLUMN_CHART_PROPERTIES.labels.backgroundColor],
   ] as const) {
-    assert.notEqual(value, "#000000", `${label} must not default to black`);
-    assert.notEqual(value, "#000", `${label} must not default to black`);
+    const entry = resolvePropertyEntry(s, definition, "#000000");
+    assert.equal(entry.source, "fallback", `${label}: no theme layer supplies it`);
+    assert.equal(entry.isSet, false, `${label}: and it must not read as configured`);
   }
 
-  // The line's stroke and shade area follow the series colour rather than
-  // carrying one, which is what `matchStrokeColor` being on by default
-  // encodes. Painting them from the palette is correct; claiming the
-  // palette is their *theme default* is not.
+  // Every property named in the table is one the sweep measured as empty,
+  // and each records what the renderer paints instead — so the two can be
+  // checked against each other rather than assumed.
+  assert.ok(PROPERTIES_WITHOUT_NATIVE_DEFAULT.length > 0);
+  for (const row of PROPERTIES_WITHOUT_NATIVE_DEFAULT) {
+    assert.ok(row.property.includes("."), `${row.property} names a property path`);
+    assert.ok(row.renderFallback.length > 0, `${row.property} states its render fallback`);
+  }
+});
+
+test("the rendering fallback is a real colour, and is not mistaken for a default", () => {
+  // The other half. B must still produce something paintable — a line with
+  // no stroke colour would be invisible — while A stays absent.
+  const line = styled(resolveLineChartStyle);
+  assert.match(line.lineStyles.strokeColor, /^#[0-9A-Fa-f]{6}$/, "the preview can paint it");
+  assert.equal(line.lineStyles.strokeColor, "#00E660", "from the series palette, at draw time");
+
+  // And that painted value is NOT claimed as a theme default: the same
+  // property still resolves as unset.
+  const entry = resolvePropertyEntry(src(), LINE_CHART_PROPERTIES.lineStyles.strokeColor, "#000000");
+  assert.equal(entry.isSet, false);
+
+  // Shade area follows the stroke rather than carrying its own colour,
+  // which is what `matchStrokeColor` defaulting on encodes.
   assert.equal(line.lineStyles.areaMatchStrokeColor, true);
+});
+
+test("an explicitly set colour is distinguishable from the rendering fallback", () => {
+  // Completes the distinction: once a theme does set one of these, it must
+  // read as set. Otherwise `isSet` would be proving nothing.
+  const custom: PowerBITheme = {
+    ...FINGERPRINT,
+    visualStyles: { lineChart: { "*": { lineStyles: [{ strokeColor: { solid: { color: "#123456" } } }] } } },
+  };
+  const entry = resolvePropertyEntry(src(custom), LINE_CHART_PROPERTIES.lineStyles.strokeColor, "#000000");
+  assert.equal(entry.isSet, true);
+  assert.notEqual(entry.source, "fallback");
+  assert.equal(entry.value, "#123456");
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Tooltip typography and heading levels
+// ---------------------------------------------------------------------------
+
+test("tooltip text takes the label family and size, and the foreground colour", () => {
+  const s = src();
+  const chrome = resolveChromeStyle(s, "clusteredBarChart", resolveTheme(s.roots));
+  assert.equal(chrome.visualTooltip.fontFamily, "Courier New", "label family");
+  assert.equal(chrome.visualTooltip.fontSize, 13, "label size, unscaled");
+  assert.notEqual(chrome.visualTooltip.fontSize, 10, "not the old literal");
+  for (const colour of [
+    chrome.visualTooltip.titleFontColor,
+    chrome.visualTooltip.valueFontColor,
+    chrome.visualTooltip.actionFontColor,
+  ]) {
+    assert.equal(colour, "#E60000", "all three tooltip text roles are `foreground`");
+  }
+  // The `background` token paints the tooltip, which is the one place it
+  // does reach — unlike the visual container asserted above.
+  assert.equal(chrome.visualTooltip.background, "#00E643");
+});
+
+test("the header tooltip is a different card and keeps its own fallbacks", () => {
+  // Deliberately NOT migrated: the sweep read the General tab's Tooltips
+  // card, not the visual header's "i" affordance, so nothing establishes
+  // that the two share defaults.
+  const s = src();
+  const chrome = resolveChromeStyle(s, "clusteredBarChart", resolveTheme(s.roots));
+  assert.equal(chrome.visualHeaderTooltip.fontSize, 10, "unmeasured, so unchanged");
+  assert.notEqual(
+    chrome.visualHeaderTooltip.fontSize,
+    chrome.visualTooltip.fontSize,
+    "and it must not have been changed along with the body tooltip",
+  );
+});
+
+test("title and subtitle carry their measured heading levels", () => {
+  const s = src();
+  const chrome = resolveChromeStyle(s, "clusteredBarChart", resolveTheme(s.roots));
+  assert.equal(chrome.title.heading, "Heading3");
+  assert.equal(chrome.subTitle.heading, "Heading4");
 });
 
 // ---------------------------------------------------------------------------
