@@ -2879,10 +2879,22 @@ button { color: inherit; }
 
 .shape-tile__text {
   display: flex;
-  align-items: center;
   width: 100%;
   line-height: 1.3;
   overflow-wrap: break-word;
+  /* Vertical alignment needs somewhere to go. The box used to be one line
+     tall inside a 202px tile -- measured 0.3px of spare height -- so
+     align-items had nothing to act on whatever it was set to. flex: 1
+     claims the free space when the tile stacks an icon above or below the
+     text (a column), and align-self: stretch claims it when the icon sits
+     beside the text (a row). Between them the text box is the full tile in
+     both layouts, without changing the tile itself.
+
+     align-items is deliberately NOT set here: it carries the visual's own
+     vertical alignment and is applied inline, defaulting to center, which
+     is what this rule used to hard-code. */
+  flex: 1;
+  align-self: stretch;
 }
 
 .shape-tile__icon {

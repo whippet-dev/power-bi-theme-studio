@@ -6,7 +6,7 @@ import type { ResolvedBarChartStyle } from "../lib/barChartProperties";
 import type { ResolvedBookmarkNavigatorStyle } from "../lib/bookmarkNavigatorProperties";
 import type { ResolvedCardStyle } from "../lib/cardProperties";
 import { hexWithAlpha } from "../lib/colorUtils";
-import { formatValue, mapTextAlign, SmallMultiplesGrid } from "./ChartParts";
+import { formatValue, mapAlignItems, mapJustifyContent, mapTextAlign, SmallMultiplesGrid } from "./ChartParts";
 import { FilterPanePreview } from "./GlobalPreviews";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
@@ -247,9 +247,19 @@ function shapeTile(
             fontWeight: style.text.bold ? 700 : 400,
             fontStyle: style.text.italic ? "italic" : "normal",
             textDecoration: style.text.underline ? "underline" : "none",
+            // The two axes, mapped to the two the flex box actually has.
+            // This box is a default row, so horizontal is the MAIN axis
+            // (justify-content) and vertical is the CROSS axis
+            // (align-items). They were the other way round: vertical drove
+            // justify-content, which moved the text horizontally, while
+            // horizontal was emitted as text-align, which cannot position
+            // an anonymous flex item at all. Measured before the fix:
+            // horizontal left/center/right left the text at x=250.3 in all
+            // three, and vertical top/middle/bottom moved it 0 -> 250.3 ->
+            // 500.7 without ever changing y.
             textAlign: mapTextAlign(style.text.horizontalAlignment) ?? "center",
-            justifyContent:
-              style.text.verticalAlignment === "top" ? "flex-start" : style.text.verticalAlignment === "bottom" ? "flex-end" : "center",
+            justifyContent: mapJustifyContent(style.text.horizontalAlignment) ?? "center",
+            alignItems: mapAlignItems(style.text.verticalAlignment) ?? "center",
             padding: `${style.text.topMargin}px ${style.text.rightMargin}px ${style.text.bottomMargin}px ${style.text.leftMargin}px`,
             // Text rotates independently of the shape in Power BI.
             transform: style.rotation.textAngle ? `rotate(${style.rotation.textAngle}deg)` : undefined,
@@ -968,6 +978,7 @@ export function VisualGallery({
     backgroundColor: matrixStyle.columnFormatting.backColor,
     color: matrixStyle.columnFormatting.fontColor,
     textAlign: mapTextAlign(matrixStyle.columnFormatting.alignment),
+    justifyContent: mapJustifyContent(matrixStyle.columnFormatting.alignment),
   };
 
   const matrixExpandToggle = (expanded: boolean) =>
@@ -1059,6 +1070,7 @@ export function VisualGallery({
             // Column-level formatting optionally reaches the header too.
             ...(columnIndex === 1 && matrixStyle.columnFormatting.styleHeader ? matrixColumnFormattingStyle : {}),
             textAlign: mapTextAlign(matrixStyle.columnHeaders.titleAlignment),
+            justifyContent: mapJustifyContent(matrixStyle.columnHeaders.titleAlignment),
             borderBottom: matrixGridBorder(matrixStyle.grid.gridHorizontal, matrixStyle.grid.gridHorizontalColor, matrixStyle.grid.gridHorizontalWeight),
             ...outlineFromBitmask(
               matrixStyle.columnHeaders.outlineStyle,
@@ -1101,6 +1113,7 @@ export function VisualGallery({
               // what makes the hierarchy legible.
               paddingLeft: row.child && matrixStyle.rowHeaders.stepped ? matrixStyle.rowHeaders.steppedLayoutIndentation : undefined,
               textAlign: mapTextAlign(matrixStyle.rowHeaders.alignment),
+              justifyContent: mapJustifyContent(matrixStyle.rowHeaders.alignment),
               whiteSpace: matrixStyle.rowHeaders.wordWrap ? "normal" : "nowrap",
               borderRight: matrixGridBorder(matrixStyle.grid.gridVertical, matrixStyle.grid.gridVerticalColor, matrixStyle.grid.gridVerticalWeight),
               ...outlineFromBitmask(
