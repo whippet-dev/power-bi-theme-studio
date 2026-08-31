@@ -4,7 +4,7 @@ import test from "node:test";
 import { resolveBarChartStyle } from "../app/lib/barChartProperties";
 import { getBaseTheme } from "../app/lib/baseThemes";
 import { themeLayers } from "../app/lib/properties";
-import { resolveTextClass, resolveTextRole, TEXT_ROLE_CLASS } from "../app/lib/textClasses";
+import { NATIVE_CHROME_FONT_SIZE, resolveTextClass, resolveTextRole, TEXT_ROLE_SPEC } from "../app/lib/textClasses";
 import {
   deleteThemeValue,
   hasThemeValueAtPath,
@@ -231,29 +231,28 @@ test("foregroundNeutralSecondary layers custom over base for light classes", () 
 // Roles
 // ---------------------------------------------------------------------------
 
-test("the semantic roles map to the classes Microsoft documents", () => {
-  assert.equal(TEXT_ROLE_CLASS.visualTitle, "largeTitle");
-  assert.equal(TEXT_ROLE_CLASS.categoryAxisTitle, "title");
-  assert.equal(TEXT_ROLE_CLASS.valueAxisTitle, "title");
+test("each role names the class that supplies its family", () => {
+  assert.equal(TEXT_ROLE_SPEC.visualTitle.class, "largeTitle");
+  assert.equal(TEXT_ROLE_SPEC.categoryAxisTitle.class, "title");
+  assert.equal(TEXT_ROLE_SPEC.valueAxisTitle.class, "title");
+  assert.equal(TEXT_ROLE_SPEC.smallMultipleTitle.class, "title");
   // Microsoft's published table associates category axis labels with
-  // `lightLabel`. The runtime disagrees, and was made to prove it rather
-  // than inferred from one baseline number: raising the report theme's
-  // primary text size from 10pt to 20pt in Power BI Desktop moved the
-  // category axis to 18pt/24px (x0.9) and its own font-size control to 18,
-  // while the legend moved to 26.667px (x1.0) in the same run and the axis
-  // titles did not move at all. A custom theme setting label 20pt must
-  // therefore render its category axis at 18pt, which only the class
-  // mapping reproduces. The documented association is recorded as
-  // contradicted in BASE_THEME_DIFFERENTIAL_AUDIT.md 4.1; colour is
-  // identical either way, so only the scale moves.
-  assert.equal(TEXT_ROLE_CLASS.categoryAxisLabel, "smallLightLabel");
-  assert.equal(TEXT_ROLE_CLASS.legendText, "lightLabel");
-  assert.equal(TEXT_ROLE_CLASS.valueAxisLabel, "smallLightLabel");
-  assert.equal(TEXT_ROLE_CLASS.dataLabel, "smallLightLabel");
-  assert.equal(TEXT_ROLE_CLASS.referenceLineLabel, "smallLabel");
-  // A role is just a named class lookup, so the two must agree.
+  // `lightLabel`; the runtime uses the x0.9 class. Colour is identical
+  // either way, and the size is overridden by the native constant below,
+  // so this now only decides the family.
+  assert.equal(TEXT_ROLE_SPEC.categoryAxisLabel.class, "smallLightLabel");
+  assert.equal(TEXT_ROLE_SPEC.legendText.class, "lightLabel");
+  assert.equal(TEXT_ROLE_SPEC.valueAxisLabel.class, "smallLightLabel");
+  assert.equal(TEXT_ROLE_SPEC.dataLabel.class, "smallLightLabel");
+  assert.equal(TEXT_ROLE_SPEC.totalLabel.class, "smallLightLabel");
+  assert.equal(TEXT_ROLE_SPEC.seriesLabel.class, "smallLightLabel");
+  assert.equal(TEXT_ROLE_SPEC.referenceLineLabel.class, "smallLabel");
+});
+
+test("a role with no size or colour override is exactly its class", () => {
   const l = withClassic(PRIMARY_ONLY);
-  assert.deepEqual(resolveTextRole(l, "valueAxisLabel"), resolveTextClass(l, "smallLightLabel"));
+  assert.deepEqual(resolveTextRole(l, "dataLabel"), resolveTextClass(l, "smallLightLabel"));
+  assert.deepEqual(resolveTextRole(l, "visualTitle"), resolveTextClass(l, "largeTitle"));
 });
 
 test("Classic 2026 visual titles resolve through largeTitle to the native DIN 14 role", () => {
@@ -273,13 +272,13 @@ test("PILOT: Classic no longer falls to 6px in an unnamed font", () => {
   // The audit's headline defect. Classic 2026 declares no fontSize anywhere in
   // visualStyles, so every one of these used to be the literal 6.
   const s = barStyle(EMPTY, "classic2026");
-  assert.equal(s.categoryAxis.fontSize, 9, "from smallLightLabel, label x 0.9");
-  assert.equal(s.categoryAxis.fontFamily, "Segoe UI");
-  assert.equal(s.valueAxis.fontSize, 9, "from smallLightLabel, label x 0.9");
-  assert.equal(s.categoryAxis.titleFontSize, 12, "from title");
-  assert.equal(s.categoryAxis.titleFontFamily, "DIN");
-  assert.equal(s.legend.fontSize, 10);
-  assert.equal(s.labels.fontSize, 9);
+  assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.fontFamily, "Segoe UI", "family still from the class");
+  assert.equal(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.titleFontFamily, "DIN", "family still from the class");
+  assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.labels.fontSize, 9, "data labels DO scale: label 10 x 0.9");
   for (const size of [s.categoryAxis.fontSize, s.valueAxis.fontSize, s.legend.fontSize, s.labels.fontSize]) {
     assert.notEqual(size, 6);
   }
@@ -296,8 +295,9 @@ test("PILOT: an explicit visualStyles value still beats the text class", () => {
     String(s.categoryAxis.fontFamily).startsWith("'Segoe UI'"),
     "Fluent's explicit family stack, not the text class's bare name",
   );
-  // smallLightLabel would have said 9.45 here; visualStyles wins.
-  assert.notEqual(s.valueAxis.fontSize, 9.45);
+  // The native constant would have said 9 here; visualStyles wins, which is
+  // the precedence guarantee the whole native layer must not break.
+  assert.notEqual(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
 
   // Fluent's own label is 10.5, the same number as its explicit axis size,
   // so the assertions above would also pass if the text class were wrongly
@@ -310,17 +310,19 @@ test("PILOT: an explicit visualStyles value still beats the text class", () => {
     String(loud.categoryAxis.fontFamily).startsWith("'Segoe UI'"),
     "Fluent's family, not Comic Sans MS",
   );
-  // And where Fluent declares nothing, the custom text class does win.
-  assert.equal(loud.legend.fontSize, 14, "legend has no explicit Fluent value");
-  assert.equal(loud.legend.fontFamily, "Comic Sans MS");
+  // And where Fluent declares nothing, the custom text class supplies the
+  // family while the native constant supplies the size.
+  assert.equal(loud.legend.fontSize, NATIVE_CHROME_FONT_SIZE, "chrome size");
+  assert.equal(loud.legend.fontFamily, "Comic Sans MS", "custom class family");
 });
 
 test("PILOT: a custom explicit visualStyles value beats both", () => {
   const custom = updateThemeValue(PRIMARY_ONLY, ["visualStyles", "clusteredBarChart", "*", "categoryAxis", 0, "fontSize"], 31);
   const s = barStyle(custom, "fluent2");
   assert.equal(s.categoryAxis.fontSize, 31);
-  // Its neighbour, which nothing declares, still comes from the text class.
-  assert.equal(s.legend.fontSize, 14, "PRIMARY_ONLY's label size, via lightLabel");
+  // Its neighbour, which nothing declares, falls to the native chrome size.
+  assert.equal(s.legend.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.legend.fontFamily, "Comic Sans MS", "but keeps the class family");
 });
 
 test("PILOT: the private theme + Classic uses that theme's own Arial typography", { skip: hasPrivateTheme ? false : "private theme fixture not present" }, () => {
@@ -335,33 +337,36 @@ test("PILOT: the private theme + Classic uses that theme's own Arial typography"
   ]) {
     assert.equal(family, "Arial");
   }
-  assert.equal(s.categoryAxis.fontSize, 10);
-  assert.equal(s.categoryAxis.titleFontSize, 12);
-  // It declares smallLightLabel explicitly at 10, so the 0.9 scale does not
-  // apply — an explicit secondary outranks the derivation.
-  assert.equal(s.valueAxis.fontSize, 10);
+  // Chrome sizes are the native constant regardless of what the theme's
+  // classes declare; only the families come through.
+  assert.equal(s.categoryAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.categoryAxis.titleFontSize, NATIVE_CHROME_FONT_SIZE);
+  assert.equal(s.valueAxis.fontSize, NATIVE_CHROME_FONT_SIZE);
 });
 
 test("PILOT: reset returns an overridden property to its text-class value", () => {
-  const path = ["visualStyles", "clusteredBarChart", "*", "categoryAxis", 0, "fontSize"] as Array<string | number>;
-  const derived = barStyle(PRIMARY_ONLY, "classic2026").categoryAxis.fontSize;
+  // Driven through the data labels, which still derive from the text class.
+  // The axis would work too, but its value is now a constant, so a reset
+  // returning to it would prove nothing about the derivation surviving.
+  const path = ["visualStyles", "clusteredBarChart", "*", "labels", 0, "fontSize"] as Array<string | number>;
+  const derived = barStyle(PRIMARY_ONLY, "classic2026").labels.fontSize;
   assert.equal(derived, 12.6, "the primary's 14, through the x0.9 class");
 
   const overridden = updateThemeValue(PRIMARY_ONLY, path, 31);
   assert.equal(hasThemeValueAtPath(overridden, path), true, "the editor sees an explicit value");
-  assert.equal(barStyle(overridden, "classic2026").categoryAxis.fontSize, 31);
+  assert.equal(barStyle(overridden, "classic2026").labels.fontSize, 31);
 
   const reset = deleteThemeValue(overridden, path);
   assert.equal(hasThemeValueAtPath(reset, path), false, "and no longer sees one after reset");
-  assert.equal(barStyle(reset, "classic2026").categoryAxis.fontSize, derived, "back to the derived value");
+  assert.equal(barStyle(reset, "classic2026").labels.fontSize, derived, "back to the derived value");
 });
 
 test("PILOT: a text-class-derived value is never an explicit override", () => {
   // The editor shows the effective value but must not treat it as set, or the
   // next export would materialise defaults the author never wrote.
-  const path = ["visualStyles", "clusteredBarChart", "*", "categoryAxis", 0, "fontSize"] as Array<string | number>;
+  const path = ["visualStyles", "clusteredBarChart", "*", "labels", 0, "fontSize"] as Array<string | number>;
   assert.equal(hasThemeValueAtPath(PRIMARY_ONLY, path), false);
-  assert.equal(barStyle(PRIMARY_ONLY, "classic2026").categoryAxis.fontSize, 12.6);
+  assert.equal(barStyle(PRIMARY_ONLY, "classic2026").labels.fontSize, 12.6);
   assert.equal(hasThemeValueAtPath(PRIMARY_ONLY, path), false, "resolving must not have set anything");
 });
 
@@ -550,6 +555,7 @@ test("PILOT: the main data-label colour follows smallLightLabel, not the palette
   });
   assert.equal(barStyle(overridden, "classic2026").labels.color, "#0000FF");
 
-  // detailColor is deliberately NOT migrated: its Power BI role is unproven.
-  assert.equal(s.labels.detailColor, "#FF0000", "still the first data colour");
+  // All three label parts share one colour source, so Detail follows Value.
+  assert.equal(s.labels.detailColor, s.labels.color, "Detail shares Value's colour");
+  assert.notEqual(s.labels.detailColor, "#FF0000", "no longer the first data colour");
 });

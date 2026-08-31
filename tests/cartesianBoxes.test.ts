@@ -293,6 +293,10 @@ test("a bigger font costs plot, it does not move the box", () => {
   // viewport carved out of its authored rectangle: formatting subtracts from
   // the plot and never grows the container back. A theme that doubles every
   // font must therefore shrink the plot and leave the box alone.
+  // Set through visualStyles rather than the text classes. Axis typography
+  // is the only formatting that moves a gutter, and its size is now a native
+  // constant that no text class reaches — so a class-only theme would leave
+  // the layout identical and this test would prove nothing.
   const HUGE: PowerBITheme = {
     name: "huge",
     textClasses: {
@@ -301,7 +305,14 @@ test("a bigger font costs plot, it does not move the box", () => {
       title: { fontFace: "Segoe UI", fontSize: 24, color: "#111111" },
       label: { fontFace: "Segoe UI", fontSize: 20, color: "#111111" },
     },
-    visualStyles: {},
+    visualStyles: {
+      "*": {
+        "*": {
+          categoryAxis: [{ fontSize: 40, titleFontSize: 40 }],
+          valueAxis: [{ fontSize: 40, titleFontSize: 40 }],
+        },
+      },
+    },
   };
 
   for (const entry of CARTESIAN) {

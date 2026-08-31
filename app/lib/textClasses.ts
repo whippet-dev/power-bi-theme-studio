@@ -32,6 +32,18 @@ import { themeFontFamilyToCss } from "./fontFamilies";
 import { resolveColorValue, themeRoots, type ThemeSource } from "./properties";
 import type { PowerBITheme } from "./theme";
 
+/**
+ * The size Power BI holds the chart chrome at, whatever the text classes say.
+ *
+ * Axis values, axis titles and legend text all read 9 in Desktop's own
+ * font-size control under a theme setting `label` 13 / `title` 19, and read
+ * 9 again under `label` 20 / `title` 30. Two points, no movement.
+ */
+export const NATIVE_CHROME_FONT_SIZE = 9;
+
+/** Power BI's `foreground` when a theme declares none. */
+const BUILT_IN_FOREGROUND = "#252423";
+
 /** Every class Power BI's own table produces. */
 export type TextClassName =
   | "callout"
@@ -99,57 +111,106 @@ export type ResolvedTextClass = {
 };
 
 /**
- * The semantic roles a visual can ask for, and the class each maps to.
+ * A text surface's three independently-resolvable typography channels.
+ *
+ * Power BI does not give a surface one text class. It gives it a family
+ * from a class, a size from one of four rules, and a colour from either a
+ * class or a root token — and those three choices do not have to agree.
+ * The proof is the axis title: it renders in the `title` class's family and
+ * colour at a size of exactly 9 that no class produces. A role modelled as
+ * a single class name cannot express that, which is why this is a spec
+ * rather than a lookup.
+ *
+ * Measured in Power BI Desktop against a diagnostic theme in which every
+ * token and text class carries a unique colour, at two theme points
+ * (`label` 13 / `title` 19 and `label` 20 / `title` 30) so that an
+ * inherited size is distinguishable from a constant that merely matched:
+ *
+ * | surface | family | size | colour |
+ * |---|---|---|---|
+ * | visual title | title | title x 7/6 | title |
+ * | small-multiple title | title | title x 1 | title |
+ * | axis title | title | **fixed 9** | title |
+ * | subtitle | label | label x 1 | foregroundNeutralSecondary |
+ * | tooltip | label | label x 1 | **foreground** |
+ * | data / total / series label | label | label x 0.9 | foregroundNeutralSecondary |
+ * | axis values, legend | label | **fixed 9** | foregroundNeutralSecondary |
+ *
+ * `fixedFontSize` and `color` are *derivation* defaults, not overrides. A
+ * theme that declares the class explicitly still wins, exactly as it does
+ * for every other field — see `resolveTextRole`.
+ */
+export type TextRoleSpec = {
+  /** Supplies the family and weight, and the declaration that can override. */
+  class: TextClassName;
+  /**
+   * A size Power BI holds constant regardless of the text class.
+   *
+   * Only the chart chrome does this. It held at 9 across both theme points
+   * while `label` moved 13 -> 20 and `title` moved 19 -> 30, so it ignores
+   * both classes rather than deriving from either.
+   */
+  fixedFontSize?: number;
+  /**
+   * A root token that supplies the colour instead of the class's own.
+   * `builtIn` is Power BI's value when the theme declares no such token.
+   */
+  color?: { token: string; builtIn: string };
+};
+
+/**
+ * The semantic roles a visual can ask for.
  *
  * Kept here rather than in a chart registry because the mapping is Power
- * BI's, not any one visual's — a value axis label comes from
- * `smallLightLabel` on every cartesian visual that has one. Renderers name a
- * *role*; this module owns which class serves it.
+ * BI's, not any one visual's — a value axis label resolves identically on
+ * every cartesian visual that has one. Renderers name a *role*; this module
+ * owns how that role's three channels resolve.
  *
- * `categoryAxisLabel` is `smallLightLabel` because Power BI was **made to
- * demonstrate the derivation**, not because the baseline number happens to
- * fit. Microsoft's published table associates this role with `lightLabel`;
- * the runtime disagrees.
+ * ## A recorded contradiction, deliberately not smoothed over
  *
- * The test that settles it: raise the report theme's primary text size from
- * 10pt to 20pt in Power BI Desktop, under Classic 2026, touching nothing
- * else (§5.15). What follows it:
+ * The fixed 9 on `categoryAxisLabel` and `valueAxisLabel` contradicts the
+ * earlier finding recorded in POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.15,
+ * which reported the category axis moving 9pt -> 18pt when the theme's
+ * primary text size went 10 -> 20, i.e. deriving as `label` x 0.9.
  *
- * | role | before | after | scale |
- * |---|---|---|---|
- * | category axis | 9pt / 12px | **18pt / 24px** | ×0.9 |
- * | value axis | 9pt / 12px | 18pt / 24px | ×0.9 |
- * | legend | 10pt / 13.333px | 26.667px | ×1.0 |
- * | axis titles | 12pt / 16px | 16px | unmoved |
+ * Both were read from Power BI's own font-size control. The most likely
+ * reconciliation is that the two experiments changed different things:
+ * §5.15 describes raising "the report theme's primary text size", which in
+ * Desktop's theme customiser is a global scale applied on top of the class
+ * system, whereas the measurement encoded here set `textClasses.label`
+ * directly in an imported theme JSON and moved nothing else. That would
+ * make both observations true of different inputs.
  *
- * Power BI's own font-size control for the category axis reads **18** after
- * the change, so this is its resolution, not our reading of pixels. The
- * legend is the control in the experiment: it moved 1:1 in the same run,
- * which rules out "everything scaled" and shows the two roles genuinely
- * take different classes. Axis titles did not move at all, which is
- * `title` behaving as documented.
- *
- * This matters beyond Classic 2026: a custom theme that sets `label` to
- * 20pt must render its category axis at 18pt, and only the class mapping
- * reproduces that. A visual-property default of 9pt would have stayed at
- * 9pt and been wrong for every theme but the baseline.
- *
- * Classic 2018 remains unexplained: it declares `label` 10pt like 2026, yet
- * its category axis control reads **8pt**, which no class scale produces.
- * Recorded, not modelled — see POWER_BI_CARTESIAN_DIFFERENTIAL.md §5.15.
+ * That reconciliation is a hypothesis, not evidence. What is evidence is
+ * that under an imported theme setting `textClasses.label.fontSize`, the
+ * axis does not move — measured twice — and an imported theme is what this
+ * app produces. The §5.15 note is left in place rather than deleted.
  */
-export const TEXT_ROLE_CLASS = {
-  visualTitle: "largeTitle",
-  categoryAxisLabel: "smallLightLabel",
-  categoryAxisTitle: "title",
-  valueAxisLabel: "smallLightLabel",
-  valueAxisTitle: "title",
-  legendText: "lightLabel",
-  dataLabel: "smallLightLabel",
-  referenceLineLabel: "smallLabel",
-} as const satisfies Record<string, TextClassName>;
+export const TEXT_ROLE_SPEC = {
+  /** title x 7/6 — `largeTitle` already derives exactly this. */
+  visualTitle: { class: "largeTitle" },
+  /** title x 1, title colour. */
+  smallMultipleTitle: { class: "title" },
+  /** label x 1, foregroundNeutralSecondary — `lightLabel` derives both. */
+  subtitle: { class: "lightLabel" },
+  /** label x 1 family and size, but `foreground` rather than the light role. */
+  tooltipText: { class: "lightLabel", color: { token: "foreground", builtIn: BUILT_IN_FOREGROUND } },
+  /** label family and colour, size held at 9. */
+  categoryAxisLabel: { class: "smallLightLabel", fixedFontSize: NATIVE_CHROME_FONT_SIZE },
+  valueAxisLabel: { class: "smallLightLabel", fixedFontSize: NATIVE_CHROME_FONT_SIZE },
+  legendText: { class: "lightLabel", fixedFontSize: NATIVE_CHROME_FONT_SIZE },
+  /** title family and colour, size held at 9. */
+  categoryAxisTitle: { class: "title", fixedFontSize: NATIVE_CHROME_FONT_SIZE },
+  valueAxisTitle: { class: "title", fixedFontSize: NATIVE_CHROME_FONT_SIZE },
+  /** label x 0.9, foregroundNeutralSecondary. */
+  dataLabel: { class: "smallLightLabel" },
+  totalLabel: { class: "smallLightLabel" },
+  seriesLabel: { class: "smallLightLabel" },
+  /** Not measured in the fingerprint sweep; left as it was. */
+  referenceLineLabel: { class: "smallLabel" },
+} as const satisfies Record<string, TextRoleSpec>;
 
-export type TextRole = keyof typeof TEXT_ROLE_CLASS;
+export type TextRole = keyof typeof TEXT_ROLE_SPEC;
 
 /**
  * Power BI's built-in text classes, used when a theme omits a primary.
@@ -282,12 +343,21 @@ const readColor = (raw: unknown, theme: PowerBITheme): string | undefined => {
   return resolveColorValue(raw as never, theme);
 };
 
+/**
+ * One of the theme's root colour tokens, custom over base, over Power BI's
+ * own value.
+ *
+ * `roots` is already the custom-over-base merge, so there is no second
+ * precedence rule to get wrong here.
+ */
+function rootToken(source: ThemeSource, token: string, builtIn: string): string {
+  const raw = themeRoots(source)[token];
+  return typeof raw === "string" && HEX_COLOR.test(raw) ? raw : builtIn;
+}
+
 /** `foregroundNeutralSecondary`, custom over base, over Power BI's own. */
 function neutralSecondary(source: ThemeSource): string {
-  // Root tokens are exactly what `roots` merges custom-over-base, so there
-  // is no second precedence rule to get wrong here.
-  const raw = themeRoots(source).foregroundNeutralSecondary;
-  return typeof raw === "string" && HEX_COLOR.test(raw) ? raw : BUILT_IN_NEUTRAL_SECONDARY;
+  return rootToken(source, "foregroundNeutralSecondary", BUILT_IN_NEUTRAL_SECONDARY);
 }
 
 function layersOf(source: ThemeSource): { custom: PowerBITheme; base: PowerBITheme | undefined } {
@@ -418,7 +488,57 @@ export function resolveTextClass(source: ThemeSource, name: TextClassName): Reso
   };
 }
 
-/** The style for a semantic role, via `TEXT_ROLE_CLASS`. */
+/**
+ * Whether a field came from a text class someone actually declared, as
+ * opposed to being derived from a primary or filled in by Power BI.
+ */
+const isDeclared = (source: TextClassSource): boolean =>
+  source === "custom-class" || source === "base-class";
+
+/**
+ * The style for a semantic role, resolving family, size and colour
+ * independently.
+ *
+ * The class supplies all three to begin with, and the role's spec then
+ * replaces the size and colour where Power BI does not take them from the
+ * class — but only where the class was left to derive. An explicit
+ * declaration at either theme layer still wins, so this narrows what the
+ * class system is claimed to control without weakening theme precedence.
+ */
 export function resolveTextRole(source: ThemeSource, role: TextRole): ResolvedTextClass {
-  return resolveTextClass(source, TEXT_ROLE_CLASS[role]);
+  const spec: TextRoleSpec = TEXT_ROLE_SPEC[role];
+  const resolved = resolveTextClass(source, spec.class);
+
+  /**
+   * The fixed size wins over the text class outright, including over a
+   * class the theme declared explicitly.
+   *
+   * That asymmetry with colour below is not an oversight. It is what was
+   * measured: the axis title renders at 9 under themes declaring `title` at
+   * 19 and at 30, so Power BI is not consulting the class for this size at
+   * all — honouring a declaration would reproduce a resolution the product
+   * does not perform. Theme precedence is untouched where it does apply:
+   * an explicit `visualStyles` font size is resolved by the registries
+   * before this value is ever reached, and still wins.
+   */
+  const useFixedSize = spec.fixedFontSize !== undefined;
+  /**
+   * Colour is the conservative case. Nothing measured shows Power BI
+   * ignoring a declared class colour — the role simply names a different
+   * source when the class was left to derive — so an explicit declaration
+   * is still honoured here.
+   */
+  const useTokenColor = spec.color !== undefined && !isDeclared(resolved.source.color);
+  if (!useFixedSize && !useTokenColor) return resolved;
+
+  return {
+    ...resolved,
+    fontSize: useFixedSize ? (spec.fixedFontSize as number) : resolved.fontSize,
+    color: useTokenColor ? rootToken(source, spec.color!.token, spec.color!.builtIn) : resolved.color,
+    source: {
+      ...resolved.source,
+      fontSize: useFixedSize ? "derived-default" : resolved.source.fontSize,
+      color: useTokenColor ? "derived-default" : resolved.source.color,
+    },
+  };
 }
