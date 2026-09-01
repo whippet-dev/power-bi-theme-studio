@@ -9,6 +9,8 @@ import {
   textProp as sharedTextProp,
   type EnumOption,
 } from "./properties";
+import { TABLE_BLEND, blendNativeTokens, nativeToken } from "./nativeTokens";
+import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -686,14 +688,28 @@ export type ResolvedTableStyle = {
  */
 export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedTableStyle {
   const p = TABLE_PROPERTIES;
+  /**
+   * Table values, column headers and the grid text size all take the
+   * `label` class at its own size — every one of them read 13 under a theme
+   * setting `label` 13, and 20 under `label` 20 — with `foreground` as the
+   * text colour.
+   */
+  const tableText = resolveTextRole(theme, "tableText");
+  /** Totals differ only in colour: the `label` class's own, not a root token. */
+  const totalsText = resolveTextRole(theme, "tableTotalsText");
+  /**
+   * Gridlines are a computed colour, not a token and not a constant. Both
+   * the horizontal and vertical lines use the same blend.
+   */
+  const gridlineColor = blendNativeTokens(theme, "background", "foreground", TABLE_BLEND.gridline);
   return {
     columnHeaders: {
       alignment: resolvePropertyValue(theme, p.columnHeaders.alignment, "Auto"),
-      backColor: resolvePropertyValue(theme, p.columnHeaders.backColor, base.tableAccent),
-      fontColor: resolvePropertyValue(theme, p.columnHeaders.fontColor, base.background),
-      fontFamily: resolvePropertyValue(theme, p.columnHeaders.fontFamily, base.fontFamily),
-      fontSize: resolvePropertyValue(theme, p.columnHeaders.fontSize, 12),
-      bold: resolvePropertyValue(theme, p.columnHeaders.bold, true),
+      backColor: resolvePropertyValue(theme, p.columnHeaders.backColor, nativeToken(theme, "background")),
+      fontColor: resolvePropertyValue(theme, p.columnHeaders.fontColor, tableText.color),
+      fontFamily: resolvePropertyValue(theme, p.columnHeaders.fontFamily, tableText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.columnHeaders.fontSize, tableText.fontSize),
+      bold: resolvePropertyValue(theme, p.columnHeaders.bold, false),
       italic: resolvePropertyValue(theme, p.columnHeaders.italic, false),
       underline: resolvePropertyValue(theme, p.columnHeaders.underline, false),
       wordWrap: resolvePropertyValue(theme, p.columnHeaders.wordWrap, true),
@@ -706,18 +722,18 @@ export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): Reso
       outlineStyle: resolvePropertyValue(theme, p.columnHeaders.outlineStyle, 0),
     },
     values: {
-      backColor: resolvePropertyValue(theme, p.values.backColor, base.background),
-      backColorPrimary: resolvePropertyValue(theme, p.values.backColorPrimary, base.background),
-      backColorSecondary: resolvePropertyValue(theme, p.values.backColorSecondary, base.background),
-      fontColor: resolvePropertyValue(theme, p.values.fontColor, base.foreground),
-      fontColorPrimary: resolvePropertyValue(theme, p.values.fontColorPrimary, base.foreground),
-      fontColorSecondary: resolvePropertyValue(theme, p.values.fontColorSecondary, base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.values.fontFamily, base.fontFamily),
-      fontSize: resolvePropertyValue(theme, p.values.fontSize, 12),
+      backColor: resolvePropertyValue(theme, p.values.backColor, nativeToken(theme, "background")),
+      backColorPrimary: resolvePropertyValue(theme, p.values.backColorPrimary, nativeToken(theme, "background")),
+      backColorSecondary: resolvePropertyValue(theme, p.values.backColorSecondary, blendNativeTokens(theme, "background", "foreground", TABLE_BLEND.alternatingRow)),
+      fontColor: resolvePropertyValue(theme, p.values.fontColor, tableText.color),
+      fontColorPrimary: resolvePropertyValue(theme, p.values.fontColorPrimary, tableText.color),
+      fontColorSecondary: resolvePropertyValue(theme, p.values.fontColorSecondary, tableText.color),
+      fontFamily: resolvePropertyValue(theme, p.values.fontFamily, tableText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.values.fontSize, tableText.fontSize),
       bold: resolvePropertyValue(theme, p.values.bold, false),
       italic: resolvePropertyValue(theme, p.values.italic, false),
       underline: resolvePropertyValue(theme, p.values.underline, false),
-      wordWrap: resolvePropertyValue(theme, p.values.wordWrap, false),
+      wordWrap: resolvePropertyValue(theme, p.values.wordWrap, true),
       urlIcon: resolvePropertyValue(theme, p.values.urlIcon, false),
       webURL: resolvePropertyValue(theme, p.values.webURL, ""),
       outlineColor: resolvePropertyValue(theme, p.values.outlineColor, "#E3E3E3"),
@@ -727,10 +743,13 @@ export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): Reso
     total: {
       totals: resolvePropertyValue(theme, p.total.totals, true),
       label: resolvePropertyValue(theme, p.total.label, "Total"),
-      backColor: resolvePropertyValue(theme, p.total.backColor, base.background),
-      fontColor: resolvePropertyValue(theme, p.total.fontColor, base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.total.fontFamily, base.fontFamily),
-      fontSize: resolvePropertyValue(theme, p.total.fontSize, 12),
+      // No native default: the Format pane shows the totals background empty.
+      // The token below is only what Studio paints so an enabled totals row
+      // is visible — see PROPERTIES_WITHOUT_NATIVE_DEFAULT.
+      backColor: resolvePropertyValue(theme, p.total.backColor, nativeToken(theme, "background")),
+      fontColor: resolvePropertyValue(theme, p.total.fontColor, totalsText.color),
+      fontFamily: resolvePropertyValue(theme, p.total.fontFamily, totalsText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.total.fontSize, totalsText.fontSize),
       bold: resolvePropertyValue(theme, p.total.bold, true),
       italic: resolvePropertyValue(theme, p.total.italic, false),
       underline: resolvePropertyValue(theme, p.total.underline, false),
@@ -740,18 +759,18 @@ export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): Reso
     },
     grid: {
       gridHorizontal: resolvePropertyValue(theme, p.grid.gridHorizontal, true),
-      gridHorizontalColor: resolvePropertyValue(theme, p.grid.gridHorizontalColor, "#E3E3E3"),
+      gridHorizontalColor: resolvePropertyValue(theme, p.grid.gridHorizontalColor, gridlineColor),
       gridHorizontalWeight: resolvePropertyValue(theme, p.grid.gridHorizontalWeight, 1),
       gridVertical: resolvePropertyValue(theme, p.grid.gridVertical, false),
-      gridVerticalColor: resolvePropertyValue(theme, p.grid.gridVerticalColor, "#E3E3E3"),
+      gridVerticalColor: resolvePropertyValue(theme, p.grid.gridVerticalColor, gridlineColor),
       gridVerticalWeight: resolvePropertyValue(theme, p.grid.gridVerticalWeight, 1),
-      rowPadding: resolvePropertyValue(theme, p.grid.rowPadding, 3),
-      textSize: resolvePropertyValue(theme, p.grid.textSize, 12),
-      outlineColor: resolvePropertyValue(theme, p.grid.outlineColor, "#D8D3DC"),
+      rowPadding: resolvePropertyValue(theme, p.grid.rowPadding, 1),
+      textSize: resolvePropertyValue(theme, p.grid.textSize, tableText.fontSize),
+      outlineColor: resolvePropertyValue(theme, p.grid.outlineColor, nativeToken(theme, "tableAccent")),
       outlineWeight: resolvePropertyValue(theme, p.grid.outlineWeight, 1),
       outlineStyle: resolvePropertyValue(theme, p.grid.outlineStyle, 0),
-      imageHeight: resolvePropertyValue(theme, p.grid.imageHeight, 20),
-      imageWidth: resolvePropertyValue(theme, p.grid.imageWidth, 20),
+      imageHeight: resolvePropertyValue(theme, p.grid.imageHeight, 75),
+      imageWidth: resolvePropertyValue(theme, p.grid.imageWidth, 75),
     },
     columnFormatting: {
       alignment: resolvePropertyValue(theme, p.columnFormatting.alignment, "Auto"),

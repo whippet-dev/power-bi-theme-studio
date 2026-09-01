@@ -217,6 +217,42 @@ export const TEXT_ROLE_SPEC = {
   dataLabel: { class: "smallLightLabel" },
   totalLabel: { class: "smallLightLabel" },
   seriesLabel: { class: "smallLightLabel" },
+  /**
+   * The pie legend, which is NOT the cartesian legend.
+   *
+   * A separate role rather than a change to `legendText`, because both
+   * measurements stand: a cartesian legend holds at 9 across themes setting
+   * `label` to 13 and to 20, and a pie legend reads 13 and 20 under the
+   * same two. The fixed 9 is real and specific to the cartesian chrome, so
+   * widening `legendText` would break the visuals it was measured on.
+   *
+   * Deliberately the narrowest possible model: one extra role, no
+   * family-scoped lookup and no conditional mechanism. Two visuals
+   * disagreeing does not yet say which abstraction generalises, and a
+   * second role costs nothing to replace later if a third case arrives.
+   */
+  pieLegendText: { class: "lightLabel" },
+  /**
+   * Table values, column headers and the grid's own text size.
+   *
+   * `lightLabel` supplies the `label` family at the class's own size; the
+   * colour is then `foreground`, which is what the Format pane reports for
+   * both the values and the header text.
+   *
+   * All four table text surfaces share this size rule — confirmed at
+   * `label` 13 and 20, where every one of them read 13 and 20 in turn.
+   */
+  tableText: { class: "lightLabel", color: { token: "foreground", builtIn: BUILT_IN_FOREGROUND } },
+  /**
+   * Table totals, which take the `label` class's own colour rather than a
+   * root token.
+   *
+   * The only surface measured anywhere that does so, which is why it is a
+   * distinct role rather than sharing `tableText`. Using the primary class
+   * directly is what gives it that colour: `label` carries its own, where
+   * the light variants substitute a neutral.
+   */
+  tableTotalsText: { class: "label" },
   /** Not measured in the fingerprint sweep; left as it was. */
   referenceLineLabel: { class: "smallLabel" },
 } as const satisfies Record<string, TextRoleSpec>;

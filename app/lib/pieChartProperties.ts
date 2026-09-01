@@ -8,6 +8,8 @@ import {
   resolvePropertyValue,
   textProp,
 } from "./properties";
+import { nativeToken } from "./nativeTokens";
+import { resolveTextRole } from "./textClasses";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -137,14 +139,27 @@ export type ResolvedPieChartStyle = {
  */
 export function resolvePieChartStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedPieChartStyle {
   const p = PIE_CHART_PROPERTIES;
+  /**
+   * The pie legend takes the `label` class at its own size — 13 and 20 under
+   * themes setting `label` to 13 and 20 — where a cartesian legend holds at
+   * 9 under the same two. Hence `pieLegendText` rather than `legendText`.
+   */
+  const legendText = resolveTextRole(theme, "pieLegendText");
+  /** Detail labels follow `label` x 0.9, exactly as cartesian data labels do. */
+  const detailLabelText = resolveTextRole(theme, "dataLabel");
   return {
     dataPoint: {
-      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, "#E3E3E3"),
+      borderColor: resolvePropertyValue(theme, p.dataPoint.borderColor, nativeToken(theme, "foregroundNeutralSecondary")),
       borderColorMatchFill: resolvePropertyValue(theme, p.dataPoint.borderColorMatchFill, false),
       borderOutlineOnly: resolvePropertyValue(theme, p.dataPoint.borderOutlineOnly, false),
       borderShow: resolvePropertyValue(theme, p.dataPoint.borderShow, false),
       borderSize: resolvePropertyValue(theme, p.dataPoint.borderSize, 1),
       borderTransparency: resolvePropertyValue(theme, p.dataPoint.borderTransparency, 0),
+      // A slice has NO native fill default — the Format pane shows it empty,
+      // and Power BI colours slices per category at draw time. The palette
+      // entry below is what Theme Studio paints so the preview is not blank;
+      // it is not a claim that Power BI defaults to it. Recorded as such in
+      // PROPERTIES_WITHOUT_NATIVE_DEFAULT, and `isSet` stays false either way.
       defaultColor: resolvePropertyValue(theme, p.dataPoint.defaultColor, base.palette[0] ?? base.foreground),
       fill: resolvePropertyValue(theme, p.dataPoint.fill, base.palette[0] ?? base.foreground),
       fillTransparency: resolvePropertyValue(theme, p.dataPoint.fillTransparency, 0),
@@ -156,29 +171,29 @@ export function resolvePieChartStyle(theme: ThemeSource, base: ResolvedTheme): R
     legend: {
       show: resolvePropertyValue(theme, p.legend.show, true),
       bold: resolvePropertyValue(theme, p.legend.bold, false),
-      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.legend.fontSize, 6),
+      fontFamily: resolvePropertyValue(theme, p.legend.fontFamily, legendText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.legend.fontSize, legendText.fontSize),
       italic: resolvePropertyValue(theme, p.legend.italic, false),
-      labelColor: resolvePropertyValue(theme, p.legend.labelColor, base.foreground),
+      labelColor: resolvePropertyValue(theme, p.legend.labelColor, legendText.color),
       // Verified against themes/base/classic2026.json's pieChart override.
       position: resolvePropertyValue(theme, p.legend.position, "RightCenter"),
       underline: resolvePropertyValue(theme, p.legend.underline, false),
-      showTitle: resolvePropertyValue(theme, p.legend.showTitle, false),
+      showTitle: resolvePropertyValue(theme, p.legend.showTitle, true),
       titleText: resolvePropertyValue(theme, p.legend.titleText, ""),
     },
     labels: {
       show: resolvePropertyValue(theme, p.labels.show, true),
       background: resolvePropertyValue(theme, p.labels.background, "auto"),
       bold: resolvePropertyValue(theme, p.labels.bold, false),
-      color: resolvePropertyValue(theme, p.labels.color, base.palette[0] ?? base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, ""),
-      fontSize: resolvePropertyValue(theme, p.labels.fontSize, 6),
+      color: resolvePropertyValue(theme, p.labels.color, detailLabelText.color),
+      fontFamily: resolvePropertyValue(theme, p.labels.fontFamily, detailLabelText.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.labels.fontSize, detailLabelText.fontSize),
       italic: resolvePropertyValue(theme, p.labels.italic, false),
       labelDisplayUnits: resolvePropertyValue(theme, p.labels.labelDisplayUnits, 0),
       labelPrecision: resolvePropertyValue(theme, p.labels.labelPrecision, 0),
       // Verified against classic2026.json's pieChart override.
       labelStyle: resolvePropertyValue(theme, p.labels.labelStyle, "Data value, percent of total"),
-      overflow: resolvePropertyValue(theme, p.labels.overflow, false),
+      overflow: resolvePropertyValue(theme, p.labels.overflow, true),
       percentageLabelPrecision: resolvePropertyValue(theme, p.labels.percentageLabelPrecision, 0),
       position: resolvePropertyValue(theme, p.labels.position, "outside"),
       underline: resolvePropertyValue(theme, p.labels.underline, false),
