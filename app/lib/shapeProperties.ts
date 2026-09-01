@@ -46,7 +46,10 @@ const SHAPE_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
     leftMargin: 0,
     rightMargin: 0,
   },
-  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
+  // Only `roundEdge` is measured. `rectangleRoundedCurve` expresses the same
+  // rounding under a different key and was never read in the sweep, so it is
+  // deliberately left on the generic fallback rather than assumed to match.
+  shapeParams: { roundEdge: 0 },
 };
 
 export function resolveShapeStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedShapeStyle {

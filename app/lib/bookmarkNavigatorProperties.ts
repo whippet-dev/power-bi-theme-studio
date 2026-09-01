@@ -152,14 +152,6 @@ export type ResolvedBookmarkNavigatorStyle = ResolvedShapeFamilyCore & {
 /** `state` previews how the navigator looks in each interaction state — see resolveShapeFamilyCore's doc comment. */
 
 /**
- * Measured natively on a Bookmark Navigator under the current default base
- * theme: text ON, Segoe UI 10, bold; border on at 1px; no shadow, no glow.
- *
- * Text alignment was not established for this visual, so it is deliberately
- * absent and keeps the resolver's generic value rather than borrowing the
- * Page Navigator's measured left alignment. Selected differs by colour only.
- */
-/**
  * Measured on both navigators independently, across all four states, and
  * identical between them — so this block is duplicated deliberately rather
  * than shared: two visuals agreeing today is not a reason to make one depend
@@ -183,7 +175,10 @@ const BOOKMARK_NAVIGATOR_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
     horizontalAlignment: "center",
     verticalAlignment: "middle",
   },
-  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
+  // Only `roundEdge` is measured. `rectangleRoundedCurve` expresses the same
+  // rounding under a different key and was never read in the sweep, so it is
+  // deliberately left on the generic fallback rather than assumed to match.
+  shapeParams: { roundEdge: 0 },
   perState: {
     hover: { fill: { color: { token: "backgroundLight" } } },
     press: { fill: { color: { token: "backgroundNeutral" } } },
