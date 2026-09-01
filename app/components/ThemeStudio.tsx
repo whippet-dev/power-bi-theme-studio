@@ -159,7 +159,7 @@ export function ThemeStudio() {
     [selectedVisual, themeSource, resolved, previewInteractionState, pageNavigatorStyle],
   );
 
-  const textboxStyle = useMemo(() => resolveTextboxStyle(themeSource, resolved), [themeSource, resolved]);
+  const textboxStyle = useMemo(() => resolveTextboxStyle(themeSource), [themeSource]);
   const imageStyle = useMemo(() => resolveImageStyle(themeSource, resolved), [themeSource, resolved]);
   const chromeStyles = useMemo<Record<VisualKind, ResolvedChromeStyle>>(
     () => ({

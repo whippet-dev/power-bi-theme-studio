@@ -1,5 +1,6 @@
 import type { ThemeSource } from "./properties";
 import { boolProp, colorProp, enumProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
+import { nativeToken } from "./nativeTokens";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -329,11 +330,21 @@ export type ResolvedImageStyle = {
   imageScaling: { imageScalingType: string | number };
 };
 
+/**
+ * Measured natively on an Image with no source set, across all four of its
+ * interaction states — which are byte-identical, so the visual is stateful in
+ * structure only and is resolved without a state here.
+ *
+ * Two values were wrong: the source type started on "Enter URL" where Power
+ * BI starts on "Upload image", and the border resolved a hard `#E3E3E3` where
+ * it is the `foreground` token. Everything else already matched, including
+ * every effect slider and all four advanced corner radii.
+ */
 export function resolveImageStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedImageStyle {
   const p = IMAGE_PROPERTIES;
   return {
     image: {
-      sourceType: resolvePropertyValue(theme, p.image.sourceType, "imageUrl"),
+      sourceType: resolvePropertyValue(theme, p.image.sourceType, "image"),
       sourceUrl: resolvePropertyValue(theme, p.image.sourceUrl, ""),
       fit: resolvePropertyValue(theme, p.image.fit, "Fit"),
       altText: resolvePropertyValue(theme, p.image.altText, ""),
@@ -343,7 +354,7 @@ export function resolveImageStyle(theme: ThemeSource, base: ResolvedTheme): Reso
       backgroundTransparency: resolvePropertyValue(theme, p.image.backgroundTransparency, 0),
       transparency: resolvePropertyValue(theme, p.image.transparency, 0),
       strokeShow: resolvePropertyValue(theme, p.image.strokeShow, false),
-      strokeColor: resolvePropertyValue(theme, p.image.strokeColor, "#E3E3E3"),
+      strokeColor: resolvePropertyValue(theme, p.image.strokeColor, nativeToken(theme, "foreground")),
       strokeWidth: resolvePropertyValue(theme, p.image.strokeWidth, 1),
       strokePattern: resolvePropertyValue(theme, p.image.strokePattern, "solid"),
       strokeTransparency: resolvePropertyValue(theme, p.image.strokeTransparency, 0),

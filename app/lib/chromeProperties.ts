@@ -1276,22 +1276,59 @@ export type ResolvedChromeStyle = {
  *
  * Exactly the four swept in the shape-family pass — Shape, Button and both
  * navigators — each read `title.show` Off with no base theme setting it, so
- * Off is their capability default. Every other visual keeps the previous
- * `true`, including Text Box and Image, which measured Off but are out of
- * this pass's scope and would be changed on evidence not yet applied.
+ * Off is their capability default. Text Box and Image were measured later
+ * and read Off too, on both a base that sets nothing for their title and a
+ * pane showing it unticked, so they joined the table -- six visuals now.
+ * Every other visual keeps the previous `true`.
  *
  * Deliberately NOT `isCanvasObject`: that set exists for a different
  * question (background and header defaults) and includes visuals this pass
  * has not corrected. An earlier "chart versus non-chart" explanation for
  * which visuals behave this way was disproven and is not encoded here — the
- * only claim is that these four were measured Off.
+ * only claim is that these six were measured Off.
  */
 const TITLE_OFF_BY_DEFAULT = new Set<VisualSchemaKey>([
   "shape",
   "actionButton",
   "pageNavigator",
   "bookmarkNavigator",
+  "textbox",
+  "image",
 ]);
+
+/**
+ * Visuals whose measured capability background is not what `isCanvasObject`
+ * assumes.
+ *
+ * A Text Box reads background On with the Classic 2026 base setting nothing
+ * for it, which makes On its capability default on direct evidence. The
+ * shared `!isCanvasObject` fallback says Off, and that is not merely latent:
+ * Classic 2018 is a supported base and is likewise silent here, so under it
+ * the shared fallback is the value a user actually gets.
+ *
+ * Image is deliberately absent. It reads Off, but both bases that were
+ * measured supply that Off themselves, so its own capability background has
+ * never been observed and `isCanvasObject` continues to answer for it.
+ */
+const BACKGROUND_SHOW_BY_VISUAL: Partial<Record<VisualSchemaKey, boolean>> = {
+  textbox: true,
+};
+
+/**
+ * Visuals whose measured capability padding is not the usual zero.
+ *
+ * A Text Box reads 5 on every edge with no base theme setting padding at
+ * all, so 5 is its capability default. An Image reads zero — but Classic
+ * 2026 *supplies* that zero, so the Image's own capability padding was never
+ * observed and it is deliberately absent here rather than recorded as 0.
+ *
+ * That pair is the cleanest proof so far that the layering is
+ * custom > base theme > capability: same session, same base, opposite
+ * results, each matching whether that visual's base entry sets the property.
+ */
+const PADDING_BY_VISUAL: Partial<Record<VisualSchemaKey, number>> = {
+  textbox: 5,
+};
 
 export function resolveChromeStyle(
   theme: ThemeSource,
@@ -1372,8 +1409,14 @@ export function resolveChromeStyle(
       // shared background group ({show: true, transparency: 0}) — this
       // visual chrome background is a distinct group from the page's own
       // outspace/background (see globalOptionsProperties.ts). Canvas
-      // objects (see isCanvasObject above) override this back to false.
-      show: resolveChromeValue(theme, activeVisual, p.background.show, !isCanvasObject),
+      // objects (see isCanvasObject above) override this back to false,
+      // except where BACKGROUND_SHOW_BY_VISUAL carries direct evidence.
+      show: resolveChromeValue(
+        theme,
+        activeVisual,
+        p.background.show,
+        BACKGROUND_SHOW_BY_VISUAL[activeVisual] ?? !isCanvasObject,
+      ),
       color: resolveChromeValue(theme, activeVisual, p.background.color, CAPABILITY_COLOR.visualBackground),
       transparency: resolveChromeValue(theme, activeVisual, p.background.transparency, 0),
     },
@@ -1415,10 +1458,10 @@ export function resolveChromeStyle(
       show: resolveChromeValue(theme, activeVisual, p.lockAspect.show, false),
     },
     padding: {
-      top: resolveChromeValue(theme, activeVisual, p.padding.top, 0),
-      right: resolveChromeValue(theme, activeVisual, p.padding.right, 0),
-      bottom: resolveChromeValue(theme, activeVisual, p.padding.bottom, 0),
-      left: resolveChromeValue(theme, activeVisual, p.padding.left, 0),
+      top: resolveChromeValue(theme, activeVisual, p.padding.top, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      right: resolveChromeValue(theme, activeVisual, p.padding.right, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      bottom: resolveChromeValue(theme, activeVisual, p.padding.bottom, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      left: resolveChromeValue(theme, activeVisual, p.padding.left, PADDING_BY_VISUAL[activeVisual] ?? 0),
     },
     spacing: {
       customizeSpacing: resolveChromeValue(theme, activeVisual, p.spacing.customizeSpacing, false),

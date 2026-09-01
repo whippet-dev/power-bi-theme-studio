@@ -1,6 +1,6 @@
 import type { ThemeSource } from "./properties";
 import { colorProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
-import type { ResolvedTheme } from "./theme";
+import { resolveTextRole } from "./textClasses";
 
 /**
  * Textbox — a free-form rich-text canvas object, `visual-textbox` in the
@@ -44,13 +44,22 @@ export type ResolvedTextboxStyle = {
   text: { color: string; fontFamily: string; fontSize: number };
 };
 
-export function resolveTextboxStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedTextboxStyle {
+export function resolveTextboxStyle(theme: ThemeSource): ResolvedTextboxStyle {
   const p = TEXTBOX_PROPERTIES;
+  /**
+   * The `label` class in full. Measured off the canvas and the inline
+   * rich-text toolbar — a Text Box has no Visual tab, so there is no
+   * Format-pane reading for any of this — and confirmed at two theme points.
+   *
+   * `base.foreground` and a literal 12 stood here before. The family was
+   * already right by accident, `base.fontFamily` being the label family.
+   */
+  const text = resolveTextRole(theme, "textboxText");
   return {
     text: {
-      color: resolvePropertyValue(theme, p.text.color, base.foreground),
-      fontFamily: resolvePropertyValue(theme, p.text.fontFamily, base.fontFamily),
-      fontSize: resolvePropertyValue(theme, p.text.fontSize, 12),
+      color: resolvePropertyValue(theme, p.text.color, text.color),
+      fontFamily: resolvePropertyValue(theme, p.text.fontFamily, text.fontFamily),
+      fontSize: resolvePropertyValue(theme, p.text.fontSize, text.fontSize),
     },
   };
 }
