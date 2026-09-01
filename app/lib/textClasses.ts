@@ -266,6 +266,34 @@ export const TEXT_ROLE_SPEC = {
    * the light variants substitute a neutral.
    */
   tableTotalsText: { class: "label" },
+  /**
+   * The legacy Card's big value.
+   *
+   * The `callout` primary class in full — family, size and colour. Proven at
+   * two theme points: with `callout` at 23 the value reads 23, and at 40 it
+   * reads 40, while its family stays Comic Sans MS and its colour the class's
+   * own. It also held at 23 across a theme that moved `label` 13 -> 20 and
+   * `title` 19 -> 30, which rules out either of those as the source.
+   *
+   * The only surface measured that consumes `callout` in full. The NEW card
+   * visual (`cardVisual`) takes only the size from this class, with a
+   * capability-constant family and a `foreground` colour — the two visuals
+   * share a name and nothing else, so they must not share a role.
+   */
+  cardValue: { class: "callout" },
+  /**
+   * The legacy Card's category label.
+   *
+   * `largeLightLabel` exactly: the `label` family at x 1.2 with
+   * `foregroundNeutralSecondary`. Proven at two theme points, 15.6 under
+   * `label` 13 and 24 under `label` 20.
+   *
+   * This confirms a claim `cardProperties.ts` already made from Microsoft's
+   * documentation and a private theme. The claim was right; only the wiring
+   * was partial, reading the raw class declaration for colour alone and
+   * hard-coding the family and size.
+   */
+  cardCategoryLabel: { class: "largeLightLabel" },
   /** Not measured in the fingerprint sweep; left as it was. */
   referenceLineLabel: { class: "smallLabel" },
 } as const satisfies Record<string, TextRoleSpec>;

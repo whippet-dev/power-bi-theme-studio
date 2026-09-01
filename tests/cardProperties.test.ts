@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CARD_PROPERTIES, propertyThemePath, resolveCardStyle } from "../app/lib/cardProperties";
-import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
+import { updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 const STARTER_THEME: PowerBITheme = {
   name: "Sample theme",
@@ -28,8 +28,7 @@ const THEME_WITH_CARD_OVERRIDE: PowerBITheme = {
 };
 
 test("resolveCardStyle falls back to sensible defaults when there is no override", () => {
-  const base = resolveTheme(STARTER_THEME);
-  const card = resolveCardStyle(STARTER_THEME, base);
+  const card = resolveCardStyle(STARTER_THEME);
 
   assert.equal(card.categoryLabels.show, true);
   assert.equal(card.wordWrap.show, false);
@@ -48,8 +47,7 @@ test("category label colour falls back to textClasses.largeLightLabel.color, and
     ...STARTER_THEME,
     textClasses: { callout: { color: "#252423" } },
   };
-  const base = resolveTheme(theme);
-  const card = resolveCardStyle(theme, base);
+  const card = resolveCardStyle(theme);
 
   assert.equal(card.categoryLabels.color, "#605E5C");
   assert.equal(card.labels.color, "#252423");
@@ -62,20 +60,19 @@ test("category label colour falls back to textClasses.largeLightLabel.color, and
 // textClasses.largeLightLabel.color must.
 test("category label colour reads textClasses.largeLightLabel.color specifically, not fourthLevelElements", () => {
   const wrongField: PowerBITheme = { ...STARTER_THEME, fourthLevelElements: "#FF00FF" };
-  const wrongCard = resolveCardStyle(wrongField, resolveTheme(wrongField));
+  const wrongCard = resolveCardStyle(wrongField);
   assert.equal(wrongCard.categoryLabels.color, "#605E5C", "fourthLevelElements must not affect the card");
 
   const rightField: PowerBITheme = {
     ...STARTER_THEME,
     textClasses: { ...STARTER_THEME.textClasses, largeLightLabel: { color: "#00FF00" } },
   };
-  const rightCard = resolveCardStyle(rightField, resolveTheme(rightField));
+  const rightCard = resolveCardStyle(rightField);
   assert.equal(rightCard.categoryLabels.color, "#00FF00");
 });
 
 test("resolveCardStyle prefers a visualStyles.card override over defaults", () => {
-  const base = resolveTheme(THEME_WITH_CARD_OVERRIDE);
-  const card = resolveCardStyle(THEME_WITH_CARD_OVERRIDE, base);
+  const card = resolveCardStyle(THEME_WITH_CARD_OVERRIDE);
 
   assert.equal(card.categoryLabels.show, false);
   assert.equal(card.categoryLabels.color, "#912B88");
@@ -85,8 +82,7 @@ test("resolveCardStyle prefers a visualStyles.card override over defaults", () =
 test("propertyThemePath writes a card colour round-trip through updateThemeValue and resolveCardStyle", () => {
   const path = propertyThemePath(CARD_PROPERTIES.categoryLabels.color);
   const updated = updateThemeValue(STARTER_THEME, path, "#00FF00");
-  const base = resolveTheme(updated);
-  const card = resolveCardStyle(updated, base);
+  const card = resolveCardStyle(updated);
 
   assert.equal(card.categoryLabels.color, "#00FF00");
 });
@@ -100,5 +96,8 @@ test("every resolved CARD_PROPERTIES path is unique (no accidental JSON collisio
       seen.add(key);
     }
   }
-  assert.equal(seen.size, 19, `expected 19 resolved properties, got ${seen.size}`);
+  // 18, not 19: categoryLabels.preserveWhitespace was removed. A fully
+  // expanded native Category label card offers only font, size, B/I/U and
+  // colour, so Power BI has no such property to theme.
+  assert.equal(seen.size, 18, `expected 18 resolved properties, got ${seen.size}`);
 });
