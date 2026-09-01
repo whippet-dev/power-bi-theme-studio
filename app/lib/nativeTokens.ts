@@ -216,6 +216,13 @@ export const PROPERTIES_WITHOUT_NATIVE_DEFAULT = [
       "category at draw time, but what it substitutes was not read",
   },
   {
+    property: "card.labels.labelPrecision",
+    studioPaints: "0 decimal places",
+    evidence:
+      "the Format pane's \"Value decimal places\" reads Auto, not a number, on a " +
+      "fully expanded legacy Card; the preview needs a precision to format with",
+  },
+  {
     property: "tableEx.total.backColor",
     studioPaints: "the `background` token",
     evidence:

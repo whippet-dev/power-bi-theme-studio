@@ -104,7 +104,7 @@ export function ThemeStudio() {
     [themeSource, resolved],
   );
   const lineChartStyle = useMemo(() => resolveLineChartStyle(themeSource, resolved), [themeSource, resolved]);
-  const cardStyle = useMemo(() => resolveCardStyle(themeSource, resolved), [themeSource, resolved]);
+  const cardStyle = useMemo(() => resolveCardStyle(themeSource), [themeSource]);
   const slicerStyle = useMemo(() => resolveSlicerStyle(themeSource, resolved), [themeSource, resolved]);
   const matrixStyle = useMemo(() => resolveMatrixStyle(themeSource, resolved), [themeSource, resolved]);
   const pieChartStyle = useMemo(() => resolvePieChartStyle(themeSource, resolved), [themeSource, resolved]);

@@ -759,11 +759,11 @@ export function VisualGallery({
             fontWeight: cardStyle.categoryLabels.bold ? 700 : 400,
             fontStyle: cardStyle.categoryLabels.italic ? "italic" : "normal",
             textDecoration: cardStyle.categoryLabels.underline ? "underline" : "none",
-            whiteSpace: cardStyle.categoryLabels.preserveWhitespace
-              ? "pre-wrap"
-              : cardStyle.wordWrap.show
-                ? "normal"
-                : "nowrap",
+            // Power BI offers no source-spacing control on the category
+            // label — a fully expanded native Category label card has only
+            // font, size, B/I/U and colour — so wrapping is decided by
+            // wordWrap alone.
+            whiteSpace: cardStyle.wordWrap.show ? "normal" : "nowrap",
             // "Space between label and value" is a shared chrome property
             // rather than a Card one, but the Card is where it applies —
             // the category label sits below the value, so the gap is
