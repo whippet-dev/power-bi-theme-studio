@@ -14,15 +14,17 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveActionButtonStyle } from "../app/lib/actionButtonProperties";
+import { ACTION_BUTTON_PROPERTIES, resolveActionButtonStyle } from "../app/lib/actionButtonProperties";
 import { getBaseTheme } from "../app/lib/baseThemes";
 import { resolveBookmarkNavigatorStyle } from "../app/lib/bookmarkNavigatorProperties";
 import { resolveChromeStyle } from "../app/lib/chromeProperties";
+import { PROPERTIES_WITHOUT_NATIVE_DEFAULT } from "../app/lib/nativeTokens";
 import { resolvePageNavigatorStyle } from "../app/lib/pageNavigatorProperties";
 import {
   ALL_INTERACTION_STATES,
   interactionStatesFor,
   nearestInteractionState,
+  resolvePropertyEntry,
   supportsInteractionState,
   themeLayers,
   type InteractionState,
@@ -255,6 +257,46 @@ test("PR #12's two disproven values are corrected", () => {
   for (const style of [pageNav("default"), bookmarkNav("default")]) {
     assert.equal(style.text.bold, false, "bold was recorded true");
     assert.equal(style.text.horizontalAlignment, "center", "page nav was recorded left");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Properties with no native default
+// ---------------------------------------------------------------------------
+
+test("the button's icon size has no native default, though the preview draws one", () => {
+  // Power BI's Icon size reads Auto, not a number, in every state. The
+  // preview still needs a concrete size, so 20 is resolved — but nothing set
+  // it, and the difference lives in provenance rather than in the value.
+  const entry = resolvePropertyEntry(src(), ACTION_BUTTON_PROPERTIES.icon.iconSize, 20);
+  assert.equal(entry.source, "fallback", "no theme layer supplies it");
+  assert.equal(entry.isSet, false, "so it must not read as configured");
+  assert.equal(button("default").icon.iconSize, 20, "the preview still gets a size");
+
+  assert.ok(
+    PROPERTIES_WITHOUT_NATIVE_DEFAULT.some((row) => row.property === "actionButton.icon.iconSize"),
+    "recorded with its evidence",
+  );
+});
+
+test("an explicit icon size reads as set and wins", () => {
+  // Completes the distinction; otherwise `isSet` would prove nothing.
+  const custom: PowerBITheme = {
+    ...FINGERPRINT,
+    visualStyles: { actionButton: { "*": { icon: [{ $id: "default", iconSize: 44 }] } } },
+  };
+  const entry = resolvePropertyEntry(src(custom), ACTION_BUTTON_PROPERTIES.icon.iconSize, 20);
+  assert.equal(entry.isSet, true);
+  assert.equal(button("default", custom).icon.iconSize, 44);
+});
+
+test("rectangleRoundedCurve is left unmeasured rather than assumed to match roundEdge", () => {
+  // Only `roundEdge` was read in the sweep. The two express the same rounding
+  // under different keys, which is exactly why assuming they agree would be
+  // inference dressed as measurement.
+  for (const style of [shape(), button("default"), pageNav("default"), bookmarkNav("default")]) {
+    assert.equal(style.shape.roundEdge, 0, "measured");
+    assert.equal(style.shape.rectangleRoundedCurve, 10, "still the generic fallback");
   }
 });
 

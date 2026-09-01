@@ -232,6 +232,14 @@ export const PROPERTIES_WITHOUT_NATIVE_DEFAULT = [
       "fully expanded legacy Card; the preview needs a precision to format with",
   },
   {
+    property: "actionButton.icon.iconSize",
+    studioPaints: "20",
+    evidence:
+      "the Format pane's Icon size reads Auto, not a number, on a Blank button in " +
+      "every state; the preview needs a concrete size to draw with, and what Power " +
+      "BI substitutes for Auto at draw time was not measured",
+  },
+  {
     property: "tableEx.total.backColor",
     studioPaints: "the `background` token",
     evidence:

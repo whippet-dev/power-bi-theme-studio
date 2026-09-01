@@ -202,13 +202,6 @@ export type ResolvedActionButtonStyle = ResolvedShapeFamilyCore & {
  */
 
 /**
- * Measured natively on an Action Button under the current default base theme,
- * across Default / On hover / On press: fill OFF, border ON at 3px and full
- * opacity, text off with Segoe UI 10 latent, no shadow, no glow.
- *
- * Disabled differs only in colour treatment, which is not encoded here.
- */
-/**
  * Measured on a Blank button, all four states.
  *
  * `default`, `hover` and `press` are byte-identical; only `disabled` differs,
@@ -233,7 +226,10 @@ const ACTION_BUTTON_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
     leftMargin: 4,
     rightMargin: 4,
   },
-  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
+  // Only `roundEdge` is measured. `rectangleRoundedCurve` expresses the same
+  // rounding under a different key and was never read in the sweep, so it is
+  // deliberately left on the generic fallback rather than assumed to match.
+  shapeParams: { roundEdge: 0 },
   perState: {
     disabled: {
       fill: { color: { token: "backgroundNeutral" }, transparency: 0 },
@@ -268,6 +264,10 @@ export function resolveActionButtonStyle(
       shapeType: resolvePropertyValue(theme, at(p.icon.shapeType), "blank"),
       // Measured: Custom placement, 3px line weight, 4px padding all round.
       placement: resolvePropertyValue(theme, at(p.icon.placement), "custom"),
+      // No native default: the Format pane reads Auto, not a number. The 20
+      // below is only what the preview draws with — see
+      // PROPERTIES_WITHOUT_NATIVE_DEFAULT. `isSet` stays false, so nothing
+      // exports it and the editor still shows it as unset.
       iconSize: resolvePropertyValue(theme, at(p.icon.iconSize), 20),
       lineColor: resolvePropertyValue(
         theme,
