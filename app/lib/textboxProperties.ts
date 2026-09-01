@@ -1,5 +1,5 @@
 import type { ThemeSource } from "./properties";
-import { boolProp, colorProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
+import { colorProp, numberProp, propertyThemePath, resolvePropertyValue, textProp } from "./properties";
 import { resolveTextRole } from "./textClasses";
 
 /**
@@ -38,31 +38,10 @@ export const TEXTBOX_PROPERTIES = {
       60,
     ),
   },
-  general: {
-    /**
-     * Both shipped base themes set this on a Text Box, and Theme Studio had
-     * no way to read, edit or export it. It is a real theme property at
-     * `general[0].keepLayerOrder`, not a Format-pane artefact — Power BI's
-     * own General tab exposes it under Advanced options.
-     *
-     * Its effect is on how the visual stacks against others on the canvas,
-     * which a single-visual preview cannot show, so it is offered in the
-     * editor without a fabricated demonstration.
-     */
-    keepLayerOrder: boolProp(
-      "textbox",
-      "textbox.general.keepLayerOrder",
-      "Keep layer order",
-      "Holds this text box's stacking position on the page instead of bringing it forward when selected.",
-      ["general", 0, "keepLayerOrder"],
-      undefined,
-    ),
-  },
 } as const;
 
 export type ResolvedTextboxStyle = {
   text: { color: string; fontFamily: string; fontSize: number };
-  general: { keepLayerOrder: boolean };
 };
 
 export function resolveTextboxStyle(theme: ThemeSource): ResolvedTextboxStyle {
@@ -81,9 +60,6 @@ export function resolveTextboxStyle(theme: ThemeSource): ResolvedTextboxStyle {
       color: resolvePropertyValue(theme, p.text.color, text.color),
       fontFamily: resolvePropertyValue(theme, p.text.fontFamily, text.fontFamily),
       fontSize: resolvePropertyValue(theme, p.text.fontSize, text.fontSize),
-    },
-    general: {
-      keepLayerOrder: resolvePropertyValue(theme, p.general.keepLayerOrder, false),
     },
   };
 }

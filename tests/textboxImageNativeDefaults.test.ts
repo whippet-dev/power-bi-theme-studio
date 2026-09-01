@@ -20,7 +20,8 @@ import { getBaseTheme } from "../app/lib/baseThemes";
 import { resolveChromeStyle } from "../app/lib/chromeProperties";
 import { resolveImageStyle } from "../app/lib/imageProperties";
 import { themeLayers } from "../app/lib/properties";
-import { TEXTBOX_PROPERTIES, resolveTextboxStyle } from "../app/lib/textboxProperties";
+import { CHROME_PROPERTIES } from "../app/lib/chromeProperties";
+import { resolveTextboxStyle } from "../app/lib/textboxProperties";
 import { resolveTheme, updateThemeValue, type PowerBITheme } from "../app/lib/theme";
 
 /** `label` is the only class either visual reads, so it is the one that moves. */
@@ -39,7 +40,13 @@ const fixture = (labelSize: number): PowerBITheme => ({
 const BASE = fixture(13);
 const BIG_LABEL = fixture(20);
 
-type BaseId = "classic2026" | "fluent2";
+/**
+ * All three supported bases. Classic 2018 matters most here: it has no
+ * `textbox` or `image` entry at all, so it is the base under which capability
+ * fallbacks are what a user actually gets.
+ */
+type BaseId = "classic2026" | "classic2018" | "fluent2";
+const ALL_BASES: readonly BaseId[] = ["classic2026", "classic2018", "fluent2"];
 const src = (theme: PowerBITheme = BASE, baseId: BaseId = "classic2026") =>
   themeLayers(theme, getBaseTheme(baseId));
 const textbox = (theme: PowerBITheme = BASE, baseId: BaseId = "classic2026") =>
@@ -69,20 +76,23 @@ test("the text box size follows the label class across two theme points", () => 
   assert.equal(textbox(BIG_LABEL).text.fontSize, 20);
 });
 
-test("keepLayerOrder is modelled at its measured theme path", () => {
-  // Boolean, under the `general` object, shown as "Keep layer order" in the
-  // Text Box's Advanced options. It reads On natively, but that On comes from
-  // the base theme rather than from the capability: Classic 2026's `textbox`
-  // entry sets it true, and a Bookmark Navigator -- whose base entry is
-  // silent -- measures Off, which is what fixes the capability default at
-  // false. So this asserts the resolved value under a real base, not a bare
-  // fallback.
-  assert.deepEqual(TEXTBOX_PROPERTIES.general.keepLayerOrder.path, ["general", 0, "keepLayerOrder"]);
-  assert.equal(TEXTBOX_PROPERTIES.general.keepLayerOrder.valueType, "boolean");
-  assert.equal(textbox().general.keepLayerOrder, true);
+test("a text box's keepLayerOrder round-trips through the shared chrome property", () => {
+  // The sweep VERIFIED an existing property; it did not find a missing one.
+  // `general[0].keepLayerOrder` was already modelled once, on the shared
+  // chrome registry, and the chrome groups are already offered against the
+  // active visual's own schema key -- so a Text Box could always read, edit
+  // and export it. What the sweep adds is confirmation that the path is real
+  // rather than a Format-pane artefact.
+  assert.deepEqual(CHROME_PROPERTIES.general.keepLayerOrder.path, ["general", 0, "keepLayerOrder"]);
+
+  // Measured On, but that On comes from the base theme -- Classic 2026's
+  // `textbox` entry sets it true. Text Box's OWN capability fallback was
+  // never independently observed, so nothing here asserts one; the shared
+  // resolver's pre-existing `false` stands untouched.
+  assert.equal(chrome("textbox").general.keepLayerOrder, true, "supplied by the Classic 2026 base");
 
   const off = updateThemeValue(BASE, ["visualStyles", "textbox", "*", "general", 0, "keepLayerOrder"], false);
-  assert.equal(textbox(off).general.keepLayerOrder, false);
+  assert.equal(chrome("textbox", off).general.keepLayerOrder, false, "an explicit override wins");
 });
 
 test("a text box hides its visual title by default", () => {
@@ -127,6 +137,17 @@ test("a capability default shows through only where the base theme is silent", (
   assert.deepEqual([im.top, im.right, im.bottom, im.left], [0, 0, 0, 0], "base theme, capability unobserved");
 });
 
+test("Classic 2018 sets nothing for either visual, so both fall to capability", () => {
+  // The base with no `textbox` or `image` entry at all. The text box's
+  // padding capability of 5 shows through, as it does under Classic 2026.
+  // The image's padding falls to the shared 0 -- which is the pre-existing
+  // fallback, NOT a measurement: its capability padding stays unobserved
+  // because every base that was measured supplied a value for it.
+  const tb = chrome("textbox", BASE, "classic2018").padding;
+  assert.deepEqual([tb.top, tb.right, tb.bottom, tb.left], [5, 5, 5, 5], "capability");
+  assert.equal(chrome("image", BASE, "classic2018").padding.top, 0, "shared fallback, not evidence");
+});
+
 test("a different base theme overrides the same capability default", () => {
   // Fluent 2 *does* set the text box's padding to 0. Same visual, same
   // capability default of 5, different answer -- so 5 is genuinely a bottom
@@ -147,6 +168,55 @@ test("the image's capability padding is deliberately not recorded", () => {
   // would be an inference presented as a measurement.
   assert.equal(chrome("image").padding.top, 0);
   assert.equal(chrome("image", BASE, "fluent2").padding.top, 0);
+});
+
+test("a text box's background is On from the capability wherever the base is silent", () => {
+  // Direct evidence, not inference: Classic 2026 sets nothing for the text
+  // box's background and Desktop showed it On. Classic 2018 has no `textbox`
+  // entry at all, so under that base the capability value is simply what the
+  // user gets -- which is why the shared `!isCanvasObject` fallback was a
+  // real defect rather than a latent one.
+  assert.equal(chrome("textbox", BASE, "classic2018").background.show, true, "capability, base silent");
+  assert.equal(chrome("textbox", BASE, "classic2026").background.show, true, "still the measured value");
+});
+
+test("a base theme that sets the text box background still beats the capability", () => {
+  // Fluent 2's `textbox` entry carries background.show false.
+  assert.equal(chrome("textbox", BASE, "fluent2").background.show, false);
+});
+
+test("an explicit custom background beats both the base theme and the capability", () => {
+  const on = updateThemeValue(BASE, ["visualStyles", "textbox", "*", "background", 0, "show"], true);
+  const off = updateThemeValue(BASE, ["visualStyles", "textbox", "*", "background", 0, "show"], false);
+  assert.equal(chrome("textbox", on, "fluent2").background.show, true, "over Fluent 2's false");
+  assert.equal(chrome("textbox", off, "classic2018").background.show, false, "over the capability true");
+});
+
+test("the image background is untouched, and no capability claim is made for it", () => {
+  // Both measured bases supply the Image's Off themselves, so its own
+  // capability background has never been observed. Under Classic 2018, which
+  // supplies nothing, the pre-existing `!isCanvasObject` fallback still
+  // answers -- deliberately unchanged rather than "corrected" on evidence
+  // that does not exist.
+  for (const baseId of ALL_BASES) {
+    assert.equal(chrome("image", BASE, baseId).background.show, false, `image background under ${baseId}`);
+  }
+});
+
+test("the image's other defaults hold under all three bases", () => {
+  for (const baseId of ALL_BASES) {
+    assert.equal(image(BASE, baseId).image.sourceType, "image", `sourceType under ${baseId}`);
+    assert.equal(image(BASE, baseId).image.strokeColor, "#E60000", `strokeColor under ${baseId}`);
+    assert.equal(chrome("image", BASE, baseId).title.show, false, `title under ${baseId}`);
+  }
+});
+
+test("a text box's text and title hold under all three bases", () => {
+  for (const baseId of ALL_BASES) {
+    assert.equal(textbox(BASE, baseId).text.fontSize, 13, `label x 1 under ${baseId}`);
+    assert.equal(textbox(BASE, baseId).text.color, "#628E0B", `label colour under ${baseId}`);
+    assert.equal(chrome("textbox", BASE, baseId).title.show, false, `title under ${baseId}`);
+  }
 });
 
 test("resolving neither visual mutates the theme", () => {

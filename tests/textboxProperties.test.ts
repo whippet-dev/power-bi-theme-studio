@@ -34,11 +34,11 @@ test("propertyThemePath writes a textbox font-size round-trip through updateThem
 });
 
 test("general.paragraphs (rich-text run structure) and values.expr/formatString (dynamic data-bound value) are intentionally excluded", () => {
-  // `general` itself is now modelled -- the measured `keepLayerOrder` lives
-  // there -- so the exclusion is of the two content-bearing properties, not
-  // of the object. Paragraphs carry a document's runs and `values` carries a
-  // DAX expression; neither is a style a theme can meaningfully set.
-  assert.equal("paragraphs" in TEXTBOX_PROPERTIES.general, false);
+  // The text box registry stays text-only. `general.keepLayerOrder` is a real
+  // theme path, but the shared chrome registry already models it at exactly
+  // this JSON path and already offers it against the active visual -- adding
+  // it here would put two controls on one setting.
+  assert.equal("general" in TEXTBOX_PROPERTIES, false);
   assert.equal("values" in TEXTBOX_PROPERTIES, false);
 });
 
@@ -51,5 +51,5 @@ test("every resolved TEXTBOX_PROPERTIES path is unique (no accidental JSON colli
       seen.add(key);
     }
   }
-  assert.equal(seen.size, 4, `expected 4 resolved properties, got ${seen.size}`);
+  assert.equal(seen.size, 3, `expected 3 resolved properties, got ${seen.size}`);
 });

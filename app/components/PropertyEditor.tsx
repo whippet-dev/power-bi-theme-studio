@@ -174,7 +174,6 @@ const PAGE_NAVIGATOR_GROUP_LABELS: Record<keyof typeof PAGE_NAVIGATOR_PROPERTIES
 
 const TEXTBOX_GROUP_LABELS: Record<keyof typeof TEXTBOX_PROPERTIES, string> = {
   text: "Text",
-  general: "Advanced options",
 };
 
 const IMAGE_GROUP_LABELS: Record<keyof typeof IMAGE_PROPERTIES, string> = {
