@@ -86,15 +86,19 @@ export type ResolvedCardStyle = {
 };
 
 /**
- * Resolves every Card property to its theme override, falling back to the
- * shared theme tokens (palette/background/foreground) for colour-like
- * fields and a plain Power BI-typical default otherwise.
- */
-/**
- * `base` is deliberately absent. The legacy Card consumes no root colour
- * token directly and no palette entry — every value it resolves comes from a
- * text class or from an explicit `visualStyles` entry. It is the only
- * registry measured for which that is true.
+ * Resolves every legacy Card property to its theme override, falling back to
+ * the values Power BI's own Format pane reports when nothing has set them.
+ *
+ * This docblock used to say the fallbacks came from the shared theme tokens —
+ * palette, background, foreground. Measurement showed none of them do. Both
+ * of the visual's text surfaces resolve entirely through text classes: the
+ * big value is the `callout` primary class in full, and the category label is
+ * `largeLightLabel` in full. Everything else is either a plain native
+ * constant or an explicit `visualStyles` entry.
+ *
+ * That is why there is no `ResolvedTheme` parameter. The legacy Card is the
+ * only registry measured that reads no root colour token directly and no
+ * palette entry, so it has nothing to ask a resolved theme for.
  */
 export function resolveCardStyle(theme: ThemeSource): ResolvedCardStyle {
   const p = CARD_PROPERTIES;
