@@ -294,6 +294,18 @@ export const TEXT_ROLE_SPEC = {
    * hard-coding the family and size.
    */
   cardCategoryLabel: { class: "largeLightLabel" },
+  /**
+   * A Text Box's default text.
+   *
+   * The `label` primary class in full — family, size and colour — proven at
+   * two theme points, 13 under `label` 13 and 20 under `label` 20.
+   *
+   * Measured off the canvas and the inline rich-text toolbar rather than the
+   * Format pane, because a Text Box has no Visual tab at all. The theme path
+   * is nonetheless real: writing `visualStyles.textbox["*"].text[0]` changes
+   * what the visual renders.
+   */
+  textboxText: { class: "label" },
   /** Not measured in the fingerprint sweep; left as it was. */
   referenceLineLabel: { class: "smallLabel" },
 } as const satisfies Record<string, TextRoleSpec>;

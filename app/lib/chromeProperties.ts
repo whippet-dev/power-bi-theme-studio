@@ -1291,7 +1291,25 @@ const TITLE_OFF_BY_DEFAULT = new Set<VisualSchemaKey>([
   "actionButton",
   "pageNavigator",
   "bookmarkNavigator",
+  "textbox",
+  "image",
 ]);
+
+/**
+ * Visuals whose measured capability padding is not the usual zero.
+ *
+ * A Text Box reads 5 on every edge with no base theme setting padding at
+ * all, so 5 is its capability default. An Image reads zero — but Classic
+ * 2026 *supplies* that zero, so the Image's own capability padding was never
+ * observed and it is deliberately absent here rather than recorded as 0.
+ *
+ * That pair is the cleanest proof so far that the layering is
+ * custom > base theme > capability: same session, same base, opposite
+ * results, each matching whether that visual's base entry sets the property.
+ */
+const PADDING_BY_VISUAL: Partial<Record<VisualSchemaKey, number>> = {
+  textbox: 5,
+};
 
 export function resolveChromeStyle(
   theme: ThemeSource,
@@ -1415,10 +1433,10 @@ export function resolveChromeStyle(
       show: resolveChromeValue(theme, activeVisual, p.lockAspect.show, false),
     },
     padding: {
-      top: resolveChromeValue(theme, activeVisual, p.padding.top, 0),
-      right: resolveChromeValue(theme, activeVisual, p.padding.right, 0),
-      bottom: resolveChromeValue(theme, activeVisual, p.padding.bottom, 0),
-      left: resolveChromeValue(theme, activeVisual, p.padding.left, 0),
+      top: resolveChromeValue(theme, activeVisual, p.padding.top, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      right: resolveChromeValue(theme, activeVisual, p.padding.right, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      bottom: resolveChromeValue(theme, activeVisual, p.padding.bottom, PADDING_BY_VISUAL[activeVisual] ?? 0),
+      left: resolveChromeValue(theme, activeVisual, p.padding.left, PADDING_BY_VISUAL[activeVisual] ?? 0),
     },
     spacing: {
       customizeSpacing: resolveChromeValue(theme, activeVisual, p.spacing.customizeSpacing, false),
