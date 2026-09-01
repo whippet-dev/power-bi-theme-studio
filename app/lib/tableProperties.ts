@@ -679,12 +679,22 @@ export type ResolvedTableStyle = {
 };
 
 /**
- * Resolves every Table property to its theme override, falling back to
- * shared theme tokens where one naturally applies (colours, font family) or
- * to a plain Power BI-typical default otherwise. A theme with no
- * `visualStyles.tableEx` still previews sensibly — matching how Power BI's
- * simple theming recolours a table (accent header, light header text)
- * before any per-visual override exists.
+ * Resolves every Table property to its theme override, falling back to the
+ * values Power BI's own Format pane reports when nothing has set them.
+ *
+ * The header mapping used to be stated here the other way round — an accent
+ * plate behind light text — and the resolver implemented it that way.
+ * Measurement showed the opposite: the header plate is `background` and its
+ * text is `foreground`, with `tableAccent` reserved for the grid outline.
+ *
+ * The rest of the fallbacks follow the same sweep: all four text surfaces
+ * take the `label` class at its own size, totals take that class's own
+ * colour, and the gridlines and alternating row shading are computed by
+ * mixing `background` towards `foreground` (see `blendNativeTokens`).
+ *
+ * A theme with no `visualStyles.tableEx` therefore previews as a default
+ * Power BI table does, rather than as a plausible-looking approximation of
+ * one.
  */
 export function resolveTableStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedTableStyle {
   const p = TABLE_PROPERTIES;
