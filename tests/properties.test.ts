@@ -42,9 +42,12 @@ test("resolveTableStyle falls back to shared theme tokens when there is no visua
   const base = resolveTheme(STARTER_THEME);
   const table = resolveTableStyle(STARTER_THEME, base);
 
-  assert.equal(table.columnHeaders.backColor, base.tableAccent);
-  assert.equal(table.columnHeaders.fontColor, base.background);
-  assert.equal(table.columnHeaders.fontSize, 12);
+  // The header used to resolve tableAccent behind background-coloured text.
+  // Power BI does the opposite: `background` behind `foreground` text, with
+  // tableAccent reserved for the grid outline.
+  assert.equal(table.columnHeaders.backColor, base.background);
+  assert.equal(table.columnHeaders.fontColor, base.foreground);
+  assert.equal(table.grid.outlineColor, base.tableAccent);
   assert.equal(table.columnHeaders.alignment, "Auto");
   assert.equal(table.values.backColorPrimary, base.background);
   assert.equal(table.grid.gridHorizontal, true);
