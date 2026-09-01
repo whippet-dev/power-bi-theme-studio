@@ -1,5 +1,5 @@
-import { boolProp, colorProp, enumProp, forStateId, numberProp, propertyThemePath, resolveChromeValue, textProp } from "./properties";
-import type { PropertyDefinition, PropertyLookup, PropertyValueType, ThemeSource } from "./properties";
+import { boolProp, colorProp, enumProp, forStateId, numberProp, propertyThemePath as rawPropertyThemePath, readAtPath, resolveChromeValue, textProp, themeRoots } from "./properties";
+import type { PropertyDefinition, PropertyLookup, PropertyValueType, ThemeSource, VisualSchemaKey } from "./properties";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -551,4 +551,126 @@ export function resolveGlobalOptionsStyle(theme: ThemeSource, base: ResolvedThem
   };
 }
 
-export { propertyThemePath };
+/**
+ * The two filter-card states, spelled exactly as the schema tags them.
+ *
+ * These are **not** interaction states. A filter card renders differently
+ * according to whether that filter currently has a selection applied, which
+ * has nothing to do with hover or press, and the ids are capitalised where
+ * every interaction-state id is lower-case. Reusing `InteractionState` would
+ * offer Power BI four `$id`s it never reads here, so this is a separate,
+ * deliberately tiny domain.
+ */
+export const FILTER_CARD_STATES = ["Available", "Applied"] as const;
+export type FilterCardState = (typeof FILTER_CARD_STATES)[number];
+
+/**
+ * Groups whose canonical home is the shared `visualStyles["*"]["*"]` bucket.
+ *
+ * Both modern base themes and Microsoft's own theme generator put filter
+ * pane and filter card styling there, not under `page`. Theme Studio read
+ * that correctly from the start but wrote to `page`, so editing an imported
+ * theme left the original untouched and added a second, contradictory copy
+ * that won on precedence. Reads are unchanged — `page` still beats the
+ * shared bucket — but writes now land where the value already lives.
+ *
+ * Only these two groups move. `reportFilterPaneState` also targets
+ * `outspacePane`, but from the `report` bucket with a disjoint field set,
+ * and is excluded by the `visual === "page"` test in `globalWriteOwner`.
+ */
+const SHARED_BUCKET_GROUPS = new Set(["outspacePane", "filterCard"]);
+
+/** The `filterCard`/`outspacePane` array a bucket holds in the user's own theme, if any. */
+function bucketEntries(source: ThemeSource, bucket: VisualSchemaKey, group: string): unknown[] | undefined {
+  const visualStyles = themeRoots(source).visualStyles;
+  if (!isEntry(visualStyles)) return undefined;
+  const entries = readAtPath(visualStyles[bucket] as never, ["*", group]);
+  return Array.isArray(entries) ? entries : undefined;
+}
+
+/** Whether the user's own theme already carries this group in a given bucket. */
+function ownsGroup(source: ThemeSource, bucket: VisualSchemaKey, group: string): boolean {
+  const entries = bucketEntries(source, bucket, group);
+  return entries !== undefined && entries.length > 0;
+}
+
+/**
+ * Which bucket an edit to this property should be written to.
+ *
+ * Filter pane and filter card styling goes to the shared bucket — except
+ * where the user's own theme already keeps that group under `page`, which is
+ * exactly what every theme Theme Studio itself exported before this change
+ * looks like. Writing those to the shared bucket would be shadowed by the
+ * page copy on the very next read, so the edit would appear to do nothing.
+ * Editing continues wherever the value already is; only new values get the
+ * canonical home. Nothing is moved or deleted behind the user's back.
+ */
+function globalWriteOwner(
+  source: ThemeSource,
+  definition: Pick<PropertyDefinition, "visual" | "path" | "valueType">,
+): VisualSchemaKey {
+  const group = String(definition.path[0]);
+  if (definition.visual !== "page" || !SHARED_BUCKET_GROUPS.has(group)) return definition.visual;
+  return ownsGroup(source, "page", group) ? "page" : "*";
+}
+
+/**
+ * Absolute write path for a global option, honouring the canonical owner.
+ *
+ * Deliberately shadows the generic `propertyThemePath` for this registry:
+ * every call site here needs the owner rule, and a second exported name
+ * would let one of them silently skip it.
+ */
+export function propertyThemePath(
+  definition: Pick<PropertyDefinition, "visual" | "path" | "valueType">,
+  source?: ThemeSource,
+): Array<string | number> {
+  const visual = source === undefined ? definition.visual : globalWriteOwner(source, definition);
+  return rawPropertyThemePath({ ...definition, visual });
+}
+
+/**
+ * The index of a filter-card state's entry in the user's own theme.
+ *
+ * Reading and writing deliberately disagree when only an untagged entry
+ * exists. Reading falls back to it, because an untagged entry is what
+ * actually resolves for both states and the editor must show the value the
+ * user will see. Writing must not reuse it — patching the untagged entry
+ * would change *both* states at once, which is the whole defect this
+ * replaces — so a new tagged entry is appended instead, leaving the legacy
+ * entry to go on serving the state that was not edited.
+ *
+ * Neither ever falls back to index 0. Index 0 belongs to whichever state
+ * was listed first, so reading it would show one state's values under the
+ * other's label — the same trap `stateEntryIndexInLayer` documents.
+ */
+export function filterCardStateEntryIndex(
+  source: ThemeSource,
+  state: FilterCardState,
+  bucket: VisualSchemaKey,
+  create = false,
+): number {
+  const entries = bucketEntries(source, bucket, "filterCard");
+  if (entries === undefined) return 0;
+
+  const tagged = entries.findIndex((entry) => isEntry(entry) && entry.$id === state);
+  if (tagged !== -1) return tagged;
+  if (create) return entries.length;
+
+  const untagged = entries.findIndex((entry) => isEntry(entry) && entry.$id === undefined);
+  // Past the end of the array, deliberately. With neither a tagged nor an
+  // untagged entry to read, this state has no stored value, and the caller
+  // must fall back to the resolved one. Returning 0 here would read
+  // whichever state happens to be listed first and show its value under
+  // the other state's label.
+  return untagged !== -1 ? untagged : entries.length;
+}
+
+function isEntry(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The bucket a filter-card edit lands in — the same rule the write path uses. */
+export function filterCardWriteBucket(source: ThemeSource): VisualSchemaKey {
+  return globalWriteOwner(source, GLOBAL_OPTIONS_PROPERTIES.pageFilterCards.backgroundColor);
+}

@@ -12,7 +12,14 @@ import { COLUMN_CHART_PROPERTIES, propertyThemePath as columnChartPropertyThemeP
 import type { ResolvedColumnChartStyle } from "../lib/columnChartProperties";
 import { IMAGE_PROPERTIES, propertyThemePath as imagePropertyThemePath } from "../lib/imageProperties";
 import type { ResolvedImageStyle } from "../lib/imageProperties";
-import { GLOBAL_OPTIONS_PROPERTIES, propertyThemePath as globalOptionsPropertyThemePath } from "../lib/globalOptionsProperties";
+import {
+  FILTER_CARD_STATES,
+  GLOBAL_OPTIONS_PROPERTIES,
+  filterCardStateEntryIndex,
+  filterCardWriteBucket,
+  propertyThemePath as globalOptionsPropertyThemePath,
+} from "../lib/globalOptionsProperties";
+import type { FilterCardState } from "../lib/globalOptionsProperties";
 import type { ResolvedGlobalOptionsStyle } from "../lib/globalOptionsProperties";
 import { LINE_CHART_PROPERTIES, propertyThemePath as lineChartPropertyThemePath } from "../lib/lineChartProperties";
 import {
@@ -578,6 +585,46 @@ export function StateSelector({
 }
 
 /**
+ * Lets a filter card's formatting be edited per filter state.
+ *
+ * Power BI tags `filterCard` entries `$id: "Available"` / `$id: "Applied"`,
+ * and Theme Studio has always *read* the two independently. Only one set of
+ * controls was ever offered, though, and it wrote an untagged entry — which
+ * satisfies either state, so editing one value silently flattened a theme
+ * that distinguished them.
+ *
+ * Kept separate from StateSelector on purpose. These are filter states, not
+ * interaction states: the ids are capitalised, there are exactly two, and
+ * none of hover/press/selected/disabled applies.
+ */
+function FilterCardStateSelector({
+  state,
+  onSelect,
+}: {
+  state: FilterCardState;
+  onSelect: (state: FilterCardState) => void;
+}) {
+  return (
+    <div className="state-selector" role="group" aria-label="Filter state">
+      <span className="state-selector__label">Filter</span>
+      <div className="state-selector__options">
+        {FILTER_CARD_STATES.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`state-selector__option${option === state ? " is-active" : ""}`}
+            aria-pressed={option === state}
+            onClick={() => onSelect(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * A before/after demo for settings the main preview can't show — format
  * strings, blank handling, resize behaviour, log scales. Each state the
  * property can take is drawn with a sample of the affected element, and
@@ -828,6 +875,11 @@ export function PropertyEditor({
   // questions. Merging them would make picking a state to edit silently
   // restyle the hero.
   const [interactionState, setInteractionState] = useState<InteractionState>("default");
+
+  // Filter cards get their own selection rather than sharing the one above:
+  // the two axes are unrelated, and "Available"/"Applied" is not a value
+  // InteractionState can hold.
+  const [filterCardState, setFilterCardState] = useState<FilterCardState>("Available");
 
   // A group open in one tab/visual rarely makes sense after switching to
   // another, so return to the list view whenever the context changes.
@@ -1139,13 +1191,44 @@ export function PropertyEditor({
 
     if (id.startsWith(GLOBAL_OPTIONS_ID_PREFIX)) {
       const key = id.slice(GLOBAL_OPTIONS_ID_PREFIX.length) as keyof typeof GLOBAL_OPTIONS_PROPERTIES;
+      const getPath = (definition: Parameters<typeof globalOptionsPropertyThemePath>[0]) =>
+        globalOptionsPropertyThemePath(definition, theme);
+
+      if (key === "pageFilterCards") {
+        // Read the entry the selected state actually resolves to; write to
+        // its own tagged entry, appending one where only a legacy untagged
+        // entry exists so the other state keeps its value.
+        const bucket = filterCardWriteBucket(theme);
+        const readIndex = filterCardStateEntryIndex(theme, filterCardState, bucket);
+        const writeIndex = filterCardStateEntryIndex(theme, filterCardState, bucket, true);
+        return (
+          <>
+            <FilterCardStateSelector state={filterCardState} onSelect={setFilterCardState} />
+            <RegistryGroupBody
+              theme={theme}
+              group={GLOBAL_OPTIONS_PROPERTIES.pageFilterCards}
+              groupValues={
+                filterCardState === "Applied" ? globalOptionsStyle.pageFilterCardsApplied : globalOptionsStyle.pageFilterCards
+              }
+              pathPrefix={`visualStyles.${bucket}.*`}
+              getThemePath={(definition) => getPath(forState(definition, writeIndex))}
+              readThemePath={(definition) => getPath(forState(definition, readIndex))}
+              stateId={filterCardState}
+              stateIdPath={["visualStyles", bucket, "*", "filterCard", writeIndex, "$id"]}
+              onChange={onChange}
+              onReset={onReset}
+            />
+          </>
+        );
+      }
+
       return (
         <RegistryGroupBody
           theme={theme}
           group={GLOBAL_OPTIONS_PROPERTIES[key]}
           groupValues={globalOptionsStyle[key]}
           pathPrefix={key.startsWith("report") ? "visualStyles.report.*" : "visualStyles.page.*"}
-          getThemePath={globalOptionsPropertyThemePath}
+          getThemePath={getPath}
           onChange={onChange}
           onReset={onReset}
         />

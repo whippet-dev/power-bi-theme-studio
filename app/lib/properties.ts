@@ -90,7 +90,7 @@ function isRecord(value: unknown): value is Record<string, JsonValue> {
 // separate `transparency` field — CSS supports that hex form natively.
 const HEX_COLOR = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 
-function readAtPath(root: JsonValue | undefined, path: Array<string | number>): JsonValue | undefined {
+export function readAtPath(root: JsonValue | undefined, path: Array<string | number>): JsonValue | undefined {
   let cursor: JsonValue | undefined = root;
 
   for (const part of path) {
