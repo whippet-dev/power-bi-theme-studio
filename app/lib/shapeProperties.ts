@@ -23,13 +23,30 @@ export type ResolvedShapeStyle = ResolvedShapeFamilyCore;
  * defaulting to OFF and the text to ON, both backwards for a shape.
  */
 const SHAPE_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
-  fill: { show: true },
-  outline: { show: true, weight: 1 },
-  shadow: { show: false },
-  glow: { show: false },
+  // Shape is the family's outlier twice over: its text is a capability
+  // constant where the other three derive from the label class, and its
+  // shadow is a hard black where theirs is `foreground`.
+  fill: { show: true, color: { dataColor: 0 } },
+  // The border is the fill shaded by a quarter — a ThemeDataColor
+  // expression, not a token and not a constant.
+  outline: { show: true, weight: 1, color: { dataColor: 0, shade: -0.25 } },
+  shadow: { show: false, color: { constant: "#000000" }, transparency: 70, blur: 20 },
+  glow: { show: false, color: { dataColor: 0 }, transparency: 0, blur: 40 },
   // Off, but styled: the latent typography is what appears the moment a user
   // switches text on, so it is a real default rather than a placeholder.
-  text: { show: false, fontSize: 10, topMargin: 0, bottomMargin: 0, leftMargin: 0, rightMargin: 0 },
+  // Segoe UI 10 held under a theme setting `label` to 20 and appears in none
+  // of that theme's four classes, so both family and size are constants.
+  text: {
+    show: false,
+    fontFamily: "Segoe UI",
+    fontSize: 10,
+    color: { token: "background" },
+    topMargin: 0,
+    bottomMargin: 0,
+    leftMargin: 0,
+    rightMargin: 0,
+  },
+  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
 };
 
 export function resolveShapeStyle(theme: ThemeSource, base: ResolvedTheme): ResolvedShapeStyle {

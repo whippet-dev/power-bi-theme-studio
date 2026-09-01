@@ -42,6 +42,15 @@ const BUILT_IN = {
   secondaryBackground: "#C8C6C4",
   /** Classic 2026's own value; the table's grid outline resolves through this. */
   tableAccent: "#118DFF",
+  /**
+   * Classic 2026's own values. The shape family reaches all three: a
+   * navigator's hover fill is `backgroundLight`, its press fill and a
+   * disabled button's plate are `backgroundNeutral`, and a disabled button's
+   * text and icon are `foregroundNeutralTertiary`.
+   */
+  backgroundLight: "#F3F2F1",
+  backgroundNeutral: "#C8C6C4",
+  foregroundNeutralTertiary: "#B3B0AD",
 } as const;
 
 export type NativeTokenName = keyof typeof BUILT_IN;

@@ -33,9 +33,13 @@ test("resolveShapeStyle falls back to sensible defaults when there is no overrid
   assert.equal(style.outline.show, true);
   assert.equal(style.outline.weight, 1);
   // Text is off, with its latent typography still resolved behind it.
+  // Measured: a capability-constant Segoe UI 10 on `background`, not the
+  // foreground the shared core used to hand every family member.
   assert.equal(style.text.show, false);
   assert.equal(style.text.fontSize, 10);
-  assert.equal(style.text.fontColor, base.foreground);
+  assert.equal(style.text.fontFamily, "Segoe UI");
+  assert.equal(style.text.fontColor, base.background);
+  assert.notEqual(style.text.fontColor, base.foreground);
   assert.equal(style.shape.tileShape, "rectangle");
 });
 

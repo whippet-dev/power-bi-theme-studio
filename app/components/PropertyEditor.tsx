@@ -29,7 +29,14 @@ import { PAGE_NAVIGATOR_PROPERTIES, propertyThemePath as pageNavigatorPropertyTh
 import type { ResolvedPageNavigatorStyle } from "../lib/pageNavigatorProperties";
 import { PIE_CHART_PROPERTIES, propertyThemePath as pieChartPropertyThemePath } from "../lib/pieChartProperties";
 import type { ResolvedPieChartStyle } from "../lib/pieChartProperties";
-import { forState, groupSupportsStates, INTERACTION_STATES, stateEntryIndex, type InteractionState } from "../lib/properties";
+import {
+  forState,
+  groupSupportsStates,
+  interactionStatesFor,
+  nearestInteractionState,
+  stateEntryIndex,
+  type InteractionState,
+} from "../lib/properties";
 import type { PropertyDefinition, PropertyValueType, VisualSchemaKey } from "../lib/properties";
 import { activeEffectState, propertyEffect } from "../lib/propertyEffects";
 import {
@@ -518,32 +525,51 @@ export function PropertyRow({
   );
 }
 
+/** Power BI's own wording for each state id. `press` is labelled "Pressed". */
+const STATE_LABEL: Record<InteractionState, string> = {
+  default: "Default",
+  hover: "Hover",
+  press: "Pressed",
+  selected: "Selected",
+  disabled: "Disabled",
+};
+
 /**
  * Lets a button or navigator's formatting be edited per interaction
  * state. Power BI keys those groups by `$id`, so "hover" is a separate
  * array entry rather than a separate property — without this, only one
- * state is reachable and the other three are invisible.
+ * state is reachable and the others are invisible.
+ *
+ * The options come from the visual rather than a global list, because no two
+ * of these visuals offer the same set: Button has `disabled` and no
+ * `selected`, the navigators have `selected` and no `disabled`. Offering a
+ * state a visual does not have would write a `$id` Power BI never reads.
  */
 export function StateSelector({
+  visual,
   state,
   onSelect,
 }: {
+  visual: VisualSchemaKey;
   state: InteractionState;
   onSelect: (state: InteractionState) => void;
 }) {
+  const states = interactionStatesFor(visual);
+  if (states.length === 0) return null;
+  const active = nearestInteractionState(visual, state);
   return (
     <div className="state-selector" role="group" aria-label="Interaction state">
       <span className="state-selector__label">State</span>
       <div className="state-selector__options">
-        {INTERACTION_STATES.map((option) => (
+        {states.map((option) => (
           <button
             key={option}
             type="button"
-            className={`state-selector__option${option === state ? " is-active" : ""}`}
-            aria-pressed={option === state}
+            className={`state-selector__option${option === active ? " is-active" : ""}`}
+            aria-pressed={option === active}
             onClick={() => onSelect(option)}
           >
-            {option === "default" ? "Default" : option[0].toUpperCase() + option.slice(1)}
+            {STATE_LABEL[option]}
           </button>
         ))}
       </div>
@@ -1150,7 +1176,7 @@ export function PropertyEditor({
       const writeIndex = stateEntryIndex(theme, "actionButton", key, interactionState, true);
       return (
         <>
-          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          {stateful && <StateSelector visual="actionButton" state={interactionState} onSelect={setInteractionState} />}
           <RegistryGroupBody
             theme={theme}
             group={ACTION_BUTTON_PROPERTIES[key]}
@@ -1180,7 +1206,7 @@ export function PropertyEditor({
       const writeIndex = stateEntryIndex(theme, "bookmarkNavigator", key, interactionState, true);
       return (
         <>
-          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          {stateful && <StateSelector visual="bookmarkNavigator" state={interactionState} onSelect={setInteractionState} />}
           <RegistryGroupBody
             theme={theme}
             group={BOOKMARK_NAVIGATOR_PROPERTIES[key]}
@@ -1210,7 +1236,7 @@ export function PropertyEditor({
       const writeIndex = stateEntryIndex(theme, "pageNavigator", key, interactionState, true);
       return (
         <>
-          {stateful && <StateSelector state={interactionState} onSelect={setInteractionState} />}
+          {stateful && <StateSelector visual="pageNavigator" state={interactionState} onSelect={setInteractionState} />}
           <RegistryGroupBody
             theme={theme}
             group={PAGE_NAVIGATOR_PROPERTIES[key]}

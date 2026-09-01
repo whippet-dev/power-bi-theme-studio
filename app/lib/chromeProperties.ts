@@ -1271,6 +1271,28 @@ export type ResolvedChromeStyle = {
  * own override first, then the theme-wide shared default, then a plain
  * fallback — see resolveChromeValue in properties.ts.
  */
+/**
+ * Visuals measured as defaulting their title OFF.
+ *
+ * Exactly the four swept in the shape-family pass — Shape, Button and both
+ * navigators — each read `title.show` Off with no base theme setting it, so
+ * Off is their capability default. Every other visual keeps the previous
+ * `true`, including Text Box and Image, which measured Off but are out of
+ * this pass's scope and would be changed on evidence not yet applied.
+ *
+ * Deliberately NOT `isCanvasObject`: that set exists for a different
+ * question (background and header defaults) and includes visuals this pass
+ * has not corrected. An earlier "chart versus non-chart" explanation for
+ * which visuals behave this way was disproven and is not encoded here — the
+ * only claim is that these four were measured Off.
+ */
+const TITLE_OFF_BY_DEFAULT = new Set<VisualSchemaKey>([
+  "shape",
+  "actionButton",
+  "pageNavigator",
+  "bookmarkNavigator",
+]);
+
 export function resolveChromeStyle(
   theme: ThemeSource,
   activeVisual: VisualSchemaKey,
@@ -1316,7 +1338,7 @@ export function resolveChromeStyle(
     activeVisual === "bookmarkNavigator";
   return {
     title: {
-      show: resolveChromeValue(theme, activeVisual, p.title.show, true),
+      show: resolveChromeValue(theme, activeVisual, p.title.show, !TITLE_OFF_BY_DEFAULT.has(activeVisual)),
       text: resolveChromeValue(theme, activeVisual, p.title.text, ""),
       alignment: resolveChromeValue(theme, activeVisual, p.title.alignment, "left"),
       heading: resolveChromeValue(theme, activeVisual, p.title.heading, "Heading3"),

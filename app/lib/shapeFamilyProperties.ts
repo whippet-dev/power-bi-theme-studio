@@ -9,6 +9,9 @@ import {
     textProp,
 } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, VisualSchemaKey, ThemeSource, PropertyLookup } from "./properties";
+import { tintOrShade } from "./colorUtils";
+import { nativeDataColor, nativeToken, type NativeTokenName } from "./nativeTokens";
+import { resolveTextClass, type TextClassName } from "./textClasses";
 
 /**
  * Shared base for the "shape family" of canvas-object visuals — Shape,
@@ -655,14 +658,49 @@ const SHAPE_PARAM_DEFAULTS: Record<string, string | number> = {
  * imported value still wins, a base-theme value still wins over a capability
  * default, and Fluent 2's explicit per-state entries still resolve normally.
  */
+/**
+ * How a shape-family colour default is derived.
+ *
+ * A tagged union rather than a hex string, because the four visuals draw
+ * their colours from three genuinely different places and collapsing them
+ * into literals is what produced the defects this replaces — a Shape used to
+ * fill with `#005EA5`, a colour from Theme Studio's own fallback palette that
+ * appears in no Power BI theme at all.
+ */
+export type ShapeFamilyColor =
+  /** One of the theme's root colour tokens. */
+  | { token: NativeTokenName }
+  /**
+   * A palette entry, optionally tint/shaded the way a `ThemeDataColor`
+   * expression would. Shape's border is `dataColors[0]` at -25%.
+   */
+  | { dataColor: number; shade?: number }
+  /** A value Power BI hard-codes in the visual, which no token reaches. */
+  | { constant: string };
+
+/** A capability font size: a constant, or a text class's own size. */
+export type ShapeFamilyFontSize = number | { fromTextClass: TextClassName };
+
+function resolveFamilyColor(theme: ThemeSource, spec: ShapeFamilyColor): string {
+  if ("constant" in spec) return spec.constant;
+  if ("token" in spec) return nativeToken(theme, spec.token);
+  const base = nativeDataColor(theme, spec.dataColor);
+  return spec.shade === undefined ? base : tintOrShade(base, spec.shade);
+}
+
+const resolveFamilyFontSize = (theme: ThemeSource, spec: ShapeFamilyFontSize): number =>
+  typeof spec === "number" ? spec : resolveTextClass(theme, spec.fromTextClass).fontSize;
+
 export type ShapeFamilyDefaultValues = {
-  fill?: { show?: boolean; transparency?: number };
-  outline?: { show?: boolean; weight?: number; transparency?: number };
-  shadow?: { show?: boolean };
-  glow?: { show?: boolean };
+  fill?: { show?: boolean; transparency?: number; color?: ShapeFamilyColor };
+  outline?: { show?: boolean; weight?: number; transparency?: number; color?: ShapeFamilyColor };
+  shadow?: { show?: boolean; color?: ShapeFamilyColor; transparency?: number; blur?: number };
+  glow?: { show?: boolean; color?: ShapeFamilyColor; transparency?: number; blur?: number };
   text?: {
     show?: boolean;
-    fontSize?: number;
+    fontSize?: ShapeFamilyFontSize;
+    fontFamily?: string;
+    color?: ShapeFamilyColor;
     bold?: boolean;
     horizontalAlignment?: string;
     verticalAlignment?: string;
@@ -671,18 +709,19 @@ export type ShapeFamilyDefaultValues = {
     leftMargin?: number;
     rightMargin?: number;
   };
+  /** Geometry parameters, by the key the shape registry uses. */
+  shapeParams?: Record<string, string | number>;
 };
 
 export type ShapeFamilyDefaults = ShapeFamilyDefaultValues & {
   /**
    * Per-state capability defaults, applied over the visual-wide ones above.
    *
-   * Empty for every visual today, deliberately: every per-state difference
-   * measured so far (a pressed navigator's grey fill, a selected one's black
-   * fill and white text, a disabled button's dimmed treatment) is a COLOUR,
-   * and colours are not encoded here. The mechanism exists because the
-   * stateful visuals need somewhere for such a default to go the moment one
-   * is established that is not a colour.
+   * No longer empty. Every per-state difference measured is a colour, and
+   * colours are now expressible: the navigators move `fill.color` through
+   * background -> backgroundLight -> backgroundNeutral and invert with
+   * `foreground` when selected, while a disabled Button drops its text and
+   * icon to `foregroundNeutralTertiary` over a `backgroundNeutral` plate.
    */
   perState?: Partial<Record<InteractionState, ShapeFamilyDefaultValues>>;
 };
@@ -705,6 +744,19 @@ export function resolveShapeFamilyCore(
   const stateDefaults = defaults.perState?.[state];
   const cap = <T>(perState: T | undefined, perVisual: T | undefined, generic: T): T =>
     perState ?? perVisual ?? generic;
+  /**
+   * The same precedence for a colour, resolved through the theme. The generic
+   * is a bare hex because it is the pre-measurement literal being retired —
+   * a visual that supplies no colour default keeps exactly what it had.
+   */
+  const colorCap = (
+    perState: ShapeFamilyColor | undefined,
+    perVisual: ShapeFamilyColor | undefined,
+    generic: string,
+  ): string => {
+    const spec = perState ?? perVisual;
+    return spec === undefined ? generic : resolveFamilyColor(theme, spec);
+  };
 
   const shape: Record<string, string | number> = {};
   for (const [key, definition] of Object.entries(core.shape)) {
@@ -717,18 +769,22 @@ export function resolveShapeFamilyCore(
     // nothing guarantees the default entry is listed first, and reading
     // position would hand back another state's geometry. Same reasoning as
     // STATEFUL_GROUPS, minus the per-state part.
-    shape[key] = resolvePropertyValue(theme, forStateId(definition, "default"), fallback);
+    shape[key] = resolvePropertyValue(
+      theme,
+      forStateId(definition, "default"),
+      defaults.shapeParams?.[key] ?? fallback,
+    );
   }
 
   return {
     fill: {
       show: resolvePropertyValue(theme, at("fill", core.fill.show), cap(stateDefaults?.fill?.show, defaults.fill?.show, true)),
-      fillColor: resolvePropertyValue(theme, at("fill", core.fill.fillColor), "#005EA5"),
+      fillColor: resolvePropertyValue(theme, at("fill", core.fill.fillColor), colorCap(stateDefaults?.fill?.color, defaults.fill?.color, "#005EA5")),
       transparency: resolvePropertyValue(theme, at("fill", core.fill.transparency), cap(stateDefaults?.fill?.transparency, defaults.fill?.transparency, 0)),
     },
     outline: {
       show: resolvePropertyValue(theme, at("outline", core.outline.show), cap(stateDefaults?.outline?.show, defaults.outline?.show, false)),
-      lineColor: resolvePropertyValue(theme, at("outline", core.outline.lineColor), "#E3E3E3"),
+      lineColor: resolvePropertyValue(theme, at("outline", core.outline.lineColor), colorCap(stateDefaults?.outline?.color, defaults.outline?.color, "#E3E3E3")),
       weight: resolvePropertyValue(theme, at("outline", core.outline.weight), cap(stateDefaults?.outline?.weight, defaults.outline?.weight, 1)),
       transparency: resolvePropertyValue(theme, at("outline", core.outline.transparency), cap(stateDefaults?.outline?.transparency, defaults.outline?.transparency, 0)),
     },
@@ -736,16 +792,16 @@ export function resolveShapeFamilyCore(
       show: resolvePropertyValue(theme, at("shadow", core.shadow.show), cap(stateDefaults?.shadow?.show, defaults.shadow?.show, false)),
       shadowPositionPreset: resolvePropertyValue(theme, at("shadow", core.shadow.shadowPositionPreset), "bottomRight"),
       angle: resolvePropertyValue(theme, at("shadow", core.shadow.angle), 45),
-      color: resolvePropertyValue(theme, at("shadow", core.shadow.color), "#000000"),
-      transparency: resolvePropertyValue(theme, at("shadow", core.shadow.transparency), 60),
+      color: resolvePropertyValue(theme, at("shadow", core.shadow.color), colorCap(stateDefaults?.shadow?.color, defaults.shadow?.color, "#000000")),
+      transparency: resolvePropertyValue(theme, at("shadow", core.shadow.transparency), cap(stateDefaults?.shadow?.transparency, defaults.shadow?.transparency, 60)),
       shadowDistance: resolvePropertyValue(theme, at("shadow", core.shadow.shadowDistance), 2),
-      shadowBlur: resolvePropertyValue(theme, at("shadow", core.shadow.shadowBlur), 5),
+      shadowBlur: resolvePropertyValue(theme, at("shadow", core.shadow.shadowBlur), cap(stateDefaults?.shadow?.blur, defaults.shadow?.blur, 5)),
     },
     glow: {
       show: resolvePropertyValue(theme, at("glow", core.glow.show), cap(stateDefaults?.glow?.show, defaults.glow?.show, false)),
-      color: resolvePropertyValue(theme, at("glow", core.glow.color), "#FFFFFF"),
-      transparency: resolvePropertyValue(theme, at("glow", core.glow.transparency), 60),
-      shadowBlur: resolvePropertyValue(theme, at("glow", core.glow.shadowBlur), 5),
+      color: resolvePropertyValue(theme, at("glow", core.glow.color), colorCap(stateDefaults?.glow?.color, defaults.glow?.color, "#FFFFFF")),
+      transparency: resolvePropertyValue(theme, at("glow", core.glow.transparency), cap(stateDefaults?.glow?.transparency, defaults.glow?.transparency, 60)),
+      shadowBlur: resolvePropertyValue(theme, at("glow", core.glow.shadowBlur), cap(stateDefaults?.glow?.blur, defaults.glow?.blur, 5)),
     },
     rotation: {
       angle: resolvePropertyValue(theme, core.rotation.angle, 0),
@@ -756,9 +812,9 @@ export function resolveShapeFamilyCore(
     text: {
       show: resolvePropertyValue(theme, at("text", core.text.show), cap(stateDefaults?.text?.show, defaults.text?.show, true)),
       text: resolvePropertyValue(theme, at("text", core.text.text), ""),
-      fontColor: resolvePropertyValue(theme, at("text", core.text.fontColor), baseForeground),
-      fontFamily: resolvePropertyValue(theme, at("text", core.text.fontFamily), baseFontFamily),
-      fontSize: resolvePropertyValue(theme, at("text", core.text.fontSize), cap(stateDefaults?.text?.fontSize, defaults.text?.fontSize, 10)),
+      fontColor: resolvePropertyValue(theme, at("text", core.text.fontColor), colorCap(stateDefaults?.text?.color, defaults.text?.color, baseForeground)),
+      fontFamily: resolvePropertyValue(theme, at("text", core.text.fontFamily), cap(stateDefaults?.text?.fontFamily, defaults.text?.fontFamily, baseFontFamily)),
+      fontSize: resolvePropertyValue(theme, at("text", core.text.fontSize), resolveFamilyFontSize(theme, cap(stateDefaults?.text?.fontSize, defaults.text?.fontSize, 10))),
       bold: resolvePropertyValue(theme, at("text", core.text.bold), cap(stateDefaults?.text?.bold, defaults.text?.bold, false)),
       italic: resolvePropertyValue(theme, at("text", core.text.italic), false),
       underline: resolvePropertyValue(theme, at("text", core.text.underline), false),

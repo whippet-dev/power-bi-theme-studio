@@ -45,13 +45,15 @@ test("the four visuals do not share one set of capability defaults", () => {
   assert.equal(page.fill.show, true);
   assert.equal(bookmark.fill.show, true);
 
-  // Text: off for a shape and a button, ON and bold for both navigators.
+  // Text: off for a shape and a button, ON for both navigators. Bold is off
+  // everywhere — PR #12 recorded the navigators as bold from measurement and
+  // the later sweep found both Off.
   assert.equal(shape.text.show, false);
   assert.equal(button.text.show, false);
   assert.equal(page.text.show, true);
-  assert.equal(page.text.bold, true);
+  assert.equal(page.text.bold, false);
   assert.equal(bookmark.text.show, true);
-  assert.equal(bookmark.text.bold, true);
+  assert.equal(bookmark.text.bold, false);
 
   // Border weight: 1px everywhere except the button's 3px.
   assert.equal(shape.outline.weight, 1);
@@ -78,14 +80,34 @@ test("latent text styling survives text being off", () => {
 
   const button = resolveActionButtonStyle(layers(), RESOLVED, "default");
   assert.equal(button.text.show, false);
-  assert.equal(button.text.fontSize, 10);
 });
 
-test("Bookmark Navigator does not borrow the Page Navigator's measured alignment", () => {
-  // Alignment was measured for the Page Navigator and not for the Bookmark
-  // Navigator, so only one of them declares it. A gap must read as "not
-  // established", never as a value copied from a sibling.
-  assert.equal(resolvePageNavigatorStyle(layers(), RESOLVED, "default").text.horizontalAlignment, "left");
+test("the shape's latent text is a constant; the button's follows the label class", () => {
+  // Under EMPTY the two agree by coincidence, because Power BI's built-in
+  // `label` is itself Segoe UI 10. A theme that moves the class separates
+  // them: the shape holds, the button follows.
+  const themed: PowerBITheme = {
+    name: "themed",
+    textClasses: { label: { fontFace: "Courier New", fontSize: 20, color: "#628E0B" } },
+    visualStyles: {},
+  };
+  const src = layers(themed);
+  const shape = resolveShapeStyle(src, resolveTheme(themed));
+  const button = resolveActionButtonStyle(src, resolveTheme(themed), "default");
+
+  assert.equal(shape.text.fontFamily, "Segoe UI", "capability constant");
+  assert.equal(shape.text.fontSize, 10, "capability constant");
+  assert.equal(button.text.fontFamily, "Courier New", "the label class family");
+  assert.equal(button.text.fontSize, 20, "label x 1");
+});
+
+test("both navigators align their text the same way, because both were measured", () => {
+  // This test used to assert a DIFFERENCE. PR #12 had measured alignment for
+  // the Page Navigator only and recorded "left"; the Bookmark Navigator was
+  // left to the generic "center" as an honest gap. Measuring both directly
+  // showed the gap was the accurate one and the recorded value was not —
+  // they are both Center.
+  assert.equal(resolvePageNavigatorStyle(layers(), RESOLVED, "default").text.horizontalAlignment, "center");
   assert.equal(resolveBookmarkNavigatorStyle(layers(), RESOLVED, "default").text.horizontalAlignment, "center");
 });
 
@@ -94,15 +116,16 @@ test("Bookmark Navigator does not borrow the Page Navigator's measured alignment
 // ---------------------------------------------------------------------------
 
 test("every state of a stateful visual gets the visual's capability defaults", () => {
-  for (const state of ["default", "hover", "selected", "disabled"] as const) {
+  // Each visual is asked only for the states it actually offers.
+  for (const state of ["default", "hover", "press", "disabled"] as const) {
     const button = resolveActionButtonStyle(layers(), RESOLVED, state);
     assert.equal(button.fill.show, false, `button fill is off in "${state}"`);
     assert.equal(button.outline.weight, 3, `button border is 3px in "${state}"`);
     assert.equal(button.text.show, false, `button text is off in "${state}"`);
   }
-  for (const state of ["default", "hover", "selected"] as const) {
-    assert.equal(resolvePageNavigatorStyle(layers(), RESOLVED, state).text.bold, true);
-    assert.equal(resolveBookmarkNavigatorStyle(layers(), RESOLVED, state).text.bold, true);
+  for (const state of ["default", "hover", "press", "selected"] as const) {
+    assert.equal(resolvePageNavigatorStyle(layers(), RESOLVED, state).text.bold, false);
+    assert.equal(resolveBookmarkNavigatorStyle(layers(), RESOLVED, state).text.bold, false);
   }
 });
 

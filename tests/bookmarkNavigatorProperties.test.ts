@@ -33,7 +33,10 @@ test("resolveBookmarkNavigatorStyle falls back to sensible defaults when there i
   const style = resolveBookmarkNavigatorStyle(STARTER_THEME, base);
 
   assert.equal(style.accentBar.show, false);
-  assert.equal(style.accentBar.color, base.tableAccent);
+  // Measured `foreground`, not tableAccent — and 2px, not 4.
+  assert.equal(style.accentBar.color, base.foreground);
+  assert.equal(style.accentBar.width, 2);
+  assert.notEqual(style.accentBar.color, base.tableAccent);
   assert.equal(style.layout.orientation, 2);
 });
 
