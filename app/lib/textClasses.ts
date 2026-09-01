@@ -235,12 +235,25 @@ export const TEXT_ROLE_SPEC = {
   /**
    * Table values, column headers and the grid's own text size.
    *
-   * `lightLabel` supplies the `label` family at the class's own size; the
-   * colour is then `foreground`, which is what the Format pane reports for
-   * both the values and the header text.
+   * What the sweep proves is narrower than the class name suggests: the
+   * table's family and size track `label` at scale 1 — confirmed at `label`
+   * 13 and 20, where all four surfaces read 13 and 20 in turn — and the
+   * text colour is the `foreground` token. It does **not** distinguish the
+   * primary `label` class from any secondary that derives the same family
+   * and size, because every such class produces identical output for those
+   * two channels.
    *
-   * All four table text surfaces share this size rule — confirmed at
-   * `label` 13 and 20, where every one of them read 13 and 20 in turn.
+   * `lightLabel` is therefore a deliberate choice among equals rather than a
+   * measured fact. It gives the label-derived family and size, and its
+   * colour is a *derivation* rather than a declaration — which is what lets
+   * the measured `foreground` token through `resolveTextRole`'s conservative
+   * colour-override rule. Naming the primary `label` here would resolve the
+   * same family and size and then silently keep that class's own colour,
+   * because an explicitly declared colour is honoured over a role's token.
+   *
+   * So the class name encodes a resolution mechanic, not a claim about which
+   * class Power BI consults. If the override semantics ever change, this is
+   * the line to revisit.
    */
   tableText: { class: "lightLabel", color: { token: "foreground", builtIn: BUILT_IN_FOREGROUND } },
   /**
