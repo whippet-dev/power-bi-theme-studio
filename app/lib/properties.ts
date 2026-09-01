@@ -497,8 +497,57 @@ export function chromeThemePath(
  * registries hardcode index 0. That stays true — this is an opt-in path
  * used only by the visuals whose schema actually carries `$id`.
  */
-export const INTERACTION_STATES = ["default", "hover", "selected", "disabled"] as const;
-export type InteractionState = (typeof INTERACTION_STATES)[number];
+/**
+ * Every state name any measured visual offers. This is the TYPE's domain, not
+ * any visual's state set — nothing should iterate it to build a UI.
+ *
+ * `press` is the internal id. Power BI labels it "Pressed" in the Format pane
+ * while writing `$id: "press"`, on every visual measured. They are one state,
+ * not two.
+ */
+export const ALL_INTERACTION_STATES = ["default", "hover", "press", "selected", "disabled"] as const;
+export type InteractionState = (typeof ALL_INTERACTION_STATES)[number];
+
+/**
+ * The states each visual actually offers.
+ *
+ * Measured in Power BI Desktop, and no two of the shape family agree:
+ * Shape has no state selector at all, Button offers `disabled` but not
+ * `selected`, and the navigators offer `selected` but not `disabled`. All
+ * three interactive ones offer `press`.
+ *
+ * This replaced a single global list of default/hover/selected/disabled,
+ * which matched none of them: it omitted `press`, which three of the four
+ * offer, and advertised two states no visual here has. A visual absent from
+ * this table is not stateful — that is how Shape is expressed.
+ */
+export const VISUAL_INTERACTION_STATES: Partial<Record<VisualSchemaKey, readonly InteractionState[]>> = {
+  actionButton: ["default", "hover", "press", "disabled"],
+  pageNavigator: ["default", "hover", "press", "selected"],
+  bookmarkNavigator: ["default", "hover", "press", "selected"],
+};
+
+/** The states this visual offers, empty when it is not stateful. */
+export function interactionStatesFor(visual: VisualSchemaKey): readonly InteractionState[] {
+  return VISUAL_INTERACTION_STATES[visual] ?? [];
+}
+
+/** Whether this visual offers this state at all. */
+export function supportsInteractionState(visual: VisualSchemaKey, state: InteractionState): boolean {
+  return interactionStatesFor(visual).includes(state);
+}
+
+/**
+ * The state to resolve for a visual, given one the caller may not support.
+ *
+ * The editor and the preview each hold a single selected state that outlives
+ * a switch between visuals, so a Button can be asked for `selected` and a
+ * navigator for `disabled`. Both fall back to `default` rather than reading
+ * a `$id` the visual does not have.
+ */
+export function nearestInteractionState(visual: VisualSchemaKey, state: InteractionState): InteractionState {
+  return supportsInteractionState(visual, state) ? state : "default";
+}
 
 /** Groups that support per-state styling, by visual. */
 export const STATEFUL_GROUPS: Partial<Record<VisualSchemaKey, readonly string[]>> = {

@@ -11,6 +11,7 @@ import {
 } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore, type ShapeFamilyDefaults } from "./shapeFamilyProperties";
+import { nativeToken } from "./nativeTokens";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -158,12 +159,40 @@ export type ResolvedBookmarkNavigatorStyle = ResolvedShapeFamilyCore & {
  * absent and keeps the resolver's generic value rather than borrowing the
  * Page Navigator's measured left alignment. Selected differs by colour only.
  */
+/**
+ * Measured on both navigators independently, across all four states, and
+ * identical between them — so this block is duplicated deliberately rather
+ * than shared: two visuals agreeing today is not a reason to make one depend
+ * on the other, and PR #12's one recorded difference between them turned out
+ * to be wrong in the direction of MORE similarity, not less.
+ *
+ * Only `fill.color` varies across default/hover/press; `selected` inverts
+ * both fill and text. Everything else holds across every state.
+ */
 const BOOKMARK_NAVIGATOR_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
-  fill: { show: true },
-  outline: { show: true, weight: 1 },
-  shadow: { show: false },
-  glow: { show: false },
-  text: { show: true, fontSize: 10, bold: true },
+  fill: { show: true, color: { token: "background" } },
+  outline: { show: true, weight: 1, transparency: 0, color: { token: "foreground" } },
+  shadow: { show: false, color: { token: "foreground" }, transparency: 70, blur: 20 },
+  glow: { show: false, color: { dataColor: 0 }, transparency: 0, blur: 40 },
+  text: {
+    show: true,
+    fontSize: { fromTextClass: "label" },
+    color: { token: "foreground" },
+    // Measured Center/Middle on BOTH navigators. PR #12 recorded "left" for
+    // Page Navigator as the family's one measured difference; it is not.
+    horizontalAlignment: "center",
+    verticalAlignment: "middle",
+  },
+  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
+  perState: {
+    hover: { fill: { color: { token: "backgroundLight" } } },
+    press: { fill: { color: { token: "backgroundNeutral" } } },
+    // The selected state is a straight foreground/background inversion.
+    selected: {
+      fill: { color: { token: "foreground" } },
+      text: { color: { token: "background" } },
+    },
+  },
 };
 
 export function resolveBookmarkNavigatorStyle(
@@ -179,9 +208,9 @@ export function resolveBookmarkNavigatorStyle(
     ...resolveShapeFamilyCore(theme, p, base.foreground, base.fontFamily, state, BOOKMARK_NAVIGATOR_CAPABILITY_DEFAULTS),
     accentBar: {
       show: resolvePropertyValue(theme, at(p.accentBar.show), false),
-      color: resolvePropertyValue(theme, at(p.accentBar.color), base.tableAccent),
+      color: resolvePropertyValue(theme, at(p.accentBar.color), nativeToken(theme, "foreground")),
       position: resolvePropertyValue(theme, at(p.accentBar.position), "Left"),
-      width: resolvePropertyValue(theme, at(p.accentBar.width), 4),
+      width: resolvePropertyValue(theme, at(p.accentBar.width), 2),
       transparency: resolvePropertyValue(theme, at(p.accentBar.transparency), 0),
     },
     bookmarks: {

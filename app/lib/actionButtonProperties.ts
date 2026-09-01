@@ -10,6 +10,7 @@ import {
   } from "./properties";
 import type { InteractionState, PropertyDefinition, PropertyValueType, ThemeSource, PropertyLookup } from "./properties";
 import { buildShapeFamilyCore, resolveShapeFamilyCore, type ResolvedShapeFamilyCore, type ShapeFamilyDefaults } from "./shapeFamilyProperties";
+import { nativeToken, type NativeTokenName } from "./nativeTokens";
 import type { ResolvedTheme } from "./theme";
 
 /**
@@ -207,12 +208,48 @@ export type ResolvedActionButtonStyle = ResolvedShapeFamilyCore & {
  *
  * Disabled differs only in colour treatment, which is not encoded here.
  */
+/**
+ * Measured on a Blank button, all four states.
+ *
+ * `default`, `hover` and `press` are byte-identical; only `disabled` differs,
+ * and it differs entirely in colour: text and icon drop to
+ * `foregroundNeutralTertiary`, fill and outline become a `backgroundNeutral`
+ * plate, and the fill goes opaque so that plate actually shows.
+ *
+ * It does NOT use `disabledText`. That token exists and Fluent 2 uses it for
+ * a navigator's press state, so it was the obvious guess and it is wrong.
+ */
 const ACTION_BUTTON_CAPABILITY_DEFAULTS: ShapeFamilyDefaults = {
-  fill: { show: false },
-  outline: { show: true, weight: 3, transparency: 0 },
-  shadow: { show: false },
-  glow: { show: false },
-  text: { show: false, fontSize: 10 },
+  fill: { show: false, color: { token: "background" }, transparency: 50 },
+  outline: { show: true, weight: 3, transparency: 0, color: { token: "foregroundNeutralSecondary" } },
+  shadow: { show: false, color: { token: "foreground" }, transparency: 70, blur: 20 },
+  glow: { show: false, color: { dataColor: 0 }, transparency: 0, blur: 40 },
+  text: {
+    show: false,
+    fontSize: { fromTextClass: "label" },
+    color: { token: "foregroundNeutralSecondary" },
+    topMargin: 4,
+    bottomMargin: 4,
+    leftMargin: 4,
+    rightMargin: 4,
+  },
+  shapeParams: { roundEdge: 0, rectangleRoundedCurve: 0 },
+  perState: {
+    disabled: {
+      fill: { color: { token: "backgroundNeutral" }, transparency: 0 },
+      outline: { color: { token: "backgroundNeutral" } },
+      text: { color: { token: "foregroundNeutralTertiary" } },
+    },
+  },
+};
+
+/**
+ * The button's icon colour follows its text: `foregroundNeutralSecondary`
+ * normally, `foregroundNeutralTertiary` when disabled. Kept here rather than
+ * in the shared core because `icon` is the button's own group.
+ */
+const ICON_LINE_COLOR: Partial<Record<InteractionState, NativeTokenName>> = {
+  disabled: "foregroundNeutralTertiary",
 };
 
 export function resolveActionButtonStyle(
@@ -232,7 +269,11 @@ export function resolveActionButtonStyle(
       // Measured: Custom placement, 3px line weight, 4px padding all round.
       placement: resolvePropertyValue(theme, at(p.icon.placement), "custom"),
       iconSize: resolvePropertyValue(theme, at(p.icon.iconSize), 20),
-      lineColor: resolvePropertyValue(theme, at(p.icon.lineColor), base.foreground),
+      lineColor: resolvePropertyValue(
+        theme,
+        at(p.icon.lineColor),
+        nativeToken(theme, ICON_LINE_COLOR[state] ?? "foregroundNeutralSecondary"),
+      ),
       lineWeight: resolvePropertyValue(theme, at(p.icon.lineWeight), 3),
       lineTransparency: resolvePropertyValue(theme, at(p.icon.lineTransparency), 0),
       horizontalAlignment: resolvePropertyValue(theme, at(p.icon.horizontalAlignment), "center"),

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { hexWithAlpha } from "../lib/colorUtils";
 import { themeFontSizeToCssPx } from "../lib/fontUnits";
 import type { ResolvedChromeStyle } from "../lib/chromeProperties";
-import type { InteractionState } from "../lib/properties";
+import type { InteractionState, VisualSchemaKey } from "../lib/properties";
 import { CHROME_ID_PREFIX, StateSelector } from "./PropertyEditor";
 import type { VisualKind } from "./visualCatalog";
 
@@ -74,7 +74,13 @@ type PreviewInspectorProps = {
   openGroupId: string | null;
 };
 
-/** The three visuals whose styling genuinely varies per interaction state. */
+/**
+ * The three visuals whose styling genuinely varies per interaction state.
+ *
+ * Their VisualKind ids happen to equal their VisualSchemaKey ids, which is
+ * what lets the selector below ask `interactionStatesFor` directly — each of
+ * the three offers a DIFFERENT set, so one shared list will not do.
+ */
 const STATEFUL_VISUALS: ReadonlySet<VisualKind> = new Set<VisualKind>([
   "actionButton",
   "bookmarkNavigator",
@@ -154,7 +160,11 @@ export function PreviewInspector({
             Power BI styles these per state. The hero shows the one selected here; thumbnails stay on default.
           </p>
           <span className="preview-state-selector">
-            <StateSelector state={previewInteractionState} onSelect={onPreviewInteractionStateChange} />
+            <StateSelector
+              visual={selected as VisualSchemaKey}
+              state={previewInteractionState}
+              onSelect={onPreviewInteractionStateChange}
+            />
           </span>
         </section>
       )}

@@ -31,9 +31,11 @@ test("resolvePageNavigatorStyle falls back to sensible defaults when there is no
   assert.equal(style.pages.showPage, true);
   assert.equal(style.pages.showHiddenPages, true);
   assert.equal(style.layout.cellPadding, 5);
-  // And a navigator shows bold text where a Shape or Button shows none.
+  // A navigator shows text where a Shape or Button shows none — but not
+  // bold: PR #12 recorded bold from measurement and the later sweep found
+  // it Off on both navigators.
   assert.equal(style.text.show, true);
-  assert.equal(style.text.bold, true);
+  assert.equal(style.text.bold, false);
 });
 
 test("resolvePageNavigatorStyle prefers a visualStyles.pageNavigator override over defaults", () => {
