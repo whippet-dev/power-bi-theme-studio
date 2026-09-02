@@ -1,4 +1,5 @@
-import { boolProp, colorProp, enumProp, forStateId, numberProp, propertyThemePath as rawPropertyThemePath, readAtPath, resolveChromeValue, textProp, themeRoots } from "./properties";
+import { boolProp, colorProp, enumProp, forStateId, numberProp, propertyThemePath as rawPropertyThemePath, readAtPath, resolveChromeEntry, resolveChromeValue, textProp, themeRoots } from "./properties";
+import { nativeToken } from "./nativeTokens";
 import type { PropertyDefinition, PropertyLookup, PropertyValueType, ThemeSource, VisualSchemaKey } from "./properties";
 import type { ResolvedTheme } from "./theme";
 
@@ -437,6 +438,39 @@ function resolveGlobalValue<T extends PropertyValueType>(
   return resolveChromeValue<T>(theme, definition.visual, definition, fallback);
 }
 
+/** The provenance-carrying counterpart, for the one rule that needs it. */
+function resolveGlobalEntry<T extends PropertyValueType>(
+  theme: ThemeSource,
+  definition: PropertyLookup<T>,
+  fallback: Parameters<typeof resolveChromeEntry<T>>[3],
+) {
+  return resolveChromeEntry<T>(theme, definition.visual, definition, fallback);
+}
+
+/**
+ * The filter pane's input boxes take their colour from the pane background —
+ * but only when a theme layer actually *states* that background.
+ *
+ * Four Desktop runs pin this down, and no simpler rule survives all four:
+ *
+ *   base                background        stated?   inputBoxColor
+ *   Classic 2026        #ffffff           yes       #ffffff   follows
+ *   Fluent 2            token ref         yes       follows   follows
+ *   Classic 2018        root `background` NO        #FFFFFF   ignores
+ *   Classic 2018 + probe explicit #E600AC yes       #E600AC   follows
+ *
+ * Row three is the one that matters. There the pane background resolved to
+ * the root `background` token through the capability layer and the input box
+ * ignored it, so this is not a read of the *effective* background and not a
+ * read of the root token — both were ruled out by observation. It is the
+ * explicitly-stated property or nothing.
+ *
+ * `isSet` is exactly that distinction, so the rule needs no new machinery:
+ * resolve the background once, then hand its value to the input box only
+ * when some layer supplied it.
+ */
+const INPUT_BOX_WITHOUT_STATED_BACKGROUND = "#FFFFFF";
+
 /**
  * A filter card renders differently depending on whether that filter
  * currently has a selection applied or not (compare "Region: is (All)" vs
@@ -483,32 +517,36 @@ export function resolveGlobalOptionsStyle(theme: ThemeSource, base: ResolvedThem
     pageFilterCards: (() => {
       const at = <T extends PropertyValueType>(def: PropertyDefinition<T>): PropertyLookup<T> => forStateId(def, "Available");
       return {
+        // Follows the root `background` token -- the fingerprint moved it to
+        // #00E643 and Available cards rendered #00E643 on all three bases.
         backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), base.background),
-        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), false),
-        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#E3E3E3"),
-        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), base.fontFamily),
+        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), true),
+        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#C8C8C8"),
+        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), "Segoe UI"),
         foregroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.foregroundColor), base.foreground),
-        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), base.background),
-        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 10),
+        // Unlike the filter *pane*, a card's input box does not follow any
+        // background: it stayed white on all three bases while the card
+        // background itself was the fingerprint's green.
+        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), "#FFFFFF"),
+        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 9),
         transparency: resolveGlobalValue(theme, at(p.pageFilterCards.transparency), 0),
       };
     })(),
     pageFilterCardsApplied: (() => {
       const at = <T extends PropertyValueType>(def: PropertyDefinition<T>): PropertyLookup<T> => forStateId(def, "Applied");
       return {
-        // Classic 2026's real filterCard entries set foregroundColor
-        // identically for both states and don't set backgroundColor at
-        // all -- there's no verified hex for "Applied"'s real background
-        // tint, so this falls back to the theme's own backgroundLight
-        // token (a genuine "secondary surface" colour, not an arbitrary
-        // guess) rather than inventing one.
-        backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), "#F3F2F1"),
-        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), false),
-        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#E3E3E3"),
-        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), base.fontFamily),
+        // `backgroundLight`, now measured rather than reasoned. The old
+        // literal #F3F2F1 was right only because that is Classic 2026's
+        // own backgroundLight -- a coincidence that broke the moment a
+        // theme moved the token. Under the fingerprint's #E6C900, Applied
+        // cards rendered #E6C900 on all three bases.
+        backgroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.backgroundColor), nativeToken(theme, "backgroundLight")),
+        border: resolveGlobalValue(theme, at(p.pageFilterCards.border), true),
+        borderColor: resolveGlobalValue(theme, at(p.pageFilterCards.borderColor), "#C8C8C8"),
+        fontFamily: resolveGlobalValue(theme, at(p.pageFilterCards.fontFamily), "Segoe UI"),
         foregroundColor: resolveGlobalValue(theme, at(p.pageFilterCards.foregroundColor), base.foreground),
-        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), base.background),
-        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 10),
+        inputBoxColor: resolveGlobalValue(theme, at(p.pageFilterCards.inputBoxColor), "#FFFFFF"),
+        textSize: resolveGlobalValue(theme, at(p.pageFilterCards.textSize), 9),
         transparency: resolveGlobalValue(theme, at(p.pageFilterCards.transparency), 0),
       };
     })(),
@@ -516,20 +554,40 @@ export function resolveGlobalOptionsStyle(theme: ThemeSource, base: ResolvedThem
       color: resolveGlobalValue(theme, p.pageWallpaper.color, "#FFFFFF"),
       transparency: resolveGlobalValue(theme, p.pageWallpaper.transparency, 100),
     },
-    pageFilterPane: {
-      backgroundColor: resolveGlobalValue(theme, p.pageFilterPane.backgroundColor, base.background),
-      border: resolveGlobalValue(theme, p.pageFilterPane.border, false),
-      borderColor: resolveGlobalValue(theme, p.pageFilterPane.borderColor, "#E3E3E3"),
-      checkboxAndApplyColor: resolveGlobalValue(theme, p.pageFilterPane.checkboxAndApplyColor, base.tableAccent),
-      fontFamily: resolveGlobalValue(theme, p.pageFilterPane.fontFamily, base.fontFamily),
-      foregroundColor: resolveGlobalValue(theme, p.pageFilterPane.foregroundColor, base.foreground),
-      headerSize: resolveGlobalValue(theme, p.pageFilterPane.headerSize, 12),
-      inputBoxColor: resolveGlobalValue(theme, p.pageFilterPane.inputBoxColor, base.background),
-      searchTextSize: resolveGlobalValue(theme, p.pageFilterPane.searchTextSize, 10),
-      titleSize: resolveGlobalValue(theme, p.pageFilterPane.titleSize, 12),
-      transparency: resolveGlobalValue(theme, p.pageFilterPane.transparency, 0),
-      width: resolveGlobalValue(theme, p.pageFilterPane.width, 320),
-    },
+    // Measured natively across all three shipped bases under a fingerprint
+    // that moved every root token and all four text classes. Where a value
+    // held against that, it is recorded as a fixed capability fallback
+    // rather than derived -- the fingerprint is what rules the derivations
+    // out. Where it tracked a token, the token is used.
+    pageFilterPane: (() => {
+      // Resolved once, because the input box needs its provenance as well
+      // as its value -- see INPUT_BOX_WITHOUT_STATED_BACKGROUND.
+      const background = resolveGlobalEntry(theme, p.pageFilterPane.backgroundColor, base.background);
+      return {
+        // Follows the root `background` token when nothing states it --
+        // proven under Classic 2018, which supplies no outspacePane entry.
+        backgroundColor: background.value,
+        border: resolveGlobalValue(theme, p.pageFilterPane.border, true),
+        borderColor: resolveGlobalValue(theme, p.pageFilterPane.borderColor, "#C8C8C8"),
+        // Not `tableAccent`: the fingerprint set it to #39E600 and
+        // dataColors[0] to #00E660, and Desktop stayed on this teal.
+        checkboxAndApplyColor: resolveGlobalValue(theme, p.pageFilterPane.checkboxAndApplyColor, "#117865"),
+        // Not a text class: Courier New / Impact / Georgia / Comic Sans MS
+        // were all rejected on all three bases.
+        fontFamily: resolveGlobalValue(theme, p.pageFilterPane.fontFamily, "Segoe UI"),
+        foregroundColor: resolveGlobalValue(theme, p.pageFilterPane.foregroundColor, base.foreground),
+        headerSize: resolveGlobalValue(theme, p.pageFilterPane.headerSize, 9),
+        inputBoxColor: resolveGlobalValue(
+          theme,
+          p.pageFilterPane.inputBoxColor,
+          background.isSet ? background.value : INPUT_BOX_WITHOUT_STATED_BACKGROUND,
+        ),
+        searchTextSize: resolveGlobalValue(theme, p.pageFilterPane.searchTextSize, 10),
+        titleSize: resolveGlobalValue(theme, p.pageFilterPane.titleSize, 12),
+        transparency: resolveGlobalValue(theme, p.pageFilterPane.transparency, 0),
+        width: resolveGlobalValue(theme, p.pageFilterPane.width, 200),
+      };
+    })(),
     pageInformation: {
       pageInformationQnaPodEnabled: resolveGlobalValue(theme, p.pageInformation.pageInformationQnaPodEnabled, false),
       pageInformationType: resolveGlobalValue(theme, p.pageInformation.pageInformationType, false),

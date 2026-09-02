@@ -190,7 +190,7 @@ test("a state with no entry of its own never reads another state's entry", () =>
   const { available, applied } = read(appliedOnly);
   assert.equal(applied.textSize, 22);
   assert.notEqual(available.textSize, 22, "Available does not inherit the Applied entry");
-  assert.equal(available.textSize, 10, "it resolves its own fallback instead");
+  assert.equal(available.textSize, 9, "it resolves its own capability fallback instead");
 });
 
 test("the read index falls back to an untagged entry, but the write index never does", () => {

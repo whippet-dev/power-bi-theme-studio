@@ -36,7 +36,9 @@ test("resolveGlobalOptionsStyle falls back to sensible defaults when there is no
   assert.equal(global.reportFilterPaneState.visible, true);
   assert.equal(global.pageBackground.color, base.background);
   assert.equal(global.pageSize.pageSizeTypes, "Widescreen");
-  assert.equal(global.pageFilterPane.width, 320);
+  // 200, not the old 320: measured natively on all three shipped bases and
+  // unmoved by a fingerprint theme -- see pageFilterNativeDefaults.test.ts.
+  assert.equal(global.pageFilterPane.width, 200);
 });
 
 test("resolveGlobalOptionsStyle picks up report- and page-level overrides independently", () => {
