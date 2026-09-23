@@ -106,7 +106,7 @@ changing it just to recolour the eraser without checking the rest of the
 report.
 
 The visual-header icons that appear above a visual when you hover over it are
-different. You can colour those directly with `visualHeader[0].foreground`.
+different. You can colour those directly with `visualHeader` → `foreground`.
 
 ## Complete slicer example
 

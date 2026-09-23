@@ -172,6 +172,24 @@ function exampleJson(card: Card, property: SchemaProperty) {
   }, null, 2);
 }
 
+/**
+ * A path as the steps a reader follows through the file, rather than the
+ * dotted form with its list index: "visualStyles › lineChart › * › legend ›
+ * show" instead of "visualStyles.lineChart.*.legend.0.show". The example JSON
+ * beside it shows the exact brackets to type.
+ */
+function displayPath(path: string) {
+  return path
+    .split(".")
+    .filter((part) => part !== "0")
+    .join(" › ");
+}
+
+/** "name and url", "a, b and c". */
+function naturalList(items: string[]) {
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items.at(-1)}` : items[0];
+}
+
 async function copyExample(card: Card, property: SchemaProperty) {
   const example = exampleJson(card, property);
   if (!example) return;
@@ -291,27 +309,19 @@ async function copyExample(card: Card, property: SchemaProperty) {
             </div>
             <span class="schema-property__type">{{ property.type }}</span>
           </header>
-          <p>
-            {{ property.description }}
-            <span v-if="property.descriptionSource === 'theme-studio'" class="schema-property__description-source">
-              Theme Studio guidance
-            </span>
-            <span v-if="property.descriptionSource === 'guide'" class="schema-property__description-source">
-              Plain-English guide
-            </span>
-          </p>
+          <p>{{ property.description }}</p>
           <dl>
             <div>
-              <dt>JSON path</dt>
-              <dd><code>{{ property.path }}</code></dd>
+              <dt>Where it goes</dt>
+              <dd><code>{{ displayPath(property.path) }}</code></dd>
             </div>
             <div v-if="property.constraints?.length">
               <dt>Limits</dt>
               <dd>{{ property.constraints.join('; ') }}</dd>
             </div>
             <div v-if="property.requiredFields?.length">
-              <dt>Required parts</dt>
-              <dd>{{ property.requiredFields.join(', ') }}</dd>
+              <dt>Must include</dt>
+              <dd>{{ naturalList(property.requiredFields) }}</dd>
             </div>
           </dl>
           <div v-if="property.choices?.length" class="schema-property__choices">

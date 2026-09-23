@@ -42,7 +42,7 @@ test("catalogue retains setting paths, choices, limits and descriptions", () => 
   const title = catalogue.commonCards.find((card) => card.id === "title");
   const textSize = title.properties.find((property) => property.id === "fontSize");
   assert.equal(textSize.type, "Number (8–60)");
-  assert.deepEqual(textSize.constraints, ["minimum 8", "maximum 60"]);
+  assert.deepEqual(textSize.constraints, ["Between 8 and 60"]);
   assert.match(textSize.description, /size/i);
 });
 
@@ -96,4 +96,29 @@ test("colour limits are written for people, not as a regular expression", () => 
   assert.deepEqual(mapPushpin.constraints, [
     "Colour code: # followed by 6 characters, such as #1A73E8. Shorter codes (#FFF) and 8-character codes with transparency (#1A73E8CC) also work.",
   ]);
+});
+
+test("catalogue wording is written for people rather than mirroring schema names", () => {
+  const all = [];
+  const walk = (cards) => cards.forEach((card) => card.properties.forEach((property) => all.push({ card, property })));
+  walk(catalogue.topLevelCards);
+  walk(catalogue.commonCards);
+  catalogue.globalScopes.forEach((scope) => walk(scope.cards));
+  catalogue.visuals.forEach((visual) => walk(visual.cards));
+
+  const descriptions = all.map(({ property }) => property.description);
+  // Card titles that are not nouns, abbreviations, and mechanical editor text.
+  for (const garbled of [/\bthe general\b/, /\btheme basics\b/, /\bsec\b/, /\bthe the\b/, /^Whether the .+ is turned on\.$/]) {
+    assert.ok(!descriptions.some((text) => garbled.test(text)), `no description should match ${garbled}`);
+  }
+
+  // Labels a first-time reader would not understand.
+  const types = new Set(all.map(({ property }) => property.type));
+  for (const jargon of ["Object", "One of several value formats", "Structured value", "Fill (colour, gradient or pattern)"]) {
+    assert.ok(!types.has(jargon), `no type should be labelled "${jargon}"`);
+  }
+  assert.ok(!all.some(({ property }) => (property.constraints ?? []).some((limit) => /^(minimum|maximum) /.test(limit))));
+
+  const general = catalogue.commonCards.find((card) => card.id === "general");
+  assert.equal(general.properties.find((property) => property.id === "height").description, "Sets the height of this visual.");
 });

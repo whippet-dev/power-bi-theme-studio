@@ -74,6 +74,12 @@ On a column chart, the category axis normally runs along the bottom.
 ]
 ```
 
+- `labelDisplayUnits` shortens large numbers, for example showing 25,000 as
+  25K. Choose a value from the table below.
+- `labelPrecision` is the number of decimal places shown. `0` shows whole
+  numbers; `2` shows two decimal places.
+- `gridlineStyle` is the line pattern: `solid`, `dashed` or `dotted`.
+
 | Display | Value |
 | --- | ---: |
 | Automatic | `0` |
@@ -97,6 +103,16 @@ On a column chart, the category axis normally runs along the bottom.
   }
 ]
 ```
+
+`labelPosition` says where each label sits against its column:
+
+| Position | JSON value |
+| --- | --- |
+| Power BI decides | `Auto` |
+| Just above the column | `OutsideEnd` |
+| Inside the top of the column | `InsideEnd` |
+| In the middle of the column | `InsideCenter` |
+| Inside the bottom of the column | `InsideBase` |
 
 ## Complete clustered column example
 

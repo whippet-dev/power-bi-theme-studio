@@ -46,8 +46,8 @@ help you write clear, valid theme files of your own.
 
 Need to look up a particular option? The
 [complete settings catalogue](/reference/settings-catalogue) covers every
-report, page and visual setting in the current Microsoft schema, including its
-JSON path, value type, accepted choices and limits.
+report, page and visual setting Power BI accepts in a theme, including where it
+goes in the file, what kind of value it takes, and any choices or limits.
 
 ::: tip Prefer a visual editor?
 [Theme Studio for Power BI](https://github.com/whippet-dev/power-bi-theme-studio)
