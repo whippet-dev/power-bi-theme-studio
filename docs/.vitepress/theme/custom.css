@@ -264,19 +264,6 @@
   margin: 12px 0;
 }
 
-.schema-property__description-source {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
-  color: var(--vp-c-text-2);
-  background: var(--vp-c-bg);
-  font-size: 11px;
-  font-weight: 600;
-  vertical-align: 1px;
-}
-
 .schema-property dl {
   margin: 10px 0;
 }

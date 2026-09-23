@@ -154,24 +154,29 @@ function typeName(node) {
   const knownReferences = {
     color: "Colour",
     colorOrThemeColor: "Colour or theme colour name",
-    fill: "Fill (colour, gradient or pattern)",
+    // The schema also allows gradients and patterns here, but every example
+    // and almost every real theme uses a plain colour, which is what readers
+    // are looking for.
+    fill: "Colour",
     fontSize: "Number (8–60)",
-    icon: "Icon object",
-    image: "Image object",
-    paragraphs: "Rich-text paragraphs",
-    themeDataColor: "Theme data-colour reference",
+    icon: "Icon",
+    image: "Image",
+    paragraphs: "Formatted text",
+    themeDataColor: "Palette colour",
     themeIcon: "Theme icon",
   };
   if (knownReferences[resolved.$refName]) return knownReferences[resolved.$refName];
 
   const choices = collectChoices(node);
   if (choices.length) return "Choice";
-  if (Array.isArray(resolved.type)) return resolved.type.map(humanType).join(" or ");
-  if (resolved.type === "array") return `List of ${typeName(resolved.items)}`;
+  if (Array.isArray(resolved.type)) return typeUnion(resolved.type);
+  if (resolved.type === "array") return `List of ${pluralType(typeName(resolved.items))}`;
   if (resolved.type) return humanType(resolved.type);
-  if (resolved.oneOf || resolved.anyOf) return "One of several value formats";
-  return "Structured value";
+  return ADVANCED_TYPE;
 }
+
+/** Structured values -- rules, callouts, data bars -- that no short label explains. */
+const ADVANCED_TYPE = "Advanced setting";
 
 function humanType(type) {
   return {
@@ -179,9 +184,24 @@ function humanType(type) {
     integer: "Whole number",
     null: "Empty value",
     number: "Number",
-    object: "Object",
+    object: ADVANCED_TYPE,
     string: "Text",
   }[type] ?? type;
+}
+
+/** "Text, a number or true/false" rather than "Text or Number or Whole number or True / false". */
+function typeUnion(types) {
+  const phrases = [];
+  for (const type of types) {
+    const phrase = { boolean: "true/false", integer: "a number", number: "a number", string: "text", null: "empty" }[type] ?? type;
+    if (!phrases.includes(phrase)) phrases.push(phrase);
+  }
+  const sentence = phrases.length > 1 ? `${phrases.slice(0, -1).join(", ")} or ${phrases.at(-1)}` : phrases[0];
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+function pluralType(label) {
+  return label === "Colour" ? "colours" : label.toLocaleLowerCase();
 }
 
 /**
@@ -199,66 +219,139 @@ const READABLE_PATTERNS = new Map([
 function constraints(node) {
   const resolved = resolveReference(node);
   const values = [];
-  if (resolved.minimum !== undefined) values.push(`minimum ${resolved.minimum}`);
-  if (resolved.maximum !== undefined) values.push(`maximum ${resolved.maximum}`);
-  if (resolved.exclusiveMinimum !== undefined) values.push(`greater than ${resolved.exclusiveMinimum}`);
-  if (resolved.exclusiveMaximum !== undefined) values.push(`less than ${resolved.exclusiveMaximum}`);
-  if (resolved.minLength !== undefined) values.push(`minimum length ${resolved.minLength}`);
-  if (resolved.maxLength !== undefined) values.push(`maximum length ${resolved.maxLength}`);
+  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength } = resolved;
+  if (minimum !== undefined && maximum !== undefined) values.push(`Between ${minimum} and ${maximum}`);
+  else if (minimum !== undefined) values.push(`At least ${minimum}`);
+  else if (maximum !== undefined) values.push(`No more than ${maximum}`);
+  if (exclusiveMinimum !== undefined) values.push(`More than ${exclusiveMinimum}`);
+  if (exclusiveMaximum !== undefined) values.push(`Less than ${exclusiveMaximum}`);
+  if (minLength !== undefined) values.push(`At least ${minLength} ${minLength === 1 ? "character" : "characters"}`);
+  if (maxLength !== undefined) values.push(`No more than ${maxLength} characters`);
   if (resolved.pattern) values.push(READABLE_PATTERNS.get(resolved.pattern) ?? `pattern ${resolved.pattern}`);
   return values;
 }
 
+/** Abbreviations in schema names, spelled out for readers. */
+const EXPANSIONS = { sec: "secondary", url: "URL", pos: "position", bg: "background", img: "image" };
+
+/** Keeps short technical names readable once everything else is lower case. */
+function tidyWords(text) {
+  return text
+    .replace(/\b3 d\b/g, "3D")
+    .replace(/\b([xy])\b/g, (letter) => letter.toUpperCase())
+    .replace(/\b(sec|url|pos|bg|img)\b/g, (word) => EXPANSIONS[word])
+    .replace(/\bcolor(s?)\b/g, "colour$1")
+    .replace(/\bkpi\b/g, "KPI")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function words(value) {
-  return value
-    .replace(/^\$+/, "")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .trim()
-    .toLocaleLowerCase();
+  return tidyWords(
+    value
+      .replace(/^\$+/, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .trim()
+      .toLocaleLowerCase(),
+  );
+}
+
+/**
+ * How a card is named inside a sentence. The card title works as a noun for
+ * most cards ("the legend", "the X axis"), but not for all of them: "the
+ * general" and "the theme basics" read as nonsense.
+ */
+function cardPhrase(cardTitle) {
+  const lower = cardTitle.toLocaleLowerCase();
+  if (lower === "general") return "this visual";
+  if (["theme", "theme basics", "theme colours", "data palette and icons"].includes(lower)) return "the theme";
+  const textClass = /^text class:? (.+)$/i.exec(cardTitle);
+  if (textClass) return `the ${tidyWords(textClass[1].toLocaleLowerCase())} text class`;
+  return `the ${tidyWords(lower)}`;
+}
+
+/** Setting names that say nothing on their own: "the type", "the style". */
+const VAGUE_SETTINGS = new Set([
+  "type", "style", "value", "mode", "kind", "option", "options", "data", "level", "index", "source", "target",
+]);
+
+/**
+ * Internal plumbing that a sentence built from its name would only garble.
+ * These are left undescribed rather than guessed at.
+ */
+const OPAQUE_WORDS = /\b(selector|null|expr|expression|template|guid|json|annotation)\b/;
+
+/**
+ * A setting that already names its card ("fill colour" on the Fill card)
+ * does not need the card repeated at the end of the sentence.
+ */
+function dropEchoedCard(sentence, card, setting) {
+  const noun = card.replace(/^(the|this) /, "").replace(/ text class$/, "");
+  if (!noun || !setting.includes(noun)) return sentence;
+  const escaped = card.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return sentence.replace(new RegExp(` (?:used by|for|of|in|to|applies to) ${escaped}\\.$`), ".");
 }
 
 function guideDescription(propertyName, propertySchema, cardTitle) {
+  const sentence = draftDescription(propertyName, propertySchema, cardTitle);
+  if (!sentence) return undefined;
   const resolved = resolveReference(propertySchema);
   const title = propertySchema.title ?? resolved.title ?? friendlyName(propertyName);
-  const setting = words(title);
-  const card = cardTitle.toLocaleLowerCase();
+  return dropEchoedCard(sentence, cardPhrase(cardTitle), words(title));
+}
+
+function draftDescription(propertyName, propertySchema, cardTitle) {
+  const resolved = resolveReference(propertySchema);
+  const title = propertySchema.title ?? resolved.title ?? friendlyName(propertyName);
+  const setting = words(title).replace(/^(is|has) /, "");
+  const card = cardPhrase(cardTitle);
   const type = typeName(propertySchema);
+  // Words the card already says ("secondary" on the Secondary Y axis card)
+  // are dropped from the setting's own name so the sentence does not repeat
+  // itself: "the font family used in the secondary Y axis".
+  const cardWords = new Set(card.split(" "));
+  const own = (text) => text.split(" ").filter((word) => word && !cardWords.has(word)).join(" ");
+
+  if (OPAQUE_WORDS.test(words(propertyName)) || OPAQUE_WORDS.test(setting)) return undefined;
 
   const exact = {
     "$id": "Identifies the state or item that this formatting entry applies to.",
+    $schema: "Points to the file that describes the theme format. Most themes can leave this out.",
     baseTheme: "Names the built-in Power BI theme that this custom theme builds on.",
     dataColors: "Sets the ordered colour palette used for data series and categories.",
     formatString: "Sets the format string used to display numbers, dates or other values.",
-    fontFace: `Sets the font family used by the ${card}.`,
-    fontWeight: `Sets the font weight used by the ${card}.`,
-    image: `Sets the image used by the ${card}.`,
+    fontFace: `Sets the font family used by ${card}.`,
+    fontWeight: `Sets the font weight used by ${card}.`,
+    image: `Sets the image used by ${card}.`,
     name: "Sets the name Power BI displays for the imported theme.",
   };
   if (exact[propertyName]) return exact[propertyName];
 
-  if (propertyName === "show") return `Shows or hides the ${card}.`;
+  if (propertyName === "show") return `Shows or hides ${card}.`;
   if (propertyName === "enabled" || propertyName === "enable") {
-    return `Turns the ${card} on or off.`;
+    return `Turns ${card} on or off.`;
   }
   if (/^(bold|italic|underline)$/.test(propertyName)) {
-    return `Turns ${setting} styling on or off for the ${card} text.`;
+    return card === "the text"
+      ? `Turns ${setting} styling on or off for the text.`
+      : `Turns ${setting} styling on or off for the text in ${card}.`;
   }
   if (/fontFamily$/i.test(propertyName)) {
-    const target = words(propertyName.replace(/fontFamily$/i, ""));
-    return `Sets the font family used${target ? ` for the ${target}` : ""} in the ${card}.`;
+    const target = own(words(propertyName.replace(/fontFamily$/i, "")));
+    return `Sets the font family used${target ? ` for the ${target}` : ""} in ${card}.`;
   }
   if (/(fontSize|textSize)$/i.test(propertyName)) {
-    const target = words(propertyName.replace(/(fontSize|textSize)$/i, ""));
-    return `Sets the text size${target ? ` for the ${target}` : ""} in the ${card}.`;
+    const target = own(words(propertyName.replace(/(fontSize|textSize)$/i, "")));
+    return `Sets the text size${target ? ` for the ${target}` : ""} in ${card}.`;
   }
   if (/(Color|Colour)$/i.test(propertyName) || ["color", "fill"].includes(propertyName)) {
-    const target = words(propertyName.replace(/(Color|Colour)$/i, ""));
-    return `Sets the ${target ? `${target} ` : ""}colour used by the ${card}.`;
+    const target = own(words(propertyName.replace(/(Color|Colour)$/i, "")));
+    return `Sets the ${target ? `${target} ` : ""}colour used by ${card}.`;
   }
   if (/transparency$/i.test(propertyName)) {
-    const target = words(propertyName.replace(/transparency$/i, ""));
-    return `Controls how see-through ${target ? `the ${target}` : `the ${card}`} is; lower values are more solid.`;
+    const target = own(words(propertyName.replace(/transparency$/i, "")));
+    return `Controls how see-through ${target ? `the ${target}` : `${card}`} is; lower values are more solid.`;
   }
   if (/^(show|enable)[A-Z]/.test(propertyName) || /Show$/.test(propertyName)) {
     const target = words(
@@ -266,36 +359,43 @@ function guideDescription(propertyName, propertySchema, cardTitle) {
         .replace(/^(show|enable)/, "")
         .replace(/Show$/, ""),
     );
-    return `Shows or hides the ${target || setting} in the ${card}.`;
+    // "showOnCategoryAxis" on the zoom slider: where the card appears, not a
+    // thing inside it.
+    const where = /^on (.+)$/.exec(own(target));
+    if (where) return `Shows or hides ${card} on the ${where[1]}.`;
+    return `Shows or hides the ${own(target) || setting} in ${card}.`;
   }
   if (/^(is|has)[A-Z]/.test(propertyName) && type === "True / false") {
-    return `Controls whether ${setting} applies to the ${card}.`;
+    return `Controls whether ${setting} applies to ${card}.`;
   }
   if (/(alignment|position|placement|location)$/i.test(propertyName)) {
-    return `Controls the ${setting} of the ${card}.`;
+    return `Controls the ${setting} of ${card}.`;
   }
   if (/(padding|spacing|margin|distance|offset|radius|angle|rotation)$/i.test(propertyName)) {
-    return `Sets the ${setting} used by the ${card}.`;
+    return `Sets the ${setting} used by ${card}.`;
   }
   if (/(width|height|size|thickness|length)$/i.test(propertyName)) {
-    return `Sets the ${setting} of the ${card}.`;
+    return `Sets the ${setting} of ${card}.`;
   }
   if (/(precision|decimalPoints)$/i.test(propertyName)) {
-    return `Sets how many decimal places the ${card} displays.`;
+    return `Sets how many decimal places ${card} displays.`;
   }
   if (/displayUnits$/i.test(propertyName)) {
-    return `Chooses the units used to shorten values in the ${card}, such as thousands or millions.`;
+    return `Chooses the units used to shorten values in ${card}, such as thousands or millions.`;
   }
   if (/^(start|end|minimum|maximum|min|max)$/i.test(propertyName)) {
-    return `Sets the ${setting} value used by the ${card}.`;
+    return `Sets the ${setting} value used by ${card}.`;
   }
-  if (type === "Choice") return `Chooses the ${setting} used by the ${card}.`;
-  if (type === "True / false") return `Turns ${setting} on or off for the ${card}.`;
+  if (VAGUE_SETTINGS.has(setting)) {
+    return type === "Choice" ? `Chooses the ${setting} of ${card}. The accepted values are listed below.` : undefined;
+  }
+  if (type === "Choice") return `Chooses the ${setting} used by ${card}.`;
+  if (type === "True / false") return `Turns ${setting} on or off for ${card}.`;
   if (type === "Text" || type === "Number" || type === "Whole number" || type === "Number (8–60)") {
-    return `Sets the ${setting} used by the ${card}.`;
+    return `Sets the ${setting} used by ${card}.`;
   }
   if (type.startsWith("Fill") || type.startsWith("Colour")) {
-    return `Sets the ${setting} used by the ${card}.`;
+    return `Sets the ${setting} used by ${card}.`;
   }
   return undefined;
 }
@@ -326,15 +426,26 @@ function exampleValue(node, propertyName) {
   return undefined;
 }
 
+/**
+ * Editor descriptions that were produced from the setting's name rather than
+ * written: "Whether the enabled is turned on.", "Sets the title's title text
+ * size." They are accurate but read as machine text.
+ */
+function isWeakStudioDescription(text) {
+  return /^Whether the .+ is turned on\.$/.test(text) || /\b(\w+)'s \1\b/i.test(text) || /\bsec\b/.test(text);
+}
+
 function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme") {
   const resolved = resolveReference(propertySchema);
   const choices = collectChoices(propertySchema);
   const example = exampleValue(propertySchema, propertyName);
   const microsoftDescription = propertySchema.description ?? resolved.description;
-  const studioDescription = microsoftDescription ? undefined : themeStudioDescription(pathParts);
-  const generatedDescription = microsoftDescription || studioDescription
-    ? undefined
-    : guideDescription(propertyName, propertySchema, cardTitle);
+  const borrowed = microsoftDescription ? undefined : themeStudioDescription(pathParts);
+  const fallback = microsoftDescription ? undefined : guideDescription(propertyName, propertySchema, cardTitle);
+  // Theme Studio's editor wording is preferred, except where it was itself
+  // generated mechanically and reads worse than the guide's own sentence.
+  const studioDescription = borrowed && !(isWeakStudioDescription(borrowed) && fallback) ? borrowed : undefined;
+  const generatedDescription = microsoftDescription || studioDescription ? undefined : fallback;
   return {
     id: propertyName,
     title: propertySchema.title ?? resolved.title ?? friendlyName(propertyName),

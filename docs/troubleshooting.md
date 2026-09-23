@@ -69,8 +69,8 @@ You have probably changed a shared root colour such as `foreground` or
 the report.
 
 If the change is meant for one element, look for a visual-specific property
-such as `legend.labelColor`, `categoryAxis.labelColor` or
-`slicer.items.fontColor`.
+such as `legend` → `labelColor`, `categoryAxis` → `labelColor`, or
+`items` → `fontColor` on a slicer.
 
 Some built-in elements do not have an individual colour property. In that
 case, changing a shared colour can create more problems than it solves.
