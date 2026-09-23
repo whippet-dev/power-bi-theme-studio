@@ -12,6 +12,7 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "build:pages": "npm run build && vitepress build docs --base /guide/ --outDir dist/guide",
     "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.tsx\" \"tests/**/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist"
   },

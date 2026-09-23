@@ -199,3 +199,13 @@ tests/                         # 206 tests; discovered by glob
 
 `npm run build` produces a static `dist/` folder, including `index.html`, that
 can be deployed directly to Cloudflare Pages.
+
+To publish Theme Studio and the theme JSON guide together, use:
+
+```powershell
+npm run build:pages
+```
+
+This keeps Theme Studio at `/` and adds the guide at `/guide/` inside the same
+`dist/` folder. In Cloudflare Pages, use `npm run build:pages` as the build
+command and keep `dist` as the output directory.

@@ -14,7 +14,7 @@ hero:
       link: /recipes/colours
     - theme: alt
       text: Download a starter theme
-      link: /examples/minimal-theme.json
+      link: ./examples/minimal-theme.json
 
 features:
   - title: Begin with something that works

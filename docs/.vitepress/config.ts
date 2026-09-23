@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
+  base: "/guide/",
   title: "Power BI theme JSON guide",
   description: "A plain-English guide to creating Power BI JSON themes.",
   lang: "en-GB",
