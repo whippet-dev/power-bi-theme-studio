@@ -12,6 +12,7 @@ const catalogue = JSON.parse(
 test("schema catalogue covers every Microsoft visual definition", () => {
   assert.equal(catalogue.metadata.schema, "reportThemeSchema-2.157.json");
   assert.equal(catalogue.metadata.explorationVersion, "5.76");
+  assert.ok(catalogue.metadata.themeStudioDescriptions > 2_000);
   assert.equal(catalogue.visuals.length, 48);
   assert.ok(catalogue.totals.propertyOccurrences > 7_000);
 
@@ -59,4 +60,30 @@ test("catalogue includes top-level, report and page settings", () => {
   assert.ok(report.cards.some((card) => card.id === "outspacePane"));
   assert.ok(page.cards.some((card) => card.id === "background"));
   assert.ok(page.cards.some((card) => card.id === "filterCard"));
+});
+
+test("missing Microsoft descriptions reuse Theme Studio guidance before generated explanations", () => {
+  const commonTitle = catalogue.commonCards.find((card) => card.id === "title");
+  const show = commonTitle.properties.find((property) => property.id === "show");
+  const fontSize = commonTitle.properties.find((property) => property.id === "fontSize");
+
+  assert.equal(show.description, "Whether the visual's title is shown.");
+  assert.equal(show.descriptionSource, "theme-studio");
+  assert.match(fontSize.description, /size/i);
+  assert.equal(fontSize.descriptionSource, "microsoft");
+
+  const line = catalogue.visuals.find((visual) => visual.id === "lineChart");
+  const categoryAxis = line.cards.find((card) => card.id === "categoryAxis");
+  const concatenate = categoryAxis.properties.find((property) => property.id === "concatenateLabels");
+  assert.equal(concatenate.descriptionSource, "microsoft");
+  assert.match(concatenate.description, /hierarchy/i);
+
+  const lineStyles = line.cards.find((card) => card.id === "lineStyles");
+  const markerSize = lineStyles.properties.find((property) => property.id === "markerSize");
+  assert.equal(markerSize.descriptionSource, "theme-studio");
+  assert.match(markerSize.description, /marker/i);
+
+  const annotation = line.cards.find((card) => card.id === "annotationTemplate");
+  const callout = annotation.properties.find((property) => property.id === "callout");
+  assert.equal(callout.descriptionSource, "unavailable");
 });
