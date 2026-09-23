@@ -41,6 +41,11 @@ It focuses on two questions:
 It does not try to document Power BI's hidden internal defaults. The aim is to
 help you write clear, valid theme files of your own.
 
+Need to look up a particular option? The
+[complete settings catalogue](/reference/settings-catalogue) covers every
+report, page and visual setting in the current Microsoft schema, including its
+JSON path, value type, accepted choices and limits.
+
 ::: tip Prefer a visual editor?
 [Theme Studio for Power BI](https://github.com/whippet-dev/power-bi-theme-studio)
 can open, preview and edit theme JSON while preserving settings it does not

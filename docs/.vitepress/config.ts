@@ -25,6 +25,7 @@ export default defineConfig({
       { text: "Start here", link: "/start-here" },
       { text: "How themes work", link: "/theme-anatomy" },
       { text: "Recipes", link: "/recipes/colours" },
+      { text: "Settings catalogue", link: "/reference/settings-catalogue" },
       { text: "Reference", link: "/reference/visual-names" },
     ],
     sidebar: [
@@ -50,6 +51,7 @@ export default defineConfig({
       {
         text: "Look things up",
         items: [
+          { text: "Complete settings catalogue", link: "/reference/settings-catalogue" },
           { text: "Visual names used in JSON", link: "/reference/visual-names" },
           { text: "Frequently used settings", link: "/reference/common-settings" },
           { text: "Fix common problems", link: "/troubleshooting" },
