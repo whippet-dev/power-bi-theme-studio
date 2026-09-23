@@ -134,3 +134,45 @@ test("title and subtitle settings are described as theme defaults, not as one vi
     assert.match(described("subTitle", setting), /subtitle/i);
   }
 });
+
+test("mechanical editor wording is replaced where it reads as nonsense", () => {
+  const descriptions = [];
+  const walk = (cards) => cards.forEach((card) => card.properties.forEach((property) => descriptions.push(property.description)));
+  walk(catalogue.topLevelCards);
+  walk(catalogue.commonCards);
+  catalogue.globalScopes.forEach((scope) => walk(scope.cards));
+  catalogue.visuals.forEach((visual) => walk(visual.cards));
+
+  // "Sets the corner bottom left's bottom left corner." and its relatives.
+  for (const nonsense of [
+    "Sets the corner bottom left's bottom left corner.",
+    "Sets the column count's columns.",
+    "Sets the inner radius ratio's inner radius.",
+    "Sets the data labels's text size.",
+  ]) {
+    assert.ok(!descriptions.includes(nonsense), nonsense);
+  }
+  // A possessive that reads naturally is kept.
+  assert.ok(descriptions.includes("Sets the marker's size."));
+  assert.ok(!descriptions.some((text) => /^Whether the .+ is turned on\.$/.test(text)));
+  assert.ok(!descriptions.some((text) => /^Whether the [^']+s is shown\.$/.test(text)), "no plural subject with 'is'");
+  assert.ok(!descriptions.some((text) => /, of the width\.$/.test(text)));
+  assert.ok(!descriptions.some((text) => /\bthe by (default|state)\b/.test(text)));
+});
+
+test("settings that point at one bookmark, page or wording are described as theme defaults", () => {
+  const card = (id) => catalogue.commonCards.find((candidate) => candidate.id === id);
+  const described = (cardId, propertyId) => card(cardId).properties.find((property) => property.id === propertyId).description;
+
+  for (const [cardId, propertyId] of [
+    ["visualLink", "bookmark"],
+    ["visualLink", "navigationSection"],
+    ["visualLink", "drillthroughSection"],
+    ["visualLink", "tooltip"],
+    ["visualTooltip", "section"],
+    ["visualHeaderTooltip", "section"],
+    ["visualHeaderTooltip", "text"],
+  ]) {
+    assert.match(described(cardId, propertyId), /usually set on individual visuals instead\.$/, `${cardId}.${propertyId}`);
+  }
+});

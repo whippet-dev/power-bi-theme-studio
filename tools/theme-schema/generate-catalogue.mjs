@@ -242,6 +242,9 @@ function tidyWords(text) {
     .replace(/\b(sec|url|pos|bg|img)\b/g, (word) => EXPANSIONS[word])
     .replace(/\bcolor(s?)\b/g, "colour$1")
     .replace(/\bkpi\b/g, "KPI")
+    .replace(/\b3d\b/g, "3D")
+    .replace(/\bbehavior\b/g, "behaviour")
+    .replace(/\bcenter\b/g, "centre")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -265,6 +268,8 @@ function words(value) {
 function cardPhrase(cardTitle) {
   const lower = cardTitle.toLocaleLowerCase();
   if (lower === "general") return "this visual";
+  if (lower === "visualization") return "the visual";
+  if (lower === "find anomalies") return "anomaly detection";
   if (["theme", "theme basics", "theme colours", "data palette and icons"].includes(lower)) return "the theme";
   const textClass = /^text class:? (.+)$/i.exec(cardTitle);
   if (textClass) return `the ${tidyWords(textClass[1].toLocaleLowerCase())} text class`;
@@ -311,7 +316,11 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
   // are dropped from the setting's own name so the sentence does not repeat
   // itself: "the font family used in the secondary Y axis".
   const cardWords = new Set(card.split(" "));
-  const own = (text) => text.split(" ").filter((word) => word && !cardWords.has(word)).join(" ");
+  const own = (text) => {
+    const kept = text.split(" ").filter((word) => word && !cardWords.has(word)).join(" ");
+    // "secFontSize" on a Y axis card: "secondary" alone means the secondary axis.
+    return kept === "secondary" ? "secondary axis" : kept;
+  };
 
   if (OPAQUE_WORDS.test(words(propertyName)) || OPAQUE_WORDS.test(setting)) return undefined;
 
@@ -332,10 +341,15 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
   if (propertyName === "enabled" || propertyName === "enable") {
     return `Turns ${card} on or off.`;
   }
-  if (/^(bold|italic|underline)$/.test(propertyName)) {
+  const styling = /(bold|italic|underline)$/i.exec(propertyName);
+  if (styling) {
+    // "targetValueBold" names the text it styles; plain "bold" styles the card's own text.
+    const target = own(words(propertyName.slice(0, -styling[1].length)));
+    const style = styling[1].toLocaleLowerCase();
+    if (target) return `Turns ${style} styling on or off for the ${target} in ${card}.`;
     return card === "the text"
-      ? `Turns ${setting} styling on or off for the text.`
-      : `Turns ${setting} styling on or off for the text in ${card}.`;
+      ? `Turns ${style} styling on or off for the text.`
+      : `Turns ${style} styling on or off for the text in ${card}.`;
   }
   if (/fontFamily$/i.test(propertyName)) {
     const target = own(words(propertyName.replace(/fontFamily$/i, "")));
@@ -363,6 +377,8 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     // thing inside it.
     const where = /^on (.+)$/.exec(own(target));
     if (where) return `Shows or hides ${card} on the ${where[1]}.`;
+    // "showByDefault", "showIconByState": when it shows, not what shows.
+    if (/^by /.test(own(target))) return `Shows or hides ${card} ${own(target)}.`;
     return `Shows or hides the ${own(target) || setting} in ${card}.`;
   }
   if (/^(is|has)[A-Z]/.test(propertyName) && type === "True / false") {
@@ -376,6 +392,11 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
   }
   if (/(width|height|size|thickness|length)$/i.test(propertyName)) {
     return `Sets the ${setting} of ${card}.`;
+  }
+  if (/[a-z]Count$/.test(propertyName)) {
+    // "columnCount" -> "the number of columns", not "the columns".
+    const noun = own(words(propertyName.replace(/Count$/, "")));
+    if (noun) return `Sets the number of ${noun.endsWith("s") ? noun : `${noun}s`} used by ${card}.`;
   }
   if (/(precision|decimalPoints)$/i.test(propertyName)) {
     return `Sets how many decimal places ${card} displays.`;
@@ -431,8 +452,28 @@ function exampleValue(node, propertyName) {
  * written: "Whether the enabled is turned on.", "Sets the title's title text
  * size." They are accurate but read as machine text.
  */
+function isRepetitivePossessive(text) {
+  const match = /^Sets the ([^.']+)'s ([^.']+)\.$/.exec(text);
+  if (!match) return false;
+  if (/s$/.test(match[1])) return true;
+  const stem = (word) => word.toLocaleLowerCase().replace(/s$/, "");
+  const before = new Set(match[1].split(" ").map(stem));
+  return match[2].split(" ").some((word) => word.length > 2 && before.has(stem(word)));
+}
+
 function isWeakStudioDescription(text) {
-  return /^Whether the .+ is turned on\.$/.test(text) || /\b(\w+)'s \1\b/i.test(text) || /\bsec\b/.test(text);
+  return (
+    // "Whether the enabled is turned on." / "Whether the detail labels is shown."
+    /^Whether the .+ is turned on\.$/.test(text) ||
+    /^Whether the [^']+s is shown\.$/.test(text) ||
+    // The editor's "Sets the <setting>'s <label>." template. It reads fine as
+    // "Sets the marker's size." but turns to nonsense when both halves repeat
+    // the same words ("Sets the corner bottom left's bottom left corner.") or
+    // the setting is plural ("Sets the data labels's text size.").
+    isRepetitivePossessive(text) ||
+    /, of the width\.$/.test(text) ||
+    /\bsec\b/.test(text)
+  );
 }
 
 /**
@@ -455,6 +496,27 @@ const THEME_WORDING = {
   "subTitle.fontSize": "Font size for the subtitle.",
   "header.text":
     "The default header text for slicers. Every slicer shows this wording instead of the name of its own field, so it is usually best left out.",
+
+  // Settings that point one visual at a particular bookmark, page or piece of
+  // wording. In a theme every visual of the type would share it.
+  "visualLink.type":
+    "What happens when someone selects the visual, such as going back, opening a bookmark or moving to another page. This is usually set on individual visuals rather than in a theme.",
+  "visualLink.bookmark":
+    "The bookmark a visual opens when it is selected. In a theme, every visual of this type would open the same bookmark, so this is usually set on individual visuals instead.",
+  "visualLink.navigationSection":
+    "The page a visual takes people to when it is selected. In a theme, every visual of this type would go to the same page, so this is usually set on individual visuals instead.",
+  "visualLink.drillthroughSection":
+    "The drill-through page a visual opens when it is selected. In a theme, every visual of this type would open the same page, so this is usually set on individual visuals instead.",
+  "visualLink.tooltip":
+    "The wording shown when someone hovers over a visual that has an action. In a theme, every visual of this type would show the same wording, so this is usually set on individual visuals instead.",
+  "visualTooltip.type":
+    "Whether the tooltip is Power BI's standard tooltip or a report page you have designed as a tooltip.",
+  "visualTooltip.section":
+    "The report page used as the tooltip. In a theme, every visual of this type would use the same page, so this is usually set on individual visuals instead.",
+  "visualHeaderTooltip.section":
+    "The report page shown by the tooltip icon in the visual header. In a theme, every visual of this type would use the same page, so this is usually set on individual visuals instead.",
+  "visualHeaderTooltip.text":
+    "The wording shown by the tooltip icon in the visual header when no tooltip page is chosen. In a theme, every visual of this type would show the same wording, so this is usually set on individual visuals instead.",
 };
 
 function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme") {
