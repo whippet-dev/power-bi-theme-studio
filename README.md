@@ -197,8 +197,9 @@ tests/                         # 206 tests; discovered by glob
 
 ## Deployment
 
-`npm run build` produces a static `dist/` folder, including `index.html`, that
-can be deployed directly to Cloudflare Pages.
+`npm run build` produces one static `dist/` folder that can be deployed directly
+to Cloudflare Pages. Theme Studio is at `/` and the theme JSON guide is at
+`/guide/`.
 
 To publish Theme Studio and the theme JSON guide together, use:
 
@@ -206,6 +207,6 @@ To publish Theme Studio and the theme JSON guide together, use:
 npm run build:pages
 ```
 
-This keeps Theme Studio at `/` and adds the guide at `/guide/` inside the same
-`dist/` folder. In Cloudflare Pages, use `npm run build:pages` as the build
-command and keep `dist` as the output directory.
+`build:pages` is an alias for the standard build. In Cloudflare Pages, either
+command works and the output directory remains `dist`. Use `npm run build:app`
+only when you deliberately want to build Theme Studio without the guide.
