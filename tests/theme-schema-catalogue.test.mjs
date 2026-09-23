@@ -87,3 +87,13 @@ test("missing Microsoft descriptions reuse Theme Studio guidance before generate
   const callout = annotation.properties.find((property) => property.id === "callout");
   assert.equal(callout.descriptionSource, "unavailable");
 });
+
+test("colour limits are written for people, not as a regular expression", () => {
+  const serialised = JSON.stringify(catalogue);
+  assert.ok(!serialised.includes("[0-9a-fA-F]"), "no raw colour pattern should reach readers");
+
+  const mapPushpin = catalogue.topLevel.find((property) => property.id === "mapPushpin");
+  assert.deepEqual(mapPushpin.constraints, [
+    "Colour code: # followed by 6 characters, such as #1A73E8. Shorter codes (#FFF) and 8-character codes with transparency (#1A73E8CC) also work.",
+  ]);
+});

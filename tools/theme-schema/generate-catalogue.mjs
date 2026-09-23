@@ -184,6 +184,18 @@ function humanType(type) {
   }[type] ?? type;
 }
 
+/**
+ * Validation patterns the schema uses, restated for people rather than
+ * parsers. A raw regular expression means nothing to most readers, so a
+ * pattern listed here is shown as its sentence instead.
+ */
+const READABLE_PATTERNS = new Map([
+  [
+    "^#[0-9a-fA-F]{8}$|^#(?:[0-9a-fA-F]{3}){1,2}$",
+    "Colour code: # followed by 6 characters, such as #1A73E8. Shorter codes (#FFF) and 8-character codes with transparency (#1A73E8CC) also work.",
+  ],
+]);
+
 function constraints(node) {
   const resolved = resolveReference(node);
   const values = [];
@@ -193,7 +205,7 @@ function constraints(node) {
   if (resolved.exclusiveMaximum !== undefined) values.push(`less than ${resolved.exclusiveMaximum}`);
   if (resolved.minLength !== undefined) values.push(`minimum length ${resolved.minLength}`);
   if (resolved.maxLength !== undefined) values.push(`maximum length ${resolved.maxLength}`);
-  if (resolved.pattern) values.push(`pattern ${resolved.pattern}`);
+  if (resolved.pattern) values.push(READABLE_PATTERNS.get(resolved.pattern) ?? `pattern ${resolved.pattern}`);
   return values;
 }
 
