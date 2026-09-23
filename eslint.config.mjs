@@ -9,6 +9,8 @@ import tseslint from "typescript-eslint";
 const eslintConfig = defineConfig([
   globalIgnores([
     "dist/**",
+    "docs/.vitepress/cache/**",
+    "docs/.vitepress/dist/**",
     "out/**",
     "build/**",
   ]),

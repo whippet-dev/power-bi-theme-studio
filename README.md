@@ -62,6 +62,24 @@ npm run lint
 npm test
 ```
 
+## Theme JSON guide
+
+The repository includes a plain-English guide to creating Power BI JSON
+themes. Its Markdown source lives in [`docs/`](docs/index.md) and includes
+downloadable starter themes, common recipes and a visual-name reference.
+
+Run the guide locally:
+
+```powershell
+npm run docs:dev
+```
+
+Create the static documentation site:
+
+```powershell
+npm run docs:build
+```
+
 ## What it does
 
 - Import a `.json` Power BI theme in the browser, or start with a clean New
