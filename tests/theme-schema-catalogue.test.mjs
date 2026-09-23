@@ -122,3 +122,15 @@ test("catalogue wording is written for people rather than mirroring schema names
   const general = catalogue.commonCards.find((card) => card.id === "general");
   assert.equal(general.properties.find((property) => property.id === "height").description, "Sets the height of this visual.");
 });
+
+test("title and subtitle settings are described as theme defaults, not as one visual's name", () => {
+  const card = (id) => catalogue.commonCards.find((candidate) => candidate.id === id);
+  const described = (cardId, propertyId) => card(cardId).properties.find((property) => property.id === propertyId).description;
+
+  assert.match(described("title", "text"), /^The default title for this type of visual\./);
+  assert.match(described("subTitle", "text"), /^The default subtitle for this type of visual\./);
+  // Microsoft's own entries for the subtitle repeat the title's wording.
+  for (const setting of ["alignment", "fontColor", "fontSize"]) {
+    assert.match(described("subTitle", setting), /subtitle/i);
+  }
+});

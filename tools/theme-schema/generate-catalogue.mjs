@@ -435,13 +435,38 @@ function isWeakStudioDescription(text) {
   return /^Whether the .+ is turned on\.$/.test(text) || /\b(\w+)'s \1\b/i.test(text) || /\bsec\b/.test(text);
 }
 
+/**
+ * Replacements for Microsoft descriptions that mislead in a theme.
+ *
+ * Microsoft writes for someone formatting one visual in Power BI, so the title
+ * text is "The name of the visual". In a theme it is a default that every
+ * visual of that type picks up -- which is usually not what people want. The
+ * subtitle entries simply repeat the title's wording by mistake.
+ *
+ * Keyed by "card.setting".
+ */
+const THEME_WORDING = {
+  "title.text":
+    "The default title for this type of visual. Every visual of this type shows this wording unless it has its own title, so it is usually best left out.",
+  "subTitle.text":
+    "The default subtitle for this type of visual. Every visual of this type shows this wording unless it has its own subtitle, so only set it if the wording suits them all.",
+  "subTitle.alignment": "Where the subtitle sits: left, centre or right.",
+  "subTitle.fontColor": "Font colour for the subtitle.",
+  "subTitle.fontSize": "Font size for the subtitle.",
+  "header.text":
+    "The default header text for slicers. Every slicer shows this wording instead of the name of its own field, so it is usually best left out.",
+};
+
 function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme") {
   const resolved = resolveReference(propertySchema);
   const choices = collectChoices(propertySchema);
   const example = exampleValue(propertySchema, propertyName);
-  const microsoftDescription = propertySchema.description ?? resolved.description;
-  const borrowed = microsoftDescription ? undefined : themeStudioDescription(pathParts);
-  const fallback = microsoftDescription ? undefined : guideDescription(propertyName, propertySchema, cardTitle);
+  const themeWording = THEME_WORDING[`${pathParts.at(-3)}.${propertyName}`];
+  const microsoftDescription = themeWording ? undefined : propertySchema.description ?? resolved.description;
+  const borrowed = microsoftDescription || themeWording ? undefined : themeStudioDescription(pathParts);
+  const fallback = microsoftDescription
+    ? undefined
+    : themeWording ?? guideDescription(propertyName, propertySchema, cardTitle);
   // Theme Studio's editor wording is preferred, except where it was itself
   // generated mechanically and reads worse than the guide's own sentence.
   const studioDescription = borrowed && !(isWeakStudioDescription(borrowed) && fallback) ? borrowed : undefined;
