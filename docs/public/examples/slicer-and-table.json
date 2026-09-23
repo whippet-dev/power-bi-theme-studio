@@ -42,7 +42,7 @@
             "fontSize": 10,
             "fontColor": { "solid": { "color": "#FFFFFF" } },
             "backColor": { "solid": { "color": "#005EA5" } },
-            "alignment": "left",
+            "alignment": "Left",
             "wordWrap": true
           }
         ],

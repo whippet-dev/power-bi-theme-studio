@@ -22,7 +22,8 @@ complicated at first, but it follows the same pattern throughout the file.
 <div class="path-breakdown">
 
 1. **`clusteredColumnChart`** — the kind of visual to format.
-2. **`*`** — apply the settings to every visual of that kind.
+2. **`*`** — apply the settings to every visual of that kind, using its normal
+   style.
 3. **`legend`** — the part of the visual to format.
 4. **`[ { ... } ]`** — the settings for that part.
 
@@ -56,16 +57,44 @@ Use `"*"` as the visual name when a setting should apply broadly:
 }
 ```
 
-This is useful for shared parts such as:
+This is useful for the parts every visual shares. The JSON name for each is
+shown in brackets:
 
-- Visual title
-- Subtitle
-- Background
-- Border
-- Shadow
-- Padding
-- Visual header
-- Tooltips
+- Visual title (`title`)
+- Subtitle (`subTitle`)
+- Background (`background`)
+- Border (`border`)
+- Shadow (`dropShadow`)
+- Padding (`padding`)
+- Visual header icons (`visualHeader`)
+- Tooltips (`visualTooltip`)
+
+::: warning A shared background also colours your pages
+Power BI uses a `background` placed under `"*"` → `"*"` for the report pages
+too, not just for the visuals on them. Choose a coloured background here and
+the page behind your visuals will change to match. This shows in Power BI as
+the page's **Canvas background** setting.
+
+If you want pages to keep their own look, give them a background of their own.
+Power BI uses this one for pages instead. This example keeps the page
+see-through, so the wallpaper behind it shows:
+
+```json
+"visualStyles": {
+  "page": {
+    "*": {
+      "background": [
+        {
+          "transparency": 100
+        }
+      ]
+    }
+  }
+}
+```
+
+In a full theme, `"page"` sits alongside `"*"` inside `visualStyles`.
+:::
 
 ## Add a visual-specific change
 
@@ -183,6 +212,6 @@ See [Visual names used in JSON](./reference/visual-names) for the longer list.
 1. Start with a theme that imports successfully.
 2. Add one formatting section.
 3. Import the theme and check the result.
-4. Commit or save a copy before adding the next section.
+4. Save a copy before adding the next section.
 
 This makes it much easier to identify the setting that caused a problem.

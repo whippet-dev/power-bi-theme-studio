@@ -59,9 +59,19 @@ behaviour, search box, date controls and slider.
 ]
 ```
 
-- `selectAllCheckboxEnabled` adds a **Select all** item.
-- `singleSelect` controls whether Ctrl or Command is needed for multiple selections.
-- `strictSingleSelect` limits the slicer to one selected item.
+The names in the file do not match the labels in Power BI's Format pane, so
+here is how they line up:
+
+| Format pane option | JSON name | What it does |
+| --- | --- | --- |
+| Show "Select all" option | `selectAllCheckboxEnabled` | Adds a **Select all** item to the list. |
+| Multi-select with CTRL | `singleSelect` | People hold Ctrl (or Command on a Mac) to pick more than one item. |
+| Single select | `strictSingleSelect` | Only one item can be picked at a time. If nothing is picked, Power BI picks the first item. |
+
+::: tip Easy to mix up
+Despite its name, `singleSelect` is the **Multi-select with CTRL** option. For a
+slicer that allows only one choice, use `strictSingleSelect`.
+:::
 
 ## Change the checkbox or radio-button colour
 
@@ -82,20 +92,21 @@ the slicer.
 
 ## A note about the clear-selection eraser
 
-The eraser in the standard slicer header does not have its own theme property.
-Its stroke follows the shared root colour `foregroundNeutralSecondary`:
+The eraser in the standard slicer header does not have a theme setting of its
+own. In current versions of Power BI Desktop it takes its colour from the
+shared root colour `foregroundNeutralSecondary`:
 
 ```json
 "foregroundNeutralSecondary": "#605E5C"
 ```
 
-Changing this root colour also changes several other secondary elements,
-including axis and legend labels, slicer item text and some outlines. Avoid
-changing it solely to fix one eraser icon without checking the rest of the
+Changing this root colour also changes many other secondary elements, such as
+chart axis labels, legend text, data labels, subtitles and some outlines. Avoid
+changing it just to recolour the eraser without checking the rest of the
 report.
 
-The general visual-header icons above a selected visual are different. Their
-colour is `visualHeader.foreground`.
+The visual-header icons that appear above a visual when you hover over it are
+different. You can colour those directly with `visualHeader[0].foreground`.
 
 ## Complete slicer example
 
