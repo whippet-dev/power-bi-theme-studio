@@ -1,0 +1,61 @@
+{
+  "name": "Chart formatting example",
+  "dataColors": ["#005EA5", "#28A197", "#F47738", "#912B88"],
+  "background": "#FFFFFF",
+  "foreground": "#252423",
+  "foregroundNeutralSecondary": "#505A5F",
+  "backgroundLight": "#F3F2F1",
+  "tableAccent": "#005EA5",
+  "visualStyles": {
+    "*": {
+      "*": {
+        "title": [
+          {
+            "show": true,
+            "fontFamily": "Segoe UI Semibold",
+            "fontSize": 14,
+            "fontColor": { "solid": { "color": "#252423" } },
+            "alignment": "left",
+            "titleWrap": true
+          }
+        ]
+      }
+    },
+    "clusteredColumnChart": {
+      "*": {
+        "legend": [
+          {
+            "show": true,
+            "position": "Top",
+            "showTitle": true,
+            "titleText": "Channel"
+          }
+        ],
+        "categoryAxis": [
+          {
+            "show": true,
+            "labelColor": { "solid": { "color": "#505A5F" } },
+            "showAxisTitle": true,
+            "titleText": "Region"
+          }
+        ],
+        "valueAxis": [
+          {
+            "show": true,
+            "labelColor": { "solid": { "color": "#505A5F" } },
+            "gridlineShow": true,
+            "gridlineColor": { "solid": { "color": "#D8DDE0" } }
+          }
+        ],
+        "labels": [
+          {
+            "show": true,
+            "labelPosition": "OutsideEnd",
+            "labelDisplayUnits": 1000,
+            "labelPrecision": 0
+          }
+        ]
+      }
+    }
+  }
+}

@@ -251,6 +251,14 @@ export function ThemeStudio() {
         </div>
 
         <div className="topbar__actions">
+          <a
+            className="button button--secondary topbar__guide-link"
+            href="/guide/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Theme JSON guide <span aria-hidden="true">↗</span>
+          </a>
           <input
             ref={fileInput}
             className="visually-hidden"

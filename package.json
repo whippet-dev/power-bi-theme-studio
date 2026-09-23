@@ -9,6 +9,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "start": "vite preview",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "build:pages": "npm run build && vitepress build docs --base /guide/ --outDir dist/guide",
     "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\" \"tests/**/*.test.tsx\" \"tests/**/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist"
   },
@@ -30,7 +34,8 @@
     "tsx": "^4.23.12",
     "typescript": "5.9.3",
     "typescript-eslint": "8.59.3",
-    "vite": "8.0.13"
+    "vite": "8.0.13",
+    "vitepress": "^1.6.4"
   },
   "type": "module"
 }

@@ -1,0 +1,15 @@
+{
+  "name": "Starter theme",
+  "dataColors": [
+    "#005EA5",
+    "#28A197",
+    "#F47738",
+    "#912B88",
+    "#FFDD00"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#252423",
+  "foregroundNeutralSecondary": "#505A5F",
+  "backgroundLight": "#F3F2F1",
+  "tableAccent": "#005EA5"
+}

@@ -62,6 +62,24 @@ npm run lint
 npm test
 ```
 
+## Theme JSON guide
+
+The repository includes a plain-English guide to creating Power BI JSON
+themes. Its Markdown source lives in [`docs/`](docs/index.md) and includes
+downloadable starter themes, common recipes and a visual-name reference.
+
+Run the guide locally:
+
+```powershell
+npm run docs:dev
+```
+
+Create the static documentation site:
+
+```powershell
+npm run docs:build
+```
+
 ## What it does
 
 - Import a `.json` Power BI theme in the browser, or start with a clean New
@@ -181,3 +199,13 @@ tests/                         # 206 tests; discovered by glob
 
 `npm run build` produces a static `dist/` folder, including `index.html`, that
 can be deployed directly to Cloudflare Pages.
+
+To publish Theme Studio and the theme JSON guide together, use:
+
+```powershell
+npm run build:pages
+```
+
+This keeps Theme Studio at `/` and adds the guide at `/guide/` inside the same
+`dist/` folder. In Cloudflare Pages, use `npm run build:pages` as the build
+command and keep `dist` as the output directory.
