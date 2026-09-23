@@ -10,6 +10,9 @@ hero:
       text: Create your first theme
       link: /start-here
     - theme: alt
+      text: Browse all settings
+      link: /reference/settings-catalogue
+    - theme: alt
       text: See common recipes
       link: /recipes/colours
     - theme: alt

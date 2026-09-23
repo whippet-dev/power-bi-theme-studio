@@ -29,6 +29,10 @@ test("the default build publishes the theme guide under /guide/", async () => {
 
   assert.match(html, /<title>Power BI theme JSON guide<\/title>/i);
   assert.match(html, /(?:href|src)="\/guide\//i);
+  assert.match(
+    html,
+    /href="\/guide\/reference\/settings-catalogue(?:\.html)?"[^>]*>Browse all settings<\/a>/i,
+  );
   assert.equal(example.name, "Starter theme");
   assert.match(settingsCatalogue, /Complete settings catalogue/i);
   assert.equal(schemaCatalogue.metadata.explorationVersion, "5.76");
