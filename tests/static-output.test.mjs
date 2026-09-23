@@ -10,3 +10,14 @@ test("build produces a static Theme Studio entry point", async () => {
   assert.match(html, /<script type="module"[^>]+src="\/assets\//i);
   assert.doesNotMatch(html, /vinext|next|react-server-dom/i);
 });
+
+test("the default build publishes the theme guide under /guide/", async () => {
+  const html = await readFile(new URL("../dist/guide/index.html", import.meta.url), "utf8");
+  const example = JSON.parse(
+    await readFile(new URL("../dist/guide/examples/minimal-theme.json", import.meta.url), "utf8"),
+  );
+
+  assert.match(html, /<title>Power BI theme JSON guide<\/title>/i);
+  assert.match(html, /(?:href|src)="\/guide\//i);
+  assert.equal(example.name, "Starter theme");
+});
