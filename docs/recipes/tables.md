@@ -23,11 +23,18 @@ values, totals and grid lines.
         "color": "#005EA5"
       }
     },
-    "alignment": "left",
+    "alignment": "Left",
     "wordWrap": true
   }
 ]
 ```
+
+::: tip Capital letters matter
+Table header alignment uses capitalised choices: `Auto`, `Left`, `Center` or
+`Right`. Visual titles use lower-case ones (`left`, `center`, `right`). Power BI
+checks the exact spelling, so copy the value from the example for the setting
+you are changing.
+:::
 
 ## Style the values
 
@@ -61,8 +68,10 @@ values, totals and grid lines.
 ]
 ```
 
-Primary and secondary colours are used for alternating rows when banded rows
-are enabled.
+Power BI alternates between the two sets of colours, row by row. The
+**primary** colours are used for the first, third and fifth rows, and the
+**secondary** colours for the rows in between. Give both the same background if
+you do not want a striped table.
 
 ## Put the table example together
 
@@ -76,7 +85,7 @@ are enabled.
           "fontSize": 10,
           "fontColor": { "solid": { "color": "#FFFFFF" } },
           "backColor": { "solid": { "color": "#005EA5" } },
-          "alignment": "left",
+          "alignment": "Left",
           "wordWrap": true
         }
       ],

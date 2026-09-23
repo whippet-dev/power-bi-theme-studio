@@ -40,11 +40,14 @@ test several kinds of visual after changing them.
 
 | Setting | Common use |
 | --- | --- |
-| `background` | Main light surfaces |
+| `background` | Main light surfaces, such as visual and filter-card backgrounds |
 | `foreground` | Main text and dark elements |
-| `foregroundNeutralSecondary` | Secondary labels, axes and outlines |
-| `backgroundLight` | Gridlines and lighter surfaces |
-| `tableAccent` | Table and selection accents |
+| `foregroundNeutralSecondary` | Secondary text, such as axis labels, legends, data labels and subtitles |
+| `backgroundLight` | Lighter surfaces, such as hover highlights and filter cards with a selection applied |
+| `tableAccent` | The accent colour for tables and matrices |
+
+These are typical uses rather than a complete list. Power BI does not publish
+exactly where each shared colour is used.
 
 ## Set basic text styles
 
@@ -68,9 +71,10 @@ test several kinds of visual after changing them.
 }
 ```
 
-Power BI visuals do not all use text classes in exactly the same way. Treat
-them as a broad foundation, then use `visualStyles` where an exact visual
-element matters.
+Power BI visuals do not all use text classes in the same way, and some text
+ignores them completely. On bar, column and line charts, for example, the axis
+labels and legend keep a fixed size whatever you set for `label`. Treat text classes as a broad
+foundation, then use `visualStyles` where an exact result matters.
 
 ## Use a consistent visual title
 

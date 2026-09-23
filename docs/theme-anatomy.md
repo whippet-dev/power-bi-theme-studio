@@ -12,14 +12,14 @@ Theme
 ├── dataColors              the chart colour palette
 ├── background              main light background colour
 ├── foreground              main dark text and element colour
-├── tableAccent             accent used by tables and other visuals
+├── tableAccent             accent colour for tables and matrices
 ├── other shared colours    secondary text, borders and highlights
 ├── textClasses             reusable text styles
 └── visualStyles            formatting for visuals
 ```
 
-Only `name` is needed for the smallest useful theme. Everything else is
-optional.
+Only `name` is required. Everything else is optional, and anything you leave
+out keeps Power BI's normal look.
 
 ## Theme name
 
@@ -93,9 +93,10 @@ of visual.
 }
 ```
 
-Text classes are broad suggestions used by many visuals. If you need a precise
-result for a particular element—such as chart axis labels—set that element in
-`visualStyles` instead.
+Text classes are broad suggestions used by many visuals, but not by all text.
+On bar, column and line charts, for example, the axis labels keep a fixed size
+whatever you set for `label`. If you need a precise result for a particular
+element, set that element in `visualStyles` instead.
 
 ## Visual formatting
 

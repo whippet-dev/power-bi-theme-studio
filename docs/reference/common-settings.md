@@ -27,6 +27,9 @@ visual, or under a specific visual name for an exception.
 | Border width | `border[0].width` | Number |
 | Rounded corners | `border[0].radius` | Number |
 
+A shared `background` is also used for the report pages, not just the visuals.
+See [A shared background also colours your pages](../visual-styles#apply-a-setting-to-every-visual).
+
 ## Chart settings
 
 These names are commonly used by bar, column and line charts. Check the visual

@@ -89,8 +89,10 @@ font and colour:
 }
 ```
 
-The two `"*"` entries mean **every visual** and **every instance of that
-visual**. The `title` section then describes how titles should look.
+The first `"*"` means **every type of visual**. The second `"*"` means **the
+normal style for that visual**, which is what every visual uses unless you
+choose otherwise. Together they mean "all visuals". The `title` section then
+describes how their titles should look.
 
 ## Five rules that prevent most errors
 

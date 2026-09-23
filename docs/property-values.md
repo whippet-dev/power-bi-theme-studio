@@ -49,8 +49,12 @@ Some settings accept one of a fixed set of words or numbers:
 "labelDisplayUnits": 1000
 ```
 
-The spelling and capital letters must match a value Power BI recognises. Use
-the examples in this guide or copy the value from a theme exported by Power BI.
+The spelling and capital letters must match a value Power BI recognises, and
+the rules are not the same everywhere. A visual title uses `"left"`, for
+example, but a table header uses `"Left"`. Copy the value from an example in
+this guide, or look the setting up in the
+[complete settings catalogue](/reference/settings-catalogue), which lists every
+accepted choice.
 
 ## Root colours
 
@@ -62,9 +66,12 @@ Colours at the top of a theme are plain hex colour values:
 "tableAccent": "#005EA5"
 ```
 
-Use six hexadecimal characters after `#`. Eight-character colours can also
-include transparency, but separate transparency settings are usually easier to
-understand.
+Use six characters after the `#`, as in the examples. Each character is a
+number from 0 to 9 or a letter from A to F. Most design tools and colour pickers
+can give you a colour in this form.
+
+To make something see-through, use its separate `transparency` setting rather
+than trying to build transparency into the colour code.
 
 ## Colours inside visual formatting
 

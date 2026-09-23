@@ -27,6 +27,7 @@ them to every visual, then add exceptions for particular visual types.
   }
 }
 ```
+
 Leave out `text` if each visual should keep its own title. Setting `text` in a
 shared rule would give every visual the same wording.
 
@@ -70,6 +71,13 @@ visual. Otherwise place it under a specific visual name.
 ```
 
 `0` transparency is solid. `100` is fully transparent.
+
+::: warning Check your pages too
+When this background is placed under `"*"` → `"*"`, Power BI uses it for the
+report pages as well as the visuals. See
+[A shared background also colours your pages](../visual-styles#apply-a-setting-to-every-visual)
+for how to keep pages separate.
+:::
 
 ## Add a subtle border
 
