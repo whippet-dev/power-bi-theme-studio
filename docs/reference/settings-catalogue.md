@@ -21,6 +21,14 @@ ordinary word such as “title”, “colour”, “axis” or “font”.
 
 <SchemaExplorer />
 
+Descriptions supplied by Microsoft are shown as written. Where Microsoft has
+not supplied one, the catalogue first reuses the wording already reviewed for
+the Theme Studio editor, marked **Theme Studio guidance**. For settings the
+editor does not yet model, it adds a conservative explanation marked
+**Plain-English guide** only when the meaning is clear from the setting name,
+card and value type. Ambiguous or data-dependent settings are left unexplained
+rather than guessed.
+
 ## How to read the results
 
 - **Card** is the section of Power BI's Format pane, such as `legend` or

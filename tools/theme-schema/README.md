@@ -12,6 +12,12 @@ Run `npm run docs:schema` after replacing the schema snapshot. The generator
 creates the smaller, guide-oriented catalogue in `docs/public/schema/`; do not
 edit that generated file by hand.
 
+The generator also reads the literal property definitions in `app/lib/*Properties.ts`
+and reuses their reviewed plain-English descriptions when Microsoft has not
+provided one. It parses those TypeScript files without executing application
+code. Remaining simple settings receive conservative generated explanations;
+ambiguous structured or data-bound values stay marked as unavailable.
+
 The schema tells us which JSON structures and values Power BI accepts. It does
 not guarantee that every setting is visible for every combination of fields,
 visual state and enabled features.

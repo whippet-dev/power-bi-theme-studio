@@ -7,6 +7,7 @@ type SchemaProperty = {
   id: string;
   title: string;
   description: string;
+  descriptionSource: "microsoft" | "theme-studio" | "guide" | "unavailable";
   path: string;
   type: string;
   choices?: Choice[];
@@ -290,7 +291,15 @@ async function copyExample(card: Card, property: SchemaProperty) {
             </div>
             <span class="schema-property__type">{{ property.type }}</span>
           </header>
-          <p>{{ property.description }}</p>
+          <p>
+            {{ property.description }}
+            <span v-if="property.descriptionSource === 'theme-studio'" class="schema-property__description-source">
+              Theme Studio guidance
+            </span>
+            <span v-if="property.descriptionSource === 'guide'" class="schema-property__description-source">
+              Plain-English guide
+            </span>
+          </p>
           <dl>
             <div>
               <dt>JSON path</dt>
