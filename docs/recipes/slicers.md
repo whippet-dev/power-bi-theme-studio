@@ -3,6 +3,15 @@
 Slicers have separate settings for the header, the list of items, selection
 behaviour, search box, date controls and slider.
 
+::: warning The slicer style cannot be set by a theme
+The setting that chooses a slicer's style (`data` → `mode`, for a vertical
+list, tiles, a dropdown, Between, Relative Date and so on) is accepted in a
+theme file without an error, but Power BI does not apply it: slicers keep their
+usual style. Choose the style on each slicer in the Format pane instead. The
+formatting on this page, such as fonts, colours and selection behaviour, does
+work from a theme.
+:::
+
 ## Format the slicer header
 
 ```json

@@ -641,7 +641,7 @@ const THEME_WORDING = {
   // starts with. The style is a sensible theme default; a starting selection
   // rarely is.
   "data.mode":
-    "The slicer's style: a list, tiles, a dropdown, a single value, or a range such as Between, Before, After or Relative Date. Every slicer that has not been given its own style uses this one.",
+    "The slicer's style: a list, tiles, a dropdown, a single value, or a range such as Between, Before, After or Relative Date. Note: Power BI accepts this setting in a theme but does not apply it, so slicers keep their usual style. Choose the style on each slicer in the Format pane instead.",
   "data.numericStart":
     "The lowest number already selected when a slicer shows a range of numbers. In a theme, every such slicer would start with the same range, so this is usually set on individual slicers instead.",
   "data.numericEnd":
