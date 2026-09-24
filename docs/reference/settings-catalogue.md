@@ -21,16 +21,26 @@ ordinary word such as “title”, “colour”, “axis” or “font”.
 
 <SchemaExplorer />
 
-Where Microsoft describes a setting, its wording is shown as written. Where it
-does not, the catalogue gives a short explanation of its own, but only when the
-meaning is clear. Settings whose purpose is not clear are left unexplained
-rather than guessed at.
+Each description says which part of the visual the setting changes, in the
+words that visual uses: the same axis setting reads "the X axis" on a column
+chart and "the Y axis" on a bar chart. Where Microsoft's own description is
+clear it is used; otherwise the catalogue gives a short explanation of its own,
+but only when the meaning is clear. Settings whose purpose is not clear are left
+unexplained rather than guessed at.
 
 ## How to read the results
 
 - Each result belongs to a **card**: a section of Power BI's Format pane, such
   as `legend` or `categoryAxis`. The setting's own name, such as `show` or
   `fontSize`, appears under its title.
+- Cards are listed roughly in Format pane order, with the axes next to each
+  other. Inside a card, the on/off switch comes first, then the card's own text
+  and colours, then each part of it (such as the title or the gridlines) with
+  its settings kept together.
+- **Usually set per visual** marks a setting that normally belongs to one
+  visual, such as its title wording, its position on the page, a fixed axis
+  range or the page a button opens. A theme can set it, but every visual of that
+  type would then get the same value, so it is usually better left out.
 - **Where it goes** shows the steps to follow through the file to reach the
   setting, for example `visualStyles › lineChart › * › legend › show`.
 - The `*` step means "the normal style". Type it exactly as shown; it is not a
@@ -38,8 +48,11 @@ rather than guessed at.
 - **Choice** means you pick from a list. Type the value exactly as shown, with
   the same capital letters. The name beside it is what you may recognise from
   the Format pane.
-- **Example JSON** shows the setting in place, with every bracket you need.
-  Copying the example is the easiest way to get it right.
+- **Example JSON** shows the setting in place, with every bracket you need,
+  and a value that suits the setting: a light grey for gridlines, a heading for
+  a title. Copying the example is the easiest way to get it right; change the
+  value to suit your theme. A few settings that only make sense inside one
+  report, such as internal IDs, have no example.
 
 Read [Values you can use](/property-values) for a gentler introduction to
 on/off values, numbers, text and colours.

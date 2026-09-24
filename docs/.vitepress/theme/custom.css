@@ -250,6 +250,26 @@
   min-width: 0;
 }
 
+.schema-property__badges {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 50%;
+}
+
+.schema-property__per-visual {
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--vp-c-warning-1);
+  background: var(--vp-c-warning-soft);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .schema-property__type {
   flex: none;
   padding: 3px 8px;

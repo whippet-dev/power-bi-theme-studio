@@ -2,6 +2,9 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { sortCards, sortProperties } from "../../docs/components/setting-order.mjs";
+import { exampleValue } from "./examples.mjs";
+import { CARD_PHRASES, CURATED, fillTemplate, partDescription } from "./wording.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const schemaFile = path.join(directory, "reportThemeSchema-2.157.json");
@@ -346,18 +349,17 @@ function dropEchoedCard(sentence, card, setting) {
   return shortened.includes(noun) ? shortened : sentence;
 }
 
-function guideDescription(propertyName, propertySchema, cardTitle) {
-  const sentence = draftDescription(propertyName, propertySchema, cardTitle);
+function guideDescription(propertyName, propertySchema, cardTitle, card = cardPhrase(cardTitle)) {
+  const sentence = draftDescription(propertyName, propertySchema, cardTitle, card);
   if (!sentence) return undefined;
   const resolved = resolveReference(propertySchema);
   const title = propertySchema.title ?? resolved.title ?? friendlyName(propertyName);
-  return dropEchoedCard(sentence, cardPhrase(cardTitle), words(title));
+  return dropEchoedCard(sentence, card, words(title));
 }
 
-function draftDescription(propertyName, propertySchema, cardTitle) {
+function draftDescription(propertyName, propertySchema, cardTitle, card = cardPhrase(cardTitle)) {
   const resolved = resolveReference(propertySchema);
   const title = propertySchema.title ?? resolved.title ?? friendlyName(propertyName);
-  const card = cardPhrase(cardTitle);
   const type = typeName(propertySchema);
   // Words the card already says ("secondary" on the Secondary Y axis card)
   // are dropped from the setting's own name so the sentence does not repeat
@@ -383,7 +385,7 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
   const fuller = own(words(propertyName).replace(/^(is|has) /, ""));
   // Titles written as Format pane prompts ("Enter a URL", "Show these
   // markers") are not names; the setting's own name is.
-  const prompt = /^(enter|show these|set as|choose|select) /.test(named);
+  const prompt = /^(enter|show these|set as|choose|select|upload|add) /.test(named);
   const setting = prompt || (!named.includes(" ") && fuller.includes(" ")) ? fuller : named;
 
   // Top-level theme colours with no description of their own.
@@ -458,7 +460,7 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     const target = own(words(propertyName.replace(/(Color|Colour)$/i, "")));
     return `Sets the ${target ? `${target} ` : ""}colour used by ${card}.`;
   }
-  if (/transparency$/i.test(propertyName)) {
+  if (!onOff && /transparency$/i.test(propertyName)) {
     const target = own(words(propertyName.replace(/transparency$/i, "")));
     const subject = target ? `the ${target}` : card;
     return `Controls how see-through ${subject} ${isPlural(subject) ? "are" : "is"}; lower values are more solid.`;
@@ -545,32 +547,6 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
   return undefined;
 }
 
-function exampleValue(node, propertyName) {
-  const resolved = resolveReference(node);
-  const choices = collectChoices(node);
-  if (choices.length) return choices[0].value;
-  if (resolved.$refName === "color" || resolved.$refName === "colorOrThemeColor") return "#005EA5";
-  if (resolved.$refName === "fill") return { solid: { color: "#005EA5" } };
-  if (resolved.$refName === "fontSize") return 12;
-  if (resolved.$refName === "themeDataColor") {
-    return { expr: { ThemeDataColor: { ColorId: 0, Percent: 0 } } };
-  }
-  if (resolved.$refName === "image") return { name: "Example image", url: "data:image/png;base64,…", scaling: "Normal" };
-  if (resolved.$refName === "icon" || resolved.$refName === "themeIcon") return undefined;
-  if (resolved.type === "boolean") return true;
-  if (resolved.type === "integer") return resolved.minimum ?? 1;
-  if (resolved.type === "number") {
-    if (/transparency/i.test(propertyName)) return 0;
-    return resolved.minimum ?? 1;
-  }
-  if (resolved.type === "string") {
-    if (/fontFamily/i.test(propertyName)) return "Segoe UI";
-    if (/color/i.test(propertyName)) return "#005EA5";
-    return "Example text";
-  }
-  return undefined;
-}
-
 /**
  * Editor descriptions that were produced from the setting's name rather than
  * written: "Whether the enabled is turned on.", "Sets the title's title text
@@ -611,7 +587,13 @@ function isWeakStudioDescription(text) {
     /^The custom text used for the /.test(text) ||
     // "Sets the text's series font size."
     /^Sets the text's /.test(text) ||
-    /\b(sec|param|max|min)\b/.test(text)
+    /\b(sec|param|max|min)\b/.test(text) ||
+    // "Sets the orientation.", "Whether the shade is shown.", "The colour of
+    // the line.": true, but they do not say which part of which visual. The
+    // guide's own sentence names the card.
+    /^Sets the [^.]{1,40}\.$/.test(text) ||
+    /^Whether the [\w' ]+ (is|are) shown\.$/.test(text) ||
+    /^The colour of the [\w ]+\.$/.test(text)
   );
 }
 
@@ -631,8 +613,6 @@ const THEME_WORDING = {
   "subTitle.text":
     "The default subtitle for this type of visual. Every visual of this type shows this wording unless it has its own subtitle, so only set it if the wording suits them all.",
   "subTitle.alignment": "Where the subtitle sits: left, centre or right.",
-  "subTitle.fontColor": "Font colour for the subtitle.",
-  "subTitle.fontSize": "Font size for the subtitle.",
   "header.text":
     "The default header text for slicers. Every slicer shows this wording instead of the name of its own field, so it is usually best left out.",
 
@@ -703,29 +683,119 @@ const STUDIO_REWRITES = {
     "Which sides of the border are shown, as a number from 0 (no sides) to 15 (all four). The numbers in between pick particular sides, so this is easiest to choose in Power BI's Format pane and copy from there.",
 };
 
-function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme") {
+/**
+ * Microsoft descriptions copied from another setting, or too thin to help:
+ * "Match the legend icon color ..." on a constant line's shading, "Select
+ * color for data labels." on the colour of the labels' title line.
+ */
+function isWeakMicrosoft(text, propertyName) {
+  if (/^Match the legend icon color/.test(text)) return propertyName !== "matchLineColor";
+  if (/^Select color for data labels\.?$/.test(text)) return propertyName !== "color";
+  // "Background color transparency." is also used for images and icons.
+  if (/^Background color transparency\.?$/.test(text)) return !/background/i.test(propertyName);
+  return /^(Border|Total toggle)\.?$/.test(text);
+}
+
+/**
+ * Settings that belong to one visual (or page) in a report rather than to
+ * every visual of a type: its position, its wording, the page or bookmark it
+ * points at, a fixed axis range, a field it is bound to. A theme can set them,
+ * but every visual of the type would then share the same value.
+ *
+ * Keyed by card, then setting; `true` covers the whole card.
+ */
+const PER_VISUAL = {
+  general: ["x", "y", "z", "width", "height", "altText", "formatString", "imageUrl", "visualType1", "visualType2"],
+  title: ["text"],
+  subTitle: ["text"],
+  header: ["text"],
+  visualLink: true,
+  visualTooltip: ["section", "type"],
+  visualHeaderTooltip: ["section", "text"],
+  data: ["numericStart", "numericEnd", "startDate", "endDate", "isInvertedSelectionMode"],
+  dateRange: ["anchorDate"],
+  pageInformation: true,
+  legend: ["titleText"],
+  categoryAxis: ["titleText", "start", "end"],
+  valueAxis: ["titleText", "start", "end", "secTitleText", "secStart", "secEnd"],
+  y2Axis: ["secTitleText", "secStart", "secEnd"],
+  zoom: ["categoryMin", "categoryMax", "valueMin", "valueMax", "valueSecMin", "valueSecMax"],
+  referenceLine: ["value", "displayName"],
+  xAxisReferenceLine: ["value", "displayName"],
+  y1AxisReferenceLine: ["value", "displayName"],
+  axis: ["min", "max", "target"],
+  mapControls: ["centerLatitude", "centerLongitude", "zoom", "zoomLevel", "heading", "pitch"],
+  image: ["altText", "sourceUrl", "sourceFile", "sourceField", "imageUrl", "url", "image", "imageFile", "imageData"],
+  cardImage: ["altText", "image", "imageUrl", "imageData"],
+  icon: ["altText", "iconUrl", "icon"],
+  shape: ["mapUrl"],
+  referenceLayer: ["referenceLayerUrl"],
+  tileLayer: ["tileLayerUrl", "northBounds", "southBounds", "eastBounds", "westBounds"],
+  text: ["text"],
+  bookmarks: ["bookmarkGroup", "selectedBookmark", "deselectionBookmark"],
+  keyDrivers: ["targetValue", "numericTargetSelectedKind"],
+  scorecard: ["scorecardId", "goalIds", "scorecardReference"],
+  reportInfo: true,
+  script: true,
+  parameterMapping: true,
+  hiddenProperties: true,
+  userPrompt: true,
+  columnWidth: true,
+  columnFormatting: true,
+  accessibility: ["altTextColumns", "rowWithReferenceText"],
+  labels: ["dynamicLabelTitle", "dynamicLabelValue", "dynamicLabelDetail"],
+  calloutValue: ["dynamicLabelValue"],
+  dataPoint: ["fillRule"],
+  referenceLabel: ["value"],
+  referenceLabelDetail: ["detailValue"],
+  values: ["expr"],
+  anomalyDetection: ["BatchStart", "BatchEnd", "CategoryValue", "ExpectedHigh", "ExpectedLow", "ExpectedValue", "Value"],
+  currentFrameIndex: true,
+  personalizeVisual: ["perspectiveRef"],
+};
+
+function perVisualNote(cardId, propertyName, visualId) {
+  const rule = PER_VISUAL[cardId];
+  if (!rule || (rule !== true && !rule.includes(propertyName))) return undefined;
+  if (visualId === "page") return "This is usually set on individual pages rather than in a theme.";
+  return "This is usually set on individual visuals rather than in a theme.";
+}
+
+function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme", cardId = pathParts.at(-3)) {
   const resolved = resolveReference(propertySchema);
   const choices = collectChoices(propertySchema);
-  const example = exampleValue(propertySchema, propertyName);
-  const themeWording = THEME_WORDING[`${pathParts.at(-3)}.${propertyName}`];
-  const microsoftDescription = themeWording ? undefined : propertySchema.description ?? resolved.description;
+  const visualId = pathParts[0] === "visualStyles" ? pathParts[1] : undefined;
+  const example = exampleValue(resolved, choices, { propertyName, cardId, visualId });
+  const perVisual = perVisualNote(cardId, propertyName, visualId);
+  const card = CARD_PHRASES[cardId]?.(visualId) ?? cardPhrase(cardTitle);
+  const curated = CURATED[`${cardId}.${propertyName}`];
+  const themeWording =
+    THEME_WORDING[`${pathParts.at(-3)}.${propertyName}`] ??
+    (curated ? fillTemplate(curated, card, visualId) : partDescription(propertyName, card, cardId, typeName(propertySchema)));
+  const rawMicrosoft = themeWording ? undefined : propertySchema.description ?? resolved.description;
+  const microsoftDescription = rawMicrosoft && !isWeakMicrosoft(rawMicrosoft, propertyName) ? rawMicrosoft : undefined;
   const original = microsoftDescription || themeWording ? undefined : themeStudioDescription(pathParts);
   const borrowed = original && (STUDIO_REWRITES[original] ?? original.replace(/\bdash cap\b/g, "shape of the dash ends"));
   const fallback = microsoftDescription
     ? undefined
-    : themeWording ?? guideDescription(propertyName, propertySchema, cardTitle);
+    : themeWording ?? guideDescription(propertyName, propertySchema, cardTitle, card);
   // Theme Studio's editor wording is preferred, except where it was itself
   // generated mechanically and reads worse than the guide's own sentence.
   // Wording flagged as mechanical is dropped even with nothing to replace it:
   // no explanation reads better than "Whether the show all is turned on."
   const studioDescription = borrowed && !isWeakStudioDescription(borrowed) ? borrowed : undefined;
   const generatedDescription = microsoftDescription || studioDescription ? undefined : fallback;
+  const description = tidySentence(
+    microsoftDescription ?? studioDescription ?? generatedDescription ?? "No plain-language explanation is available yet.",
+  );
   return {
     id: propertyName,
     title: propertySchema.title ?? resolved.title ?? friendlyName(propertyName),
-    description: tidySentence(
-      microsoftDescription ?? studioDescription ?? generatedDescription ?? "No plain-language explanation is available yet.",
-    ),
+    description:
+      perVisual && !/\bindividual (visuals|slicers|pages)\b|best left out/.test(description)
+        ? `${description} ${perVisual}`
+        : description,
+    ...(perVisual ? { perVisual: true } : {}),
     descriptionSource: microsoftDescription
       ? "microsoft"
       : studioDescription
@@ -750,16 +820,20 @@ function cardRecord(cardName, cardSchema, scopePath, source) {
     title,
     description: cardSchema.description,
     source,
-    properties: Object.entries(properties).map(([propertyName, propertySchema]) =>
-      propertyRecord(propertyName, propertySchema, [...scopePath, cardName, "0", propertyName], title),
+    properties: sortProperties(
+      Object.entries(properties).map(([propertyName, propertySchema]) =>
+        propertyRecord(propertyName, propertySchema, [...scopePath, cardName, "0", propertyName], title),
+      ),
     ),
   };
 }
 
 function cardsFromProperties(properties, scopePath, source) {
-  return Object.entries(properties ?? {})
-    .filter(([cardName, cardSchema]) => cardName !== "*" && cardSchema?.items?.properties)
-    .map(([cardName, cardSchema]) => cardRecord(cardName, cardSchema, scopePath, source));
+  return sortCards(
+    Object.entries(properties ?? {})
+      .filter(([cardName, cardSchema]) => cardName !== "*" && cardSchema?.items?.properties)
+      .map(([cardName, cardSchema]) => cardRecord(cardName, cardSchema, scopePath, source)),
+  );
 }
 
 function innerStyleProperties(scopeSchema) {
@@ -825,7 +899,7 @@ const topLevelCards = [
     title: "Theme basics",
     source: "global",
     properties: themeBasics.map((propertyName) =>
-      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "theme basics"),
+      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "theme basics", "themeBasics"),
     ),
   },
   {
@@ -833,7 +907,7 @@ const topLevelCards = [
     title: "Data palette and icons",
     source: "global",
     properties: paletteAndIcons.map((propertyName) =>
-      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "data palette and icons"),
+      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "data palette and icons", "paletteAndIcons"),
     ),
   },
   {
@@ -841,7 +915,7 @@ const topLevelCards = [
     title: "Theme colours",
     source: "global",
     properties: themeColours.map((propertyName) =>
-      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "theme colours"),
+      propertyRecord(propertyName, schema.properties[propertyName], [propertyName], "theme colours", "themeColours"),
     ),
   },
   ...Object.keys(schema.properties.textClasses.properties).map((className) => ({
@@ -850,7 +924,7 @@ const topLevelCards = [
     source: "global",
     properties: Object.entries(textClassDefinition.properties).map(([propertyName, propertySchema]) => {
       const title = `text class ${friendlyName(className).toLocaleLowerCase()}`;
-      return propertyRecord(propertyName, propertySchema, ["textClasses", className, propertyName], title);
+      return propertyRecord(propertyName, propertySchema, ["textClasses", className, propertyName], title, `textClasses.${className}`);
     }),
   })),
 ];

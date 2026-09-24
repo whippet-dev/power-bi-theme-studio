@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { withBase } from "vitepress";
+import { sortCards, sortProperties } from "./setting-order.mjs";
 
 type Choice = { value: unknown; label: string };
 type SchemaProperty = {
@@ -14,6 +15,7 @@ type SchemaProperty = {
   constraints?: string[];
   requiredFields?: string[];
   example?: unknown;
+  perVisual?: boolean;
 };
 type Card = {
   id: string;
@@ -100,10 +102,12 @@ const availableCards = computed<Card[]>(() => {
     merged.set(card.id, {
       ...existing,
       ...card,
-      properties: [...properties.values()],
+      properties: sortProperties([...properties.values()]),
     });
   }
-  return [...merged.values()];
+  // The shared cards and the visual's own cards arrive as two lists; put
+  // them back in Format pane order.
+  return sortCards([...merged.values()]);
 });
 
 const availableTypes = computed(() => {
@@ -307,7 +311,14 @@ async function copyExample(card: Card, property: SchemaProperty) {
               <h3>{{ property.title }}</h3>
               <code>{{ property.id }}</code>
             </div>
-            <span class="schema-property__type">{{ property.type }}</span>
+            <span class="schema-property__badges">
+              <span
+                v-if="property.perVisual"
+                class="schema-property__per-visual"
+                title="A theme can set this, but it is normally chosen for one visual at a time"
+              >Usually set per visual</span>
+              <span class="schema-property__type">{{ property.type }}</span>
+            </span>
           </header>
           <p>{{ property.description }}</p>
           <dl>
