@@ -68,6 +68,13 @@ shown in brackets:
 - Padding (`padding`)
 - Visual header icons (`visualHeader`)
 - Tooltips (`visualTooltip`)
+- Divider between the title and the visual (`divider`)
+- Spacing around the title and subtitle (`spacing`)
+
+To see every setting you can put here, choose **Every visual** in the
+[settings catalogue](/reference/settings-catalogue). A setting you give a
+particular visual type, such as `lineChart`, takes priority over the one under
+`"*"` for that type.
 
 ::: warning A shared background also colours your pages
 Power BI uses a `background` placed under `"*"` → `"*"` for the report pages

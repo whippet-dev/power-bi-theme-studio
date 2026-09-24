@@ -43,6 +43,7 @@ type Catalogue = {
 
 const catalogue = ref<Catalogue>();
 const loadingError = ref("");
+const EVERY_VISUAL = "every-visual";
 const selectedScope = ref("visual:clusteredColumnChart");
 const query = ref("");
 const valueType = ref("all");
@@ -77,6 +78,18 @@ const availableCards = computed<Card[]>(() => {
   if (!catalogue.value) return [];
   if (selectedScope.value === "top-level") {
     return catalogue.value.topLevelCards;
+  }
+  if (selectedScope.value === EVERY_VISUAL) {
+    // visualStyles › * › *: the cards every visual shares, set once for all.
+    return sortCards(
+      catalogue.value.commonCards.map((card) => ({
+        ...card,
+        properties: card.properties.map((property) => ({
+          ...property,
+          path: property.path.replace("<visual name>", "*"),
+        })),
+      })),
+    );
   }
   if (selectedGlobal.value) return selectedGlobal.value.cards;
   if (!selectedVisual.value) return [];
@@ -145,6 +158,7 @@ const resultCount = computed(() =>
 
 const scopeTitle = computed(() => {
   if (selectedScope.value === "top-level") return "Whole theme";
+  if (selectedScope.value === EVERY_VISUAL) return "Every visual";
   return selectedVisual.value?.title ?? selectedGlobal.value?.title ?? "Settings";
 });
 
@@ -163,7 +177,8 @@ function exampleJson(card: Card, property: SchemaProperty) {
     return JSON.stringify(nested, null, 2);
   }
 
-  const scope = selectedVisual.value?.id ?? selectedGlobal.value?.id;
+  const scope =
+    selectedScope.value === EVERY_VISUAL ? "*" : (selectedVisual.value?.id ?? selectedGlobal.value?.id);
   if (!scope) return "";
   return JSON.stringify({
     visualStyles: {
@@ -227,6 +242,7 @@ async function copyExample(card: Card, property: SchemaProperty) {
           <span>Where are you changing a setting?</span>
           <select v-model="selectedScope">
             <option value="top-level">Whole theme</option>
+            <option :value="EVERY_VISUAL">Every visual (settings they all share)</option>
             <optgroup label="Report and page">
               <option
                 v-for="scope in catalogue.globalScopes"
