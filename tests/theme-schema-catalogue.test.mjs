@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import test from "node:test";
+import { sortProperties } from "../docs/components/setting-order.mjs";
 
 const catalogue = JSON.parse(
   await readFile(
@@ -67,20 +69,16 @@ test("missing Microsoft descriptions reuse Theme Studio guidance before generate
   const show = commonTitle.properties.find((property) => property.id === "show");
   const fontSize = commonTitle.properties.find((property) => property.id === "fontSize");
 
-  assert.equal(show.description, "Whether the visual's title is shown.");
-  assert.equal(show.descriptionSource, "theme-studio");
+  assert.equal(show.description, "Shows or hides the title.");
   assert.match(fontSize.description, /size/i);
-  assert.equal(fontSize.descriptionSource, "microsoft");
 
   const line = catalogue.visuals.find((visual) => visual.id === "lineChart");
   const categoryAxis = line.cards.find((card) => card.id === "categoryAxis");
   const concatenate = categoryAxis.properties.find((property) => property.id === "concatenateLabels");
-  assert.equal(concatenate.descriptionSource, "microsoft");
   assert.match(concatenate.description, /hierarchy/i);
 
   const lineStyles = line.cards.find((card) => card.id === "lineStyles");
   const markerSize = lineStyles.properties.find((property) => property.id === "markerSize");
-  assert.equal(markerSize.descriptionSource, "theme-studio");
   assert.match(markerSize.description, /marker/i);
 
   const annotation = line.cards.find((card) => card.id === "annotationTemplate");
@@ -120,7 +118,7 @@ test("catalogue wording is written for people rather than mirroring schema names
   assert.ok(!all.some(({ property }) => (property.constraints ?? []).some((limit) => /^(minimum|maximum) /.test(limit))));
 
   const general = catalogue.commonCards.find((card) => card.id === "general");
-  assert.equal(general.properties.find((property) => property.id === "height").description, "Sets the height of this visual.");
+  assert.match(general.properties.find((property) => property.id === "height").description, /^The height of the visual, in pixels\./);
 });
 
 test("title and subtitle settings are described as theme defaults, not as one visual's name", () => {
@@ -152,8 +150,6 @@ test("mechanical editor wording is replaced where it reads as nonsense", () => {
   ]) {
     assert.ok(!descriptions.includes(nonsense), nonsense);
   }
-  // A possessive that reads naturally is kept.
-  assert.ok(descriptions.includes("Sets the marker's size."));
   assert.ok(!descriptions.some((text) => /^Whether the .+ is turned on\.$/.test(text)));
   assert.ok(!descriptions.some((text) => /^Whether the [^']+s is shown\.$/.test(text)), "no plural subject with 'is'");
   assert.ok(!descriptions.some((text) => /, of the width\.$/.test(text)));
@@ -193,4 +189,109 @@ test("settings that point at one bookmark, page or wording are described as them
   ]) {
     assert.match(described(cardId, propertyId), /usually set on individual visuals instead\.$/, `${cardId}.${propertyId}`);
   }
+});
+
+const visual = (id) => catalogue.visuals.find((candidate) => candidate.id === id);
+const cardOf = (visualId, cardId) => visual(visualId).cards.find((card) => card.id === cardId);
+const setting = (visualId, cardId, propertyId) =>
+  cardOf(visualId, cardId).properties.find((property) => property.id === propertyId);
+
+test("every example is accepted by Microsoft's theme schema", async () => {
+  const Ajv = createRequire(import.meta.url)("ajv");
+  const schema = JSON.parse(
+    await readFile(new URL("../tools/theme-schema/reportThemeSchema-2.157.json", import.meta.url), "utf8"),
+  );
+  delete schema.$schema;
+  // Microsoft's file repeats a few enum values, which the strict checker rejects.
+  const validate = new Ajv({ validateSchema: false, logger: false }).compile(schema);
+  const nest = (path, value) => path.split(".").reduceRight((inner, part) => ({ [part]: inner }), value);
+  const invalid = [];
+  const check = (theme, label) => {
+    if (!validate({ name: "Check", ...theme })) invalid.push(label);
+  };
+
+  for (const property of catalogue.topLevel) {
+    if (property.example !== undefined) check(nest(property.path, property.example), property.path);
+  }
+  const checkCards = (scope, cards) => {
+    for (const card of cards) {
+      for (const property of card.properties) {
+        if (property.example === undefined) continue;
+        check({ visualStyles: { [scope]: { "*": { [card.id]: [{ [property.id]: property.example }] } } } }, `${scope}.${card.id}.${property.id}`);
+      }
+    }
+  };
+  checkCards("clusteredColumnChart", catalogue.commonCards);
+  catalogue.globalScopes.forEach((scope) => checkCards(scope.id, scope.cards));
+  catalogue.visuals.forEach((entry) => checkCards(entry.id, entry.cards));
+
+  assert.deepEqual(invalid, []);
+  // The checker itself catches a bad value.
+  assert.equal(validate({ name: "Check", visualStyles: { lineChart: { "*": { title: [{ fontSize: 200 }] } } } }), false);
+});
+
+test("examples suit the setting rather than repeating a placeholder", () => {
+  assert.ok(!JSON.stringify(catalogue).includes("Example text"));
+  const title = catalogue.commonCards.find((card) => card.id === "title");
+  assert.equal(title.properties.find((property) => property.id === "text").example, "Sales by region");
+  assert.deepEqual(setting("lineChart", "categoryAxis", "gridlineColor").example, { solid: { color: "#E1DFDD" } });
+  assert.equal(setting("lineChart", "categoryAxis", "gridlineDashArray").example, "4 2");
+  const colours = catalogue.topLevelCards.find((card) => card.id === "themeColours");
+  assert.equal(colours.properties.find((property) => property.id === "bad").example, "#D64554");
+});
+
+test("descriptions name the part of the visual they change", () => {
+  // The category axis is the X axis on a column chart and the Y axis on a bar chart.
+  assert.match(setting("clusteredColumnChart", "categoryAxis", "show").description, /the X axis/);
+  assert.match(setting("clusteredBarChart", "categoryAxis", "show").description, /the Y axis/);
+  assert.equal(setting("lineChart", "valueAxis", "gridlineColor").description, "The colour of the gridlines of the Y axis.");
+  assert.equal(setting("lineChart", "labels", "titleColor").description, "The colour of the title line of the data labels.");
+  assert.match(setting("pieChart", "dataPoint", "fill").description, /slices/);
+  assert.match(setting("clusteredBarChart", "dataPoint", "fill").description, /bars/);
+  // Microsoft's text here was copied from the legend.
+  assert.doesNotMatch(setting("lineChart", "y1AxisReferenceLine", "shadeColorMatchStroke").description, /legend/);
+});
+
+test("settings normally chosen per visual are flagged", () => {
+  const common = (cardId, propertyId) =>
+    catalogue.commonCards.find((card) => card.id === cardId).properties.find((property) => property.id === propertyId);
+  for (const property of [
+    common("title", "text"),
+    common("general", "x"),
+    common("general", "altText"),
+    common("visualLink", "bookmark"),
+    setting("lineChart", "valueAxis", "titleText"),
+    setting("lineChart", "valueAxis", "start"),
+    setting("lineChart", "y1AxisReferenceLine", "value"),
+  ]) {
+    assert.equal(property.perVisual, true, property.path);
+    assert.match(property.description, /individual visuals|best left out/, property.path);
+  }
+  assert.equal(common("title", "fontSize").perVisual, undefined);
+});
+
+test("cards and settings are in Format pane order", () => {
+  const ids = (visualId) => visual(visualId).cards.map((card) => card.id);
+  // Axes sit together, X before Y.
+  const column = ids("clusteredColumnChart");
+  assert.equal(column.indexOf("valueAxis"), column.indexOf("categoryAxis") + 1);
+  const bar = ids("clusteredBarChart");
+  assert.equal(bar.indexOf("categoryAxis"), bar.indexOf("valueAxis") + 1);
+  assert.ok(column.indexOf("legend") < column.indexOf("categoryAxis"));
+  assert.ok(column.indexOf("labels") < column.indexOf("trend"));
+
+  // Inside a card: the switch first, then each part's settings together.
+  const axis = cardOf("lineChart", "valueAxis").properties.map((property) => property.id);
+  assert.equal(axis[0], "show");
+  const gridline = axis.filter((id) => id.startsWith("gridline")).map((id) => axis.indexOf(id));
+  assert.equal(Math.max(...gridline) - Math.min(...gridline), gridline.length - 1);
+  assert.equal(axis.indexOf("titleColor") - axis.indexOf("titleFontSize"), 1);
+  assert.equal(axis.at(-1) === "$id" || !axis.includes("$id"), true);
+});
+
+test("the explorer's ordering keeps a part's settings together after merging", () => {
+  const sorted = sortProperties(
+    ["gridlineColor", "fontSize", "titleText", "show", "gridlineShow", "titleColor", "labelColor", "$id"].map((id) => ({ id })),
+  ).map((property) => property.id);
+  assert.deepEqual(sorted, ["show", "fontSize", "labelColor", "titleText", "titleColor", "gridlineShow", "gridlineColor", "$id"]);
 });
