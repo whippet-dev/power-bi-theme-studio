@@ -232,19 +232,31 @@ function constraints(node) {
 }
 
 /** Abbreviations in schema names, spelled out for readers. */
-const EXPANSIONS = { sec: "secondary", url: "URL", pos: "position", bg: "background", img: "image" };
+const EXPANSIONS = {
+  sec: "secondary",
+  url: "URL",
+  pos: "position",
+  bg: "background",
+  img: "image",
+  back: "background",
+  max: "maximum",
+  min: "minimum",
+  param: "parameter",
+};
 
 /** Keeps short technical names readable once everything else is lower case. */
 function tidyWords(text) {
   return text
     .replace(/\b3 d\b/g, "3D")
+    .replace(/\b([xy])axis\b/g, "$1 axis")
     .replace(/\b([xy])\b/g, (letter) => letter.toUpperCase())
-    .replace(/\b(sec|url|pos|bg|img)\b/g, (word) => EXPANSIONS[word])
+    .replace(/\b(sec|url|pos|bg|img|back|max|min|param)\b/g, (word) => EXPANSIONS[word])
     .replace(/\bcolor(s?)\b/g, "colour$1")
     .replace(/\bkpi\b/g, "KPI")
     .replace(/\b3d\b/g, "3D")
     .replace(/\bbehavior\b/g, "behaviour")
     .replace(/\bcenter\b/g, "centre")
+    .replace(/\bdash cap\b/g, "shape of the dash ends")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -270,22 +282,55 @@ function cardPhrase(cardTitle) {
   if (lower === "general") return "this visual";
   if (lower === "visualization") return "the visual";
   if (lower === "find anomalies") return "anomaly detection";
+  if (lower === "slicer settings") return "the slicer";
+  if (lower === "card") return "each card";
+  // Cards named after a topic rather than a thing: "the data" and "the
+  // behavior" are not objects a setting can belong to, but their settings are.
+  if (SETTINGS_CARDS.has(lower)) return `the ${tidyWords(lower)} settings`;
   if (["theme", "theme basics", "theme colours", "data palette and icons"].includes(lower)) return "the theme";
   const textClass = /^text class:? (.+)$/i.exec(cardTitle);
   if (textClass) return `the ${tidyWords(textClass[1].toLocaleLowerCase())} text class`;
   return `the ${tidyWords(lower)}`;
 }
 
+const SETTINGS_CARDS = new Set([
+  "accessibility",
+  "analysis",
+  "behavior",
+  "data",
+  "export",
+  "filters",
+  "hidden properties",
+  "layout",
+  "overflow",
+  "padding",
+  "parameter mapping",
+  "report info",
+  "script",
+  "spacing",
+  "summary refresh",
+]);
+
+/** Setting names that start with a verb: "hide inner borders", "require single select". */
+const ACTION_WORDS =
+  /^(hide|show|use|allow|keep|match|require|include|scale|hug|display|lock|limit|preserve|reverse|invert|ignore|override|remember|snap|sort|stack|split|switch|concatenate|fit|wrap|repeat|expand|collapse|highlight|merge|drill)\b/;
+
+/** "the column headers", "the bubbles" -- but not "the gridlines' glass" or "the class". */
+function isPlural(phrase) {
+  const last = phrase.split(" ").at(-1);
+  return /[^s]s$/.test(last) && !/(ss|us|is)$/.test(last);
+}
+
 /** Setting names that say nothing on their own: "the type", "the style". */
 const VAGUE_SETTINGS = new Set([
-  "type", "style", "value", "mode", "kind", "option", "options", "data", "level", "index", "source", "target",
+  "type", "style", "value", "mode", "kind", "option", "options", "data", "level", "index", "source", "target", "field",
 ]);
 
 /**
  * Internal plumbing that a sentence built from its name would only garble.
  * These are left undescribed rather than guessed at.
  */
-const OPAQUE_WORDS = /\b(selector|null|expr|expression|template|guid|json|annotation)\b/;
+const OPAQUE_WORDS = /\b(selector|null|expr|expression|template|guid|json|annotation|utterance|ids?|node)\b/;
 
 /**
  * A setting that already names its card ("fill colour" on the Fill card)
@@ -295,7 +340,10 @@ function dropEchoedCard(sentence, card, setting) {
   const noun = card.replace(/^(the|this) /, "").replace(/ text class$/, "");
   if (!noun || !setting.includes(noun)) return sentence;
   const escaped = card.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return sentence.replace(new RegExp(` (?:used by|for|of|in|to|applies to) ${escaped}\\.$`), ".");
+  const shortened = sentence.replace(new RegExp(` (?:used by|for|of|in|to|applies to) ${escaped}\\.$`), ".");
+  // Only drop the card if the sentence still says what it belongs to:
+  // "Sets the fill colour." yes, bare "Sets the colour." no.
+  return shortened.includes(noun) ? shortened : sentence;
 }
 
 function guideDescription(propertyName, propertySchema, cardTitle) {
@@ -309,23 +357,52 @@ function guideDescription(propertyName, propertySchema, cardTitle) {
 function draftDescription(propertyName, propertySchema, cardTitle) {
   const resolved = resolveReference(propertySchema);
   const title = propertySchema.title ?? resolved.title ?? friendlyName(propertyName);
-  const setting = words(title).replace(/^(is|has) /, "");
   const card = cardPhrase(cardTitle);
   const type = typeName(propertySchema);
   // Words the card already says ("secondary" on the Secondary Y axis card)
   // are dropped from the setting's own name so the sentence does not repeat
   // itself: "the font family used in the secondary Y axis".
-  const cardWords = new Set(card.split(" "));
+  // Singular forms too, so "gridline" matches the Gridlines card.
+  const cardWords = new Set(card.split(" ").flatMap((word) => (/[^s]s$/.test(word) ? [word, word.slice(0, -1)] : [word])));
   const own = (text) => {
-    const kept = text.split(" ").filter((word) => word && !cardWords.has(word)).join(" ");
+    // Only words at the ends are trimmed: "lastDateFontColor" on the Date
+    // card keeps "last date font", where removing the middle "date" would
+    // leave "last font".
+    const parts = text.split(" ").filter(Boolean);
+    while (parts.length && cardWords.has(parts[0])) parts.shift();
+    const leading = [...parts];
+    while (parts.length && cardWords.has(parts.at(-1))) parts.pop();
+    // "showDynamicLabels" on Data labels: "dynamic" alone says nothing.
+    const kept = (parts.length === 1 && leading.length > 1 ? leading : parts).join(" ");
     // "secFontSize" on a Y axis card: "secondary" alone means the secondary axis.
     return kept === "secondary" ? "secondary axis" : kept;
   };
+  // A one-word display name ("Width") loses what the setting is the width
+  // of; the setting's own name ("borderWidth") keeps it.
+  const named = words(title).replace(/^(is|has) /, "");
+  const fuller = own(words(propertyName).replace(/^(is|has) /, ""));
+  // Titles written as Format pane prompts ("Enter a URL", "Show these
+  // markers") are not names; the setting's own name is.
+  const prompt = /^(enter|show these|set as|choose|select) /.test(named);
+  const setting = prompt || (!named.includes(" ") && fuller.includes(" ")) ? fuller : named;
 
-  if (OPAQUE_WORDS.test(words(propertyName)) || OPAQUE_WORDS.test(setting)) return undefined;
+  // Top-level theme colours with no description of their own.
+  const themeRoot = {
+    foreground:
+      'The main text colour. Power BI uses it for labels, table and matrix values, card values and many other pieces of text. Same as "firstLevelElements".',
+    background:
+      "The main background colour, used for things such as label backgrounds inside data points, slicer drop-down lists, button fills and the filter pane.",
+    tableAccent: "The accent colour for tables and matrices, used for the grid outline.",
+    icons: "Custom icons, each with a name and an image, that conditional formatting in the report can use.",
+  };
+  if (card === "the theme" && themeRoot[propertyName]) return themeRoot[propertyName];
 
   const exact = {
     "$id": "Identifies the state or item that this formatting entry applies to.",
+    interpolationSmoothParam: "Sets how tightly a smoothed line bends between points (its tension).",
+    maxTiles: "Sets the largest number of cards shown at once.",
+    setAsBackGround: "Controls whether the image is used as the background.",
+    useFloatingToolbar: "Controls whether the toolbar floats over the report.",
     $schema: "Points to the file that describes the theme format. Most themes can leave this out.",
     baseTheme: "Names the built-in Power BI theme that this custom theme builds on.",
     dataColors: "Sets the ordered colour palette used for data series and categories.",
@@ -336,6 +413,10 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     name: "Sets the name Power BI displays for the imported theme.",
   };
   if (exact[propertyName]) return exact[propertyName];
+
+  if (OPAQUE_WORDS.test(words(propertyName)) || OPAQUE_WORDS.test(setting)) return undefined;
+  // "visualType1", "visualType2": numbered internals with no readable meaning.
+  if (/\d$/.test(setting)) return undefined;
 
   if (propertyName === "show") return `Shows or hides ${card}.`;
   if (propertyName === "enabled" || propertyName === "enable") {
@@ -359,15 +440,30 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     const target = own(words(propertyName.replace(/(fontSize|textSize)$/i, "")));
     return `Sets the text size${target ? ` for the ${target}` : ""} in ${card}.`;
   }
-  if (/(Color|Colour)$/i.test(propertyName) || ["color", "fill"].includes(propertyName)) {
+  const onOff = type === "True / false";
+  // "detailShowBlankAs": text, despite its name.
+  if (/showBlankAs$/i.test(propertyName)) {
+    const target = own(words(propertyName.replace(/showBlankAs$/i, "")));
+    return `The text shown instead of a blank value${target ? ` in the ${target}` : ""} in ${card}, such as "(Blank)" or "–".`;
+  }
+  if (/.FormatString$/.test(propertyName)) {
+    const target = own(words(propertyName.replace(/FormatString$/, "")));
+    return `The number format for the ${target || "value"} in ${card}, such as "#,0" for whole numbers or "0.0%" for percentages.`;
+  }
+  if (onOff && /^export[A-Z]/.test(propertyName)) {
+    // The schema's own title keeps the product names intact: "Microsoft Excel (.xlsx)".
+    return `Lets people export to ${title}.`;
+  }
+  if (!onOff && (/(Color|Colour)$/i.test(propertyName) || ["color", "fill"].includes(propertyName))) {
     const target = own(words(propertyName.replace(/(Color|Colour)$/i, "")));
     return `Sets the ${target ? `${target} ` : ""}colour used by ${card}.`;
   }
   if (/transparency$/i.test(propertyName)) {
     const target = own(words(propertyName.replace(/transparency$/i, "")));
-    return `Controls how see-through ${target ? `the ${target}` : `${card}`} is; lower values are more solid.`;
+    const subject = target ? `the ${target}` : card;
+    return `Controls how see-through ${subject} ${isPlural(subject) ? "are" : "is"}; lower values are more solid.`;
   }
-  if (/^(show|enable)[A-Z]/.test(propertyName) || /Show$/.test(propertyName)) {
+  if (onOff && (/^(show|enable)[A-Z]/.test(propertyName) || /Show$/.test(propertyName))) {
     const target = words(
       propertyName
         .replace(/^(show|enable)/, "")
@@ -379,18 +475,31 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     if (where) return `Shows or hides ${card} on the ${where[1]}.`;
     // "showByDefault", "showIconByState": when it shows, not what shows.
     if (/^by /.test(own(target))) return `Shows or hides ${card} ${own(target)}.`;
-    return `Shows or hides the ${own(target) || setting} in ${card}.`;
+    // "backgroundShow" on the Background card names nothing but the card.
+    if (!own(target)) return `Shows or hides ${card}.`;
+    // "showAll": all of what is not clear from the name.
+    if (own(target) === "all") return undefined;
+    return `Shows or hides the ${own(target)} in ${card}.`;
+  }
+  // "isCalloutValuesAdvanced": whether that part gets its own advanced formatting.
+  const advanced = /^is(.+)Advanced$/i.exec(propertyName);
+  if (advanced && type === "True / false") {
+    const part = own(words(advanced[1]));
+    return `Turns advanced formatting on or off for the ${part || "settings"} in ${card}.`;
   }
   if (/^(is|has)[A-Z]/.test(propertyName) && type === "True / false") {
+    // "isAnomalyHighlighted": whether the anomaly is highlighted.
+    const state = /^(.+) (highlighted|enabled|visible|shown|selected|expanded|hidden)$/.exec(setting);
+    if (state) return `Controls whether the ${state[1]} is ${state[2]}.`;
     return `Controls whether ${setting} applies to ${card}.`;
   }
-  if (/(alignment|position|placement|location)$/i.test(propertyName)) {
+  if (!onOff && /(alignment|position|placement|location)$/i.test(propertyName)) {
     return `Controls the ${setting} of ${card}.`;
   }
-  if (/(padding|spacing|margin|distance|offset|radius|angle|rotation)$/i.test(propertyName)) {
+  if (!onOff && /(padding|spacing|margin|distance|offset|radius|angle|rotation)$/i.test(propertyName)) {
     return `Sets the ${setting} used by ${card}.`;
   }
-  if (/(width|height|size|thickness|length)$/i.test(propertyName)) {
+  if (!onOff && /(width|height|size|thickness|length)$/i.test(propertyName)) {
     return `Sets the ${setting} of ${card}.`;
   }
   if (/[a-z]Count$/.test(propertyName)) {
@@ -411,11 +520,26 @@ function draftDescription(propertyName, propertySchema, cardTitle) {
     return type === "Choice" ? `Chooses the ${setting} of ${card}. The accepted values are listed below.` : undefined;
   }
   if (type === "Choice") return `Chooses the ${setting} used by ${card}.`;
-  if (type === "True / false") return `Turns ${setting} on or off for ${card}.`;
+  if (type === "True / false") {
+    // A setting named as an action ("hide inner borders") does not fit
+    // "Turns ... on or off"; say what switching it on does instead.
+    const appliesTo = /^apply to (.+)$/.exec(setting);
+    if (appliesTo) {
+      return /formatting/.test(card)
+        ? `Controls whether this formatting also applies to the ${appliesTo[1]}.`
+        : `Controls whether the formatting of ${card} also applies to the ${appliesTo[1]}.`;
+    }
+    if (ACTION_WORDS.test(setting)) return `Controls whether to ${setting} in ${card}.`;
+    // "addBackground": "Turns the background on or off", not "Turns add background".
+    const added = /^add (.+)$/.exec(setting);
+    if (added) return `Turns the ${added[1]} on or off for ${card}.`;
+    // "selfFilterEnabled": "enabled" is what "on" already means.
+    return `Turns ${setting.replace(/ enabled$/, "")} on or off for ${card}.`;
+  }
   if (type === "Text" || type === "Number" || type === "Whole number" || type === "Number (8–60)") {
     return `Sets the ${setting} used by ${card}.`;
   }
-  if (type.startsWith("Fill") || type.startsWith("Colour")) {
+  if (type.startsWith("Fill") || type.startsWith("Colour") || type === "Image") {
     return `Sets the ${setting} used by ${card}.`;
   }
   return undefined;
@@ -452,6 +576,15 @@ function exampleValue(node, propertyName) {
  * written: "Whether the enabled is turned on.", "Sets the title's title text
  * size." They are accurate but read as machine text.
  */
+/**
+ * Collapses stray spaces and line breaks -- Microsoft's text carries some --
+ * and ends every description with a full stop, without changing its words.
+ */
+function tidySentence(text) {
+  const tidy = text.replace(/\s+/g, " ").trim();
+  return /[.!?)"”]$/.test(tidy) ? tidy : `${tidy}.`;
+}
+
 function isRepetitivePossessive(text) {
   const match = /^Sets the ([^.']+)'s ([^.']+)\.$/.exec(text);
   if (!match) return false;
@@ -471,8 +604,14 @@ function isWeakStudioDescription(text) {
     // the same words ("Sets the corner bottom left's bottom left corner.") or
     // the setting is plural ("Sets the data labels's text size.").
     isRepetitivePossessive(text) ||
-    /, of the width\.$/.test(text) ||
-    /\bsec\b/.test(text)
+    /, of the [^.]*\bwidth\.$/.test(text) ||
+    // "Whether the column headers's text is bold."
+    /[a-z]s's\b/.test(text) ||
+    // "The custom text used for the title show blank as."
+    /^The custom text used for the /.test(text) ||
+    // "Sets the text's series font size."
+    /^Sets the text's /.test(text) ||
+    /\b(sec|param|max|min)\b/.test(text)
   );
 }
 
@@ -517,6 +656,51 @@ const THEME_WORDING = {
     "The report page shown by the tooltip icon in the visual header. In a theme, every visual of this type would use the same page, so this is usually set on individual visuals instead.",
   "visualHeaderTooltip.text":
     "The wording shown by the tooltip icon in the visual header when no tooltip page is chosen. In a theme, every visual of this type would show the same wording, so this is usually set on individual visuals instead.",
+
+  // The slicer's Data card: its style, then the selection a range slicer
+  // starts with. The style is a sensible theme default; a starting selection
+  // rarely is.
+  "data.mode":
+    "The slicer's style: a list, tiles, a dropdown, a single value, or a range such as Between, Before, After or Relative Date. Every slicer that has not been given its own style uses this one.",
+  "data.numericStart":
+    "The lowest number already selected when a slicer shows a range of numbers. In a theme, every such slicer would start with the same range, so this is usually set on individual slicers instead.",
+  "data.numericEnd":
+    "The highest number already selected when a slicer shows a range of numbers. In a theme, every such slicer would start with the same range, so this is usually set on individual slicers instead.",
+  "data.startDate":
+    "The first date already selected when a slicer shows a range of dates. In a theme, every such slicer would start with the same dates, so this is usually set on individual slicers instead.",
+  "data.endDate":
+    "The last date already selected when a slicer shows a range of dates. In a theme, every such slicer would start with the same dates, so this is usually set on individual slicers instead.",
+  "data.relativeRange":
+    "Whether a Relative Date slicer looks back (Last), ahead (Next) or at the current period (This).",
+  "data.relativeDuration":
+    "How many periods a Relative Date slicer covers, such as the 3 in \"last 3 months\".",
+  "data.relativePeriod":
+    "The unit a Relative Date slicer counts in, such as days, weeks, months or years.",
+  "data.relativeTimePeriod":
+    "The unit a Relative Time slicer counts in: minutes or hours.",
+  "data.isInvertedSelectionMode":
+    "Whether everything starts selected, so choosing an item leaves it out rather than adding it. Power BI turns this on when someone uses Select all.",
+
+  "pageInformation.pageInformationName":
+    "The page's name, shown on its tab. In a theme, every page would get the same name, so this is usually set on individual pages instead.",
+  "pageInformation.pageInformationAltName":
+    "Other names for the page, separated by commas, that Q&A recognises when people ask questions. These are usually set on individual pages rather than in a theme.",
+
+  "dataPoint.showAllDataPoints":
+    "Lists every data point in the Format pane's Data colors card, so each one can be given its own colour.",
+  "sparklines.markers":
+    "Which points on each sparkline get a marker, such as the highest, lowest, first or last, stored as a single number. This is easiest to pick in Power BI's Format pane and copy from there.",
+  // The editor's text here was copied from the category label card.
+  "wordWrap.show": "Controls whether long text wraps onto more lines instead of being cut off.",
+};
+
+/**
+ * Editor descriptions rewritten word for word, where the original is correct
+ * but written for a developer.
+ */
+const STUDIO_REWRITES = {
+  "Which sides of the border are visible, encoded as a bitmask (0 = none, 15 = all sides).":
+    "Which sides of the border are shown, as a number from 0 (no sides) to 15 (all four). The numbers in between pick particular sides, so this is easiest to choose in Power BI's Format pane and copy from there.",
 };
 
 function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "theme") {
@@ -525,18 +709,23 @@ function propertyRecord(propertyName, propertySchema, pathParts, cardTitle = "th
   const example = exampleValue(propertySchema, propertyName);
   const themeWording = THEME_WORDING[`${pathParts.at(-3)}.${propertyName}`];
   const microsoftDescription = themeWording ? undefined : propertySchema.description ?? resolved.description;
-  const borrowed = microsoftDescription || themeWording ? undefined : themeStudioDescription(pathParts);
+  const original = microsoftDescription || themeWording ? undefined : themeStudioDescription(pathParts);
+  const borrowed = original && (STUDIO_REWRITES[original] ?? original.replace(/\bdash cap\b/g, "shape of the dash ends"));
   const fallback = microsoftDescription
     ? undefined
     : themeWording ?? guideDescription(propertyName, propertySchema, cardTitle);
   // Theme Studio's editor wording is preferred, except where it was itself
   // generated mechanically and reads worse than the guide's own sentence.
-  const studioDescription = borrowed && !(isWeakStudioDescription(borrowed) && fallback) ? borrowed : undefined;
+  // Wording flagged as mechanical is dropped even with nothing to replace it:
+  // no explanation reads better than "Whether the show all is turned on."
+  const studioDescription = borrowed && !isWeakStudioDescription(borrowed) ? borrowed : undefined;
   const generatedDescription = microsoftDescription || studioDescription ? undefined : fallback;
   return {
     id: propertyName,
     title: propertySchema.title ?? resolved.title ?? friendlyName(propertyName),
-    description: microsoftDescription ?? studioDescription ?? generatedDescription ?? "No plain-language explanation is available yet.",
+    description: tidySentence(
+      microsoftDescription ?? studioDescription ?? generatedDescription ?? "No plain-language explanation is available yet.",
+    ),
     descriptionSource: microsoftDescription
       ? "microsoft"
       : studioDescription

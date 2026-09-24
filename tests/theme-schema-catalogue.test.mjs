@@ -158,6 +158,24 @@ test("mechanical editor wording is replaced where it reads as nonsense", () => {
   assert.ok(!descriptions.some((text) => /^Whether the [^']+s is shown\.$/.test(text)), "no plural subject with 'is'");
   assert.ok(!descriptions.some((text) => /, of the width\.$/.test(text)));
   assert.ok(!descriptions.some((text) => /\bthe by (default|state)\b/.test(text)));
+  // Shortened names and Format pane prompts are not read out as names.
+  assert.ok(!descriptions.some((text) => /\b(max|min|param|xaxis|yaxis)\b/.test(text)));
+  assert.ok(!descriptions.some((text) => /\b(enter a URL|show these markers|add background)\b/i.test(text)));
+});
+
+test("theme colours and entry identifiers are described", () => {
+  const colours = catalogue.topLevelCards.find((card) => card.title === "Theme colours");
+  for (const id of ["background", "foreground", "tableAccent"]) {
+    const description = colours.properties.find((property) => property.id === id).description;
+    assert.match(description, /colour/, id);
+    assert.doesNotMatch(description, /used by the theme/, id);
+  }
+
+  const ids = catalogue.visuals.flatMap((visual) =>
+    visual.cards.flatMap((card) => card.properties.filter((property) => property.id === "$id")),
+  );
+  assert.ok(ids.length);
+  assert.ok(ids.every((property) => property.descriptionSource !== "unavailable"));
 });
 
 test("settings that point at one bookmark, page or wording are described as theme defaults", () => {
