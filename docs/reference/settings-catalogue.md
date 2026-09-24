@@ -14,6 +14,11 @@ Use this catalogue when you know **what you want to change** but not what Power
 BI calls it in a theme file. Choose a visual or report area, then search using an
 ordinary word such as “title”, “colour”, “axis” or “font”.
 
+To set something once for **all** your visuals, such as the title font, the
+border or the divider, choose **Every visual**. These settings go under
+`visualStyles › * › *`. A setting you give a particular visual type takes
+priority over them for that type.
+
 <div class="plain-language">
   <strong>What this catalogue tells you</strong>
   <p>It shows the setting's name, where it goes in the file, the kind of value Power BI accepts, any choices or limits, and an example you can copy.</p>
