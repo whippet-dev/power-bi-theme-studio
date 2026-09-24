@@ -252,6 +252,10 @@ test("descriptions name the part of the visual they change", () => {
   assert.doesNotMatch(setting("lineChart", "y1AxisReferenceLine", "shadeColorMatchStroke").description, /legend/);
 });
 
+test("the slicer style warns that a theme does not apply it", () => {
+  assert.match(setting("slicer", "data", "mode").description, /does not apply it/);
+});
+
 test("settings normally chosen per visual are flagged", () => {
   const common = (cardId, propertyId) =>
     catalogue.commonCards.find((card) => card.id === cardId).properties.find((property) => property.id === propertyId);
